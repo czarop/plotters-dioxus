@@ -60,7 +60,10 @@ where
 }
 
 
-pub fn Plotters<'a, F: Fn(DioxusDrawingArea)>(cx: Scope<'a, PlottersProps<'a, F>>) -> Element<'a> {
+pub fn Plotters<'a, F: Fn(DioxusDrawingArea)>(cx: ScopeState<'a, PlottersProps<'a, F>>) -> Element
+    where
+    F: for<'b> Fn(DrawingArea<BitMapBackend<'b>, Shift>),
+    {
     let buffer_size = ((cx.props.size.1 * cx.props.size.0) as usize) * 3usize;
     let mut buffer = vec![0u8; buffer_size];
     let drawing_area = BitMapBackend::with_buffer(buffer.as_mut_slice(), cx.props.size)
@@ -78,7 +81,7 @@ pub fn Plotters<'a, F: Fn(DioxusDrawingArea)>(cx: Scope<'a, PlottersProps<'a, F>
 
     let buffer_base64 = BASE64_STANDARD.encode(data);
 
-    render!(rsx! {
+    rsx! {
         img {
             src: "data:image/png;base64,{buffer_base64}",
             draggable: "{cx.props.draggable}",
@@ -99,7 +102,7 @@ pub fn Plotters<'a, F: Fn(DioxusDrawingArea)>(cx: Scope<'a, PlottersProps<'a, F>
             ondrop: move |evt| { cx.props.on_drop.as_ref().map(|cb| cb.call(evt)) },
             onscroll: move |evt| { cx.props.on_scroll.as_ref().map(|cb| cb.call(evt)) },
         }
-    })
+    }
 
 }
 
