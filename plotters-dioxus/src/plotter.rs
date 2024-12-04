@@ -17,7 +17,10 @@ use std::io::Cursor;
 pub type DioxusDrawingArea<'a> = DrawingArea<BitMapBackend<'a>, Shift>;
 
 #[derive(Props)]
-pub struct PlottersProps<'a, F: Fn(DioxusDrawingArea)> {
+pub struct PlottersProps<'a, F>
+where
+    F: for<'b> Fn(DrawingArea<BitMapBackend<'b>, Shift>),
+{
     pub size: (u32, u32),
     pub init: F,
     #[props(optional)]
