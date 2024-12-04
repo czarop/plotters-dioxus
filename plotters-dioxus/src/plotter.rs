@@ -60,7 +60,7 @@ where
 }
 
 
-pub fn Plotters<'a, F: Fn(DioxusDrawingArea)>(cx: ScopeState<'a, PlottersProps<'a, F>>) -> Element
+pub fn Plotters(cx: ScopeState) -> Element
     where
     F: for<'b> Fn(DrawingArea<BitMapBackend<'b>, Shift>),
     {
