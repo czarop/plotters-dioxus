@@ -24,40 +24,41 @@ where
     pub size: (u32, u32),
     pub init: F,
     #[props(optional)]
-    pub on_click: Option<EventHandler<'a, MouseData>>,
+    pub on_click: Option<EventHandler<MouseData>>,
     #[props(optional)]
-    pub on_dblclick: Option<EventHandler<'a, MouseData>>,
+    pub on_dblclick: Option<EventHandler<MouseData>>,
     #[props(optional)]
-    pub on_mousemove: Option<EventHandler<'a, MouseData>>,
+    pub on_mousemove: Option<EventHandler<MouseData>>,
     #[props(optional)]
-    pub on_mouseout: Option<EventHandler<'a, MouseData>>,
+    pub on_mouseout: Option<EventHandler<MouseData>>,
     #[props(optional)]
-    pub on_mouseup: Option<EventHandler<'a, MouseData>>,
+    pub on_mouseup: Option<EventHandler<MouseData>>,
     #[props(optional)]
-    pub on_mousedown: Option<EventHandler<'a, MouseData>>,
+    pub on_mousedown: Option<EventHandler<MouseData>>,
     #[props(optional)]
-    pub on_mouseover: Option<EventHandler<'a, MouseData>>,
+    pub on_mouseover: Option<EventHandler<MouseData>>,
     #[props(optional)]
-    pub on_wheel: Option<EventHandler<'a, WheelData>>,
+    pub on_wheel: Option<EventHandler<WheelData>>,
     #[props(default = false)]
     pub draggable: bool,
     #[props(optional)]
-    pub on_drag: Option<EventHandler<'a, DragData>>,
+    pub on_drag: Option<EventHandler<DragData>>,
     #[props(optional)]
-    pub on_dragend: Option<EventHandler<'a, DragData>>,
+    pub on_dragend: Option<EventHandler<DragData>>,
     #[props(optional)]
-    pub on_dragenter: Option<EventHandler<'a, DragData>>,
+    pub on_dragenter: Option<EventHandler<DragData>>,
     #[props(optional)]
-    pub on_dragleave: Option<EventHandler<'a, DragData>>,
+    pub on_dragleave: Option<EventHandler<DragData>>,
     #[props(optional)]
-    pub on_dragover: Option<EventHandler<'a, DragData>>,
+    pub on_dragover: Option<EventHandler<DragData>>,
     #[props(optional)]
-    pub on_dragstart: Option<EventHandler<'a, DragData>>,
+    pub on_dragstart: Option<EventHandler<DragData>>,
     #[props(optional)]
-    pub on_drop: Option<EventHandler<'a, DragData>>,
+    pub on_drop: Option<EventHandler<DragData>>,
     #[props(optional)]
-    pub on_scroll: Option<EventHandler<'a, ScrollData>>,
+    pub on_scroll: Option<EventHandler<ScrollData>>,
 }
+
 
 pub fn Plotters<'a, F: Fn(DioxusDrawingArea)>(cx: Scope<'a, PlottersProps<'a, F>>) -> Element<'a> {
     let buffer_size = ((cx.props.size.1 * cx.props.size.0) as usize) * 3usize;
