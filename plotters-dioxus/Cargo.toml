@@ -12,8 +12,8 @@ authors = ["Dorian Pinaud dorian.pinaud@gmail.com"]
 categories = ["visualization", "gui"]
 
 [dependencies]
-dioxus = "0.4.3"
-dioxus-desktop = "0.4.3"
+dioxus = "0.5.6"
+dioxus-desktop = "0.5.6"
 plotters = "0.3.5"
 base64 = "0.21.7"
 plotters-bitmap = "0.3.3"
