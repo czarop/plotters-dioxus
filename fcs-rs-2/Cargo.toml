@@ -1,0 +1,10 @@
+[package]
+name = "fcs-rs-2"
+version = "0.1.0"
+edition = "2024"
+resolver = "1"
+
+[dependencies]
+byteorder = "1.5.0"
+thiserror = "2.0.12"
+polars = { version = "0.48.1", features = ["lazy"] }

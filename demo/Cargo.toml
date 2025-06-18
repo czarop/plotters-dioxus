@@ -1,16 +1,20 @@
 [package]
 name = "demo"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 resolver = "1"
 
 [dependencies.plotters-dioxus]
 path = "../plotters-dioxus"
 
+[dependencies.fcs-rs-2]
+path = "../fcs-rs-2"
+
 [dependencies]
-dioxus = "0.4.3"
-dioxus-desktop = "0.4.3"
+dioxus = "0.7.0-alpha.1"
+polars = { version = "0.48", features = ["full"] }
 plotters = "0.3.5"
 rand = "0.8.3"
 rand_distr = "0.4.3"
 rand_xorshift = "0.3.0"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

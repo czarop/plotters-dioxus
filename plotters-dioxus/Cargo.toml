@@ -1,20 +1,19 @@
 [package]
 name = "plotters-dioxus"
-version = "0.2.2"
-edition = "2021"
-license = "MIT"
+version = "0.1.0"
+edition = "2024"
 resolver = "1"
-description = "A plotters-rs component for dioxus"
-readme = "../README.md"
-repository = "https://github.com/DorianPinaud/plotters-dioxus"
-keywords = ["dioxus", "plotters-rs", "plot", "chart", "drawing"]
-authors = ["Dorian Pinaud dorian.pinaud@gmail.com"]
-categories = ["visualization", "gui"]
+
 
 [dependencies]
-dioxus = "0.5.6"
-dioxus-desktop = "0.5.6"
+dioxus = { version = "0.7.0-alpha.1", features = [] }
+# dioxus-desktop = "0.5.6"
 plotters = "0.3.5"
-base64 = "0.21.7"
+base64 = "0.22.1"
 plotters-bitmap = "0.3.3"
-image = "0.24.7"
+image = "0.25.6"
+
+
+[features]
+default = ["desktop"]
+desktop = ["dioxus/desktop"]

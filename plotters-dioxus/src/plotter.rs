@@ -1,10 +1,23 @@
 #![allow(non_snake_case)]
 
-use dioxus::prelude::*;
+// use dioxus::prelude::*;
+// use plotters::coord::Shift;
+// use plotters::prelude::*;
+// use plotters_bitmap::BitMapBackend;
 
-use plotters_bitmap::BitMapBackend;
-use plotters::prelude::*;
+// use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+// use base64::Engine as _;
+
+// use image::codecs::png::PngEncoder;
+// use image::ImageEncoder;
+
+// use std::io::Cursor;
+// use std::rc::Rc;
+
+use dioxus::prelude::*;
 use plotters::coord::Shift;
+use plotters::prelude::*;
+use plotters_bitmap::BitMapBackend;
 
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
@@ -13,96 +26,209 @@ use image::ImageEncoder;
 use image::codecs::png::PngEncoder;
 
 use std::io::Cursor;
+use std::rc::Rc;
+use std::sync::Arc;
 
 pub type DioxusDrawingArea<'a> = DrawingArea<BitMapBackend<'a>, Shift>;
 
-#[derive(Props)]
-pub struct PlottersProps<'a, F>
-where
-    F: for<'b> Fn(DrawingArea<BitMapBackend<'b>, Shift>),
-{
-    pub size: (u32, u32),
-    pub init: F,
-    #[props(optional)]
-    pub on_click: Option<EventHandler<MouseData>>,
-    #[props(optional)]
-    pub on_dblclick: Option<EventHandler<MouseData>>,
-    #[props(optional)]
-    pub on_mousemove: Option<EventHandler<MouseData>>,
-    #[props(optional)]
-    pub on_mouseout: Option<EventHandler<MouseData>>,
-    #[props(optional)]
-    pub on_mouseup: Option<EventHandler<MouseData>>,
-    #[props(optional)]
-    pub on_mousedown: Option<EventHandler<MouseData>>,
-    #[props(optional)]
-    pub on_mouseover: Option<EventHandler<MouseData>>,
-    #[props(optional)]
-    pub on_wheel: Option<EventHandler<WheelData>>,
-    #[props(default = false)]
-    pub draggable: bool,
-    #[props(optional)]
-    pub on_drag: Option<EventHandler<DragData>>,
-    #[props(optional)]
-    pub on_dragend: Option<EventHandler<DragData>>,
-    #[props(optional)]
-    pub on_dragenter: Option<EventHandler<DragData>>,
-    #[props(optional)]
-    pub on_dragleave: Option<EventHandler<DragData>>,
-    #[props(optional)]
-    pub on_dragover: Option<EventHandler<DragData>>,
-    #[props(optional)]
-    pub on_dragstart: Option<EventHandler<DragData>>,
-    #[props(optional)]
-    pub on_drop: Option<EventHandler<DragData>>,
-    #[props(optional)]
-    pub on_scroll: Option<EventHandler<ScrollData>>,
-}
+#[component]
+pub fn Plotters(
+    data: Signal<Option<Arc<Vec<(f32, f32)>>>>,
+    size: (u32, u32),
+    // init: F,
+    #[props(optional)] on_click: Option<EventHandler<Rc<MouseData>>>,
+    #[props(optional)] on_dblclick: Option<EventHandler<Rc<MouseData>>>,
+    #[props(optional)] on_mousemove: Option<EventHandler<Rc<MouseData>>>,
+    #[props(optional)] on_mouseout: Option<EventHandler<Rc<MouseData>>>,
+    #[props(optional)] on_mouseup: Option<EventHandler<Rc<MouseData>>>,
+    #[props(optional)] on_mousedown: Option<EventHandler<Rc<MouseData>>>,
+    #[props(optional)] on_mouseover: Option<EventHandler<Rc<MouseData>>>,
+    #[props(optional)] on_wheel: Option<EventHandler<Rc<WheelData>>>,
+    #[props(default = false)] draggable: bool,
+    #[props(optional)] on_drag: Option<EventHandler<Rc<DragData>>>,
+    #[props(optional)] on_dragend: Option<EventHandler<Rc<DragData>>>,
+    #[props(optional)] on_dragenter: Option<EventHandler<Rc<DragData>>>,
+    #[props(optional)] on_dragleave: Option<EventHandler<Rc<DragData>>>,
+    #[props(optional)] on_dragover: Option<EventHandler<Rc<DragData>>>,
+    #[props(optional)] on_dragstart: Option<EventHandler<Rc<DragData>>>,
+    #[props(optional)] on_drop: Option<EventHandler<Rc<DragData>>>,
+    #[props(optional)] on_scroll: Option<EventHandler<Rc<ScrollData>>>,
+) -> Element {
+    let mut plot_image_src = use_signal(|| String::new());
 
+    use_effect(move || {
+        let (width, height) = size;
+        if data().is_none() {
+            plot_image_src.set(String::new());
+        } else {
+            let data = data.unwrap();
+            spawn(async move {
+                let buffer_size = (width * height * 3) as usize;
+                let mut buffer = vec![0u8; buffer_size];
 
-pub fn Plotters(cx: ScopeState) -> Element
-    where
-    F: for<'b> Fn(DrawingArea<BitMapBackend<'b>, Shift>),
-    {
-    let buffer_size = ((cx.props.size.1 * cx.props.size.0) as usize) * 3usize;
-    let mut buffer = vec![0u8; buffer_size];
-    let drawing_area = BitMapBackend::with_buffer(buffer.as_mut_slice(), cx.props.size)
-        .into_drawing_area();
-    (cx.props.init)(drawing_area);
+                {
+                    let drawing_area =
+                        BitMapBackend::with_buffer(buffer.as_mut_slice(), (width, height))
+                            .into_drawing_area();
 
-    let mut data = Vec::new();
-    let cursor = Cursor::new(&mut data);
-    let encoder = PngEncoder::new(cursor);
-    let color = image::ColorType::Rgb8;
+                    drawing_area
+                        .fill(&WHITE)
+                        .expect("Failed to fill drawing area");
 
-    encoder
-        .write_image(buffer.as_slice(), cx.props.size.0, cx.props.size.1, color)
-        .expect("Failed to write the image");
+                    let (x_min, x_max, y_min, y_max) = if data.is_empty() {
+                        // Default ranges if data is empty
+                        (0.0, 1.0, 0.0, 1.0)
+                    } else {
+                        let mut min_x = f32::INFINITY;
+                        let mut max_x = f32::NEG_INFINITY;
+                        let mut min_y = f32::INFINITY;
+                        let mut max_y = f32::NEG_INFINITY;
 
-    let buffer_base64 = BASE64_STANDARD.encode(data);
+                        for &(x, y) in data.iter() {
+                            min_x = min_x.min(x);
+                            max_x = max_x.max(x);
+                            min_y = min_y.min(y);
+                            max_y = max_y.max(y);
+                        }
+                        (min_x, max_x, min_y, max_y)
+                    };
+
+                    let x_range_margin = (x_max - x_min) * 0.1;
+                    let y_range_margin = (y_max - y_min) * 0.1;
+
+                    // Ensure ranges are std::ops::Range (exclusive end)
+                    let x_range = (x_min - x_range_margin)..(x_max + x_range_margin);
+                    let y_range = (y_min - y_range_margin)..(y_max + y_range_margin);
+
+                    // Let plotters infer the coordinate system from the `Range<f64>` inputs.
+                    let mut chart = ChartBuilder::on(&drawing_area)
+                        .caption("Dynamic Dot Plot", ("sans-serif", 20).into_font())
+                        .margin(5)
+                        .x_label_area_size(30)
+                        .y_label_area_size(30)
+                        .build_cartesian_2d(x_range, y_range)
+                        .expect("Failed to build chart");
+
+                    chart.configure_mesh().draw().expect("Failed to draw mesh");
+
+                    chart
+                        .draw_series(
+                            data.iter()
+                                .map(|&(x, y)| Circle::new((x, y), 2, RED.filled())),
+                        )
+                        .expect("Failed to draw scatter points");
+
+                    drawing_area
+                        .present()
+                        .expect("Failed to present drawing area");
+                }
+
+                let mut png_data = Vec::new();
+                let cursor = Cursor::new(&mut png_data);
+                let encoder = PngEncoder::new(cursor);
+                let color = image::ColorType::Rgb8;
+
+                encoder
+                    .write_image(buffer.as_slice(), width, height, color.into())
+                    .expect("Failed to write the image");
+
+                let buffer_base64 = BASE64_STANDARD.encode(png_data);
+
+                plot_image_src.set(format!("data:image/png;base64,{}", buffer_base64));
+            });
+        };
+    });
 
     rsx! {
+
         img {
-            src: "data:image/png;base64,{buffer_base64}",
-            draggable: "{cx.props.draggable}",
-            onclick: move |evt| { cx.props.on_click.as_ref().map(|cb| cb.call(evt)) },
-            ondblclick: move |evt| { cx.props.on_dblclick.as_ref().map(|cb| cb.call(evt)) },
-            onmousemove: move |evt| { cx.props.on_mousemove.as_ref().map(|cb| cb.call(evt)) },
-            onmouseout: move |evt| { cx.props.on_mouseout.as_ref().map(|cb| cb.call(evt)) },
-            onmouseover: move |evt| { cx.props.on_mouseover.as_ref().map(|cb| cb.call(evt)) },
-            onmousedown: move |evt| { cx.props.on_mousedown.as_ref().map(|cb| cb.call(evt)) },
-            onmouseup: move |evt| { cx.props.on_mouseup.as_ref().map(|cb| cb.call(evt)) },
-            onwheel: move |evt| { cx.props.on_wheel.as_ref().map(|cb| cb.call(evt)) },
-            ondrag: move |evt| { cx.props.on_drag.as_ref().map(|cb| cb.call(evt)) },
-            ondragend: move |evt| { cx.props.on_dragend.as_ref().map(|cb| cb.call(evt)) },
-            ondragenter: move |evt| { cx.props.on_dragenter.as_ref().map(|cb| cb.call(evt)) },
-            ondragleave: move |evt| { cx.props.on_dragleave.as_ref().map(|cb| cb.call(evt)) },
-            ondragover: move |evt| { cx.props.on_dragover.as_ref().map(|cb| cb.call(evt)) },
-            ondragstart: move |evt| { cx.props.on_dragstart.as_ref().map(|cb| cb.call(evt)) },
-            ondrop: move |evt| { cx.props.on_drop.as_ref().map(|cb| cb.call(evt)) },
-            onscroll: move |evt| { cx.props.on_scroll.as_ref().map(|cb| cb.call(evt)) },
+            src: "{plot_image_src()}",
+            width: "{size.0}",
+            height: "{size.1}",
+            draggable: "{draggable}",
+            onclick: move |evt| {
+                if let Some(cb) = &on_click {
+                    cb.call(evt.data)
+                }
+            },
+            ondoubleclick: move |evt| {
+                if let Some(cb) = &on_dblclick {
+                    cb.call(evt.data)
+                }
+            },
+            onmousemove: move |evt| {
+                if let Some(cb) = &on_mousemove {
+                    cb.call(evt.data)
+                }
+            },
+            onmouseout: move |evt| {
+                if let Some(cb) = &on_mouseout {
+                    cb.call(evt.data)
+                }
+            },
+            onmouseover: move |evt| {
+                if let Some(cb) = &on_mouseover {
+                    cb.call(evt.data)
+                }
+            },
+            onmousedown: move |evt| {
+                if let Some(cb) = &on_mousedown {
+                    cb.call(evt.data)
+                }
+            },
+            onmouseup: move |evt| {
+                if let Some(cb) = &on_mouseup {
+                    cb.call(evt.data)
+                }
+            },
+
+            onwheel: move |evt| {
+                if let Some(cb) = &on_wheel {
+                    cb.call(evt.data)
+                }
+            },
+
+            ondrag: move |evt| {
+                if let Some(cb) = &on_drag {
+                    cb.call(evt.data)
+                }
+            },
+            ondragend: move |evt| {
+                if let Some(cb) = &on_dragend {
+                    cb.call(evt.data)
+                }
+            },
+            ondragenter: move |evt| {
+                if let Some(cb) = &on_dragenter {
+                    cb.call(evt.data)
+                }
+            },
+            ondragleave: move |evt| {
+                if let Some(cb) = &on_dragleave {
+                    cb.call(evt.data)
+                }
+            },
+            ondragover: move |evt| {
+                if let Some(cb) = &on_dragover {
+                    cb.call(evt.data)
+                }
+            },
+            ondragstart: move |evt| {
+                if let Some(cb) = &on_dragstart {
+                    cb.call(evt.data)
+                }
+            },
+            ondrop: move |evt| {
+                if let Some(cb) = &on_drop {
+                    cb.call(evt.data)
+                }
+            },
+
+            onscroll: move |evt| {
+                if let Some(cb) = &on_scroll {
+                    cb.call(evt.data)
+                }
+            },
         }
     }
-
 }
-

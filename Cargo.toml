@@ -1,3 +1,15 @@
 [workspace]
 resolver = "1"
-members = ["plotters-dioxus", "demo"]
+members = ["plotters-dioxus", "fcs-rs-2", "demo"]
+
+[profile]
+
+[profile.wasm-dev]
+inherits = "dev"
+opt-level = 1
+
+[profile.server-dev]
+inherits = "dev"
+
+[profile.android-dev]
+inherits = "dev"
