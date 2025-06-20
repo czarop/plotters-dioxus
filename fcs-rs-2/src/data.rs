@@ -3,7 +3,8 @@ use byteorder::{BigEndian, LittleEndian};
 use polars::prelude::*;
 use std::fmt;
 use std::io::{Read, Seek};
-
+use std::slice;
+use byteorder::ByteOrder;
 /// Store the names of the parameters in the FCS file.
 #[derive(Debug)]
 pub struct ColumnNames {
@@ -320,45 +321,67 @@ pub fn parse_data(
 /// use byteorder::LittleEndian;
 /// use fcs_rs::text::read_metadata;
 /// use fcs_rs::data::read_events;
-///
+/// use std::slice;
+/// use byteorder::ByteOrder;
 /// let file = File::open("./examples/20200624 LEGENDplex_20200808 CMVMRC5 NY3 pDC.813537.fcs").unwrap();
 /// let mut reader = BufReader::new(&file);
 /// let metadata: HashMap<String, String> = read_metadata(&mut reader).unwrap();
 /// let events = read_events::<LittleEndian>(&mut reader, "F", 1000, 1, &metadata).unwrap();
 /// println!("{:?}", events);
 /// ```
-pub fn read_events<B: byteorder::ByteOrder>(
+
+
+
+
+
+// Main data reading function
+pub fn read_events<B: ByteOrder>(
     reader: &mut BufReader<&File>,
     data_type: &str,
     n_events: usize,
     param_idx: usize,
     metadata: &HashMap<String, String>,
 ) -> Result<Vec<f64>, FcsError> {
-    let data = match data_type {
+    match data_type {
+        // Fast unsafe path for native-endian 4-byte floats
+        "F" if B::read_f32(&[0x00, 0x00, 0x80, 0x3f]) == 1.0 => {
+            let mut buffer = vec![0u8; n_events * 4];
+            reader.read_exact(&mut buffer).map_err(FcsError::IoError)?;
+            let ptr = buffer.as_ptr() as *const f32;
+            let slice = unsafe { slice::from_raw_parts(ptr, n_events) };
+            Ok(slice.iter().map(|&x| x as f64).collect())
+        }
+
+        // Fast unsafe path for native-endian 8-byte doubles
+        "D" if B::read_f64(&[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x3f]) == 1.0 => {
+            let mut buffer = vec![0u8; n_events * 8];
+            reader.read_exact(&mut buffer).map_err(FcsError::IoError)?;
+            let ptr = buffer.as_ptr() as *const f64;
+            let slice = unsafe { slice::from_raw_parts(ptr, n_events) };
+            Ok(slice.to_vec())
+        }
+
+        // Safe fallback for non-native 4-byte float
         "F" => {
-            let mut float_buffer = vec![0; n_events * std::mem::size_of::<f32>()];
-            reader
-                .read_exact(&mut float_buffer)
-                .map_err(FcsError::IoError)?;
-            let mut data = Vec::with_capacity(n_events);
-            for i in 0..n_events {
-                let float_value = B::read_f32(&float_buffer[i * 4..(i + 1) * 4]) as f64;
-                data.push(float_value);
-            }
-            data
+            let mut buffer = vec![0u8; n_events * 4];
+            reader.read_exact(&mut buffer).map_err(FcsError::IoError)?;
+            Ok(buffer
+                .chunks_exact(4)
+                .map(|chunk| B::read_f32(chunk) as f64)
+                .collect())
         }
+
+        // Safe fallback for non-native 8-byte float
         "D" => {
-            let mut float_buffer = vec![0; n_events * std::mem::size_of::<f64>()];
-            reader
-                .read_exact(&mut float_buffer)
-                .map_err(FcsError::IoError)?;
-            let mut data = Vec::with_capacity(n_events);
-            for i in 0..n_events {
-                let double_value = B::read_f64(&float_buffer[i * 8..(i + 1) * 8]);
-                data.push(double_value);
-            }
-            data
+            let mut buffer = vec![0u8; n_events * 8];
+            reader.read_exact(&mut buffer).map_err(FcsError::IoError)?;
+            Ok(buffer
+                .chunks_exact(8)
+                .map(|chunk| B::read_f64(chunk))
+                .collect())
         }
+
+        // Integer type
         "I" => {
             let bits_per_param = metadata
                 .get(&format!("$P{}B", param_idx))
@@ -373,71 +396,102 @@ pub fn read_events<B: byteorder::ByteOrder>(
                     ))
                 })?;
 
-            match bits_per_param / 8 {
-                2 => {
-                    let mut int_buffer = vec![0; n_events * std::mem::size_of::<u16>()];
-                    reader
-                        .read_exact(&mut int_buffer)
-                        .map_err(FcsError::IoError)?;
-                    let mut data = Vec::with_capacity(n_events);
-                    for i in 0..n_events {
-                        let int_value = B::read_u16(&int_buffer[i * 2..(i + 1) * 2]) as f64;
-                        data.push(int_value);
-                    }
-                    data
-                }
-                4 => {
-                    let mut int_buffer = vec![0; n_events * std::mem::size_of::<u32>()];
-                    reader
-                        .read_exact(&mut int_buffer)
-                        .map_err(FcsError::IoError)?;
-                    let mut data = Vec::with_capacity(n_events);
-                    for i in 0..n_events {
-                        let int_value = B::read_u32(&int_buffer[i * 4..(i + 1) * 4]) as f64;
-                        data.push(int_value);
-                    }
-                    data
-                }
-                8 => {
-                    let mut int_buffer = vec![0; n_events * std::mem::size_of::<u64>()];
-                    reader
-                        .read_exact(&mut int_buffer)
-                        .map_err(FcsError::IoError)?;
-                    let mut data = Vec::with_capacity(n_events);
-                    for i in 0..n_events {
-                        let int_value = B::read_u64(&int_buffer[i * 8..(i + 1) * 8]) as f64;
-                        data.push(int_value);
-                    }
-                    data
-                }
-                16 => {
-                    let mut int_buffer = vec![0; n_events * std::mem::size_of::<u128>()];
-                    reader
-                        .read_exact(&mut int_buffer)
-                        .map_err(FcsError::IoError)?;
-                    let mut data = Vec::with_capacity(n_events);
-                    for i in 0..n_events {
-                        let int_value = B::read_u128(&int_buffer[i * 16..(i + 1) * 16]) as f64;
-                        data.push(int_value);
-                    }
-                    data
-                }
+            let (bytes_per_value, reader_fn): (usize, Box<dyn Fn(&[u8]) -> f64>) = match bits_per_param {
+                16 => (2, Box::new(|chunk| B::read_u16(chunk) as f64)),
+                32 => (4, Box::new(|chunk| B::read_u32(chunk) as f64)),
+                64 => (8, Box::new(|chunk| B::read_u64(chunk) as f64)),
+                128 => (16, Box::new(|chunk| B::read_u128(chunk) as f64)),
                 _ => {
                     return Err(FcsError::InvalidData(
                         "Bits for param type not supported".to_string(),
-                    ));
+                    ))
                 }
-            }
-        }
-        _ => {
-            return Err(FcsError::InvalidData(
-                "FCS data type not supported. Must be F, D, or I".to_string(),
-            ));
-        }
-    };
+            };
 
-    Ok(data)
+            let mut buffer = vec![0u8; n_events * bytes_per_value];
+            reader.read_exact(&mut buffer).map_err(FcsError::IoError)?;
+
+            Ok(buffer
+                .chunks_exact(bytes_per_value)
+                .map(|chunk| reader_fn(chunk))
+                .collect())
+        }
+
+        _ => Err(FcsError::InvalidData(
+            "FCS data type not supported. Must be F, D, or I".to_string(),
+        )),
+    }
 }
+
+// pub fn read_events<B: byteorder::ByteOrder>(
+//     reader: &mut BufReader<&File>,
+//     data_type: &str,
+//     n_events: usize,
+//     param_idx: usize,
+//     metadata: &HashMap<String, String>,
+// ) -> Result<Vec<f64>, FcsError> {
+//     match data_type {
+//         "F" => {
+//             let mut buffer = vec![0u8; n_events * 4];
+//             reader.read_exact(&mut buffer).map_err(FcsError::IoError)?;
+//             let data = buffer
+//                 .chunks_exact(4)
+//                 .map(|chunk| B::read_f32(chunk) as f64)
+//                 .collect();
+//             Ok(data)
+//         }
+//         "D" => {
+//             let mut buffer = vec![0u8; n_events * 8];
+//             reader.read_exact(&mut buffer).map_err(FcsError::IoError)?;
+//             let data = buffer
+//                 .chunks_exact(8)
+//                 .map(|chunk| B::read_f64(chunk))
+//                 .collect();
+//             Ok(data)
+//         }
+//         "I" => {
+//             let bits_per_param = metadata
+//                 .get(&format!("$P{}B", param_idx))
+//                 .ok_or_else(|| {
+//                     FcsError::InvalidText(format!("Missing $P{}B in metadata", param_idx))
+//                 })?
+//                 .parse::<usize>()
+//                 .map_err(|_| {
+//                     FcsError::InvalidData(format!(
+//                         "Invalid bits per param value for $P{}B",
+//                         param_idx
+//                     ))
+//                 })?;
+
+//             let (bytes_per_value, reader_fn): (usize, Box<dyn Fn(&[u8]) -> f64>) = match bits_per_param {
+//                 16 => (2, Box::new(|chunk| B::read_u16(chunk) as f64)),
+//                 32 => (4, Box::new(|chunk| B::read_u32(chunk) as f64)),
+//                 64 => (8, Box::new(|chunk| B::read_u64(chunk) as f64)),
+//                 128 => (16, Box::new(|chunk| B::read_u128(chunk) as f64)),
+//                 _ => {
+//                     return Err(FcsError::InvalidData(
+//                         "Bits for param type not supported".to_string(),
+//                     ))
+//                 }
+//             };
+
+//             let mut buffer = vec![0u8; n_events * bytes_per_value];
+//             reader.read_exact(&mut buffer).map_err(FcsError::IoError)?;
+
+//             let data = buffer
+//                 .chunks_exact(bytes_per_value)
+//                 .map(|chunk| reader_fn(chunk))
+//                 .collect();
+
+//             Ok(data)
+//         }
+//         _ => Err(FcsError::InvalidData(
+//             "FCS data type not supported. Must be F, D, or I".to_string(),
+//         )),
+//     }
+// }
+
+
 
 /// Creates a DataFrame from column titles and corresponding data vectors.
 ///

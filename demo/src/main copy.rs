@@ -1,9 +1,10 @@
 #![allow(non_snake_case)]
 
 use dioxus::{
-    desktop::{Config, LogicalSize, WindowBuilder}, prelude::*
+    desktop::{Config, LogicalSize, WindowBuilder},
+    prelude::*,
 };
-use fcs_rs_2::{FcsError, FcsFile, FlowSample};
+use fcs_rs_2::{FcsError, FcsFile};
 use std::rc::Rc; // Needed for event handlers
 
 // Import your Plotters component from the `plotters-dioxus` crate.
@@ -12,13 +13,27 @@ use std::rc::Rc; // Needed for event handlers
 use plotters_dioxus::Plotters;
 use polars::prelude::*;
 
-async fn get_flow_data(path: String) -> Result<FlowSample, FcsError> {
+async fn get_flow_data(path: String) -> Result<Arc<Vec<(f64, f64)>>, FcsError> {
+    // let path = "C:/Users/ts286220/Documents/FACS Temp/ELX21208_Th17MAITHUPDBMXA/Unmixed/Plate_001/DN 382/G7 FMX_1_Plate_001.fcs";
+    // let path = path.to_string();
+    // IMPORTANT: The closure passed to spawn_blocking must be `Send + 'static`.
+    // It should contain *all* the blocking operations.
     let result = tokio::task::spawn_blocking(move || {
+        println!("loading file");
         let fcs_file = FcsFile::open(&path)?;
+        println!("file opened");
         let fcs_data = fcs_file.read()?; // This is the blocking read
-        Ok(fcs_data)
+        println!("data loaded");
+        // Print head is also blocking I/O/computation, so it should be in spawn_blocking too.
+        // println!("{}", fcs_data.data.head(Some(50)));
+
+        let new_data = get_zipped_column_data(&fcs_data.data, "CD4", "CD8")
+            .map_err(|e| FcsError::InvalidData(format!("Polars extraction error: {}", e)))?;
+        println!("data zipped");
+        Ok(Arc::new(new_data))
     })
     .await; // Await the result of the blocking task
+
     let inner_result = result.map_err(|e| FcsError::IoError(e.into()))?;
     inner_result
 }
@@ -37,57 +52,6 @@ fn get_zipped_column_data(
     Ok(zipped_data)
 }
 
-fn arcsinh_transform_f64(s: Series, cofactor: f64) -> Result<Series, PolarsError> {
-    if cofactor == 0.0 {
-        // Return a series of NaNs or an error here, depending on desired behavior.
-        // For simplicity, let's return a series of NaNs if cofactor is zero.
-        Ok(Series::new(s.name().clone(), vec![f64::NAN; s.len()]))
-    } else {
-        let res = s.f64()
-            .expect("Series was not f64, but it should be") // Expect f64 as per type hint
-            .apply(|value| Some(value?.asinh() / cofactor))
-            .into_series();
-        Ok(res)
-    }
-}
-
-pub fn apply_arcsinh_scaling(
-    df: &DataFrame,
-    col1_name: &str,
-    col2_name: &str,
-    col1_cofactor: f64, // Separate cofactor for col1
-    col2_cofactor: f64, // Separate cofactor for col2
-) -> Result<DataFrame, FcsError> {
-    // Basic validation for cofactors
-    if col1_cofactor == 0.0 || col2_cofactor == 0.0 {
-        return Err(FcsError::InvalidData("Cofactors for arcsinh scaling cannot be zero.".to_string()));
-    }
-
-    let df_transformed = df
-        .clone() // Clone if you want to modify a copy, or modify in place if `df` is `&mut`
-        .with_columns([
-            // Apply arcsinh transform to col1
-            col(col1_name)
-                .map(
-                    move |s| Ok(arcsinh_transform_f64(s, col1_cofactor)),
-                    Get  ::ref_null_bytes_lengths_buffers(DataType::Float64)
-                )
-                .alias(col1_name), // Keep the original column name
-            // Apply arcsinh transform to col2
-            col(col2_name)
-                .map(
-                    move |s| Ok(arcsinh_transform_f64(s, col2_cofactor)),
-                    Get  ::ref_null_bytes_lengths_buffers(DataType::Float64)
-                )
-                .alias(col2_name), // Keep the original column name
-        ])
-        .map_err(|e| FcsError::InvalidData(format!("Failed to apply arcsinh scaling: {}", e)))?;
-
-    Ok(df_transformed)
-}
-
-
-
 #[component]
 fn App() -> Element {
     let mut data_version = use_signal_sync(|| {
@@ -97,7 +61,7 @@ fn App() -> Element {
     let mut message = use_signal(|| "No data loaded".to_string());
     // let mut data_version = use_signal_sync(|| 0);
 
-    let mut fcs_file = use_resource(move || async move {
+    let mut scatter_data = use_resource(move || async move {
         println!("resouce running");
         get_flow_data(data_version()).await
     });
@@ -128,17 +92,10 @@ fn App() -> Element {
 
     use_effect(move || {
         println!("data read memo called");
-        match &*fcs_file.read() {
+        match &*scatter_data.read() {
             Some(Ok(d)) => {
-                let x = d;
-                match get_zipped_column_data(&x.data, "CD4", "CD8"){
-                    Ok(d) => data.set(Some(d)),
-                    Err(e) => {
-                        data.set(None);
-                        message.set(e.to_string());
-                    },
-                };
-                
+                let x = d.clone();
+                data.set(Some(x));
             }
             Some(Err(e)) => {
                 let error_s = format!("Error loading data: {}", e.to_string());
@@ -200,7 +157,7 @@ fn App() -> Element {
                                 "C:/Users/ts286220/Documents/FACS Temp/ELX21208_Th17MAITHUPDBMXA/Unmixed/Plate_001/DN 382/G8 FMX_2_Plate_001.fcs"
                                     .to_string(),
                             );
-                        fcs_file.restart();
+                        scatter_data.restart();
                     },
                     "Update Data"
                 }
