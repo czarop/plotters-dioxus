@@ -19,7 +19,7 @@ pub struct ColumnNames {
 /// and the value is a vector of measurements.
 /// * `parameters` - A HashMap containing the parameters of the flow cytometry experiment.
 /// The key is the parameter name, and the value is the parameter value.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct FlowSample {
     pub data: DataFrame,
     pub parameters: HashMap<String, String>,

@@ -12,13 +12,39 @@ use std::rc::Rc; // Needed for event handlers
 use plotters_dioxus::Plotters;
 use polars::prelude::*;
 
-async fn get_flow_data(path: String) -> Result<FlowSample, FcsError> {
+
+
+async fn get_flow_data(path: String) -> Result<Arc<FlowSample>, FcsError> {
+    println!("{path}");
     let result = tokio::task::spawn_blocking(move || {
         let fcs_file = FcsFile::open(&path)?;
         let fcs_data = fcs_file.read()?; // This is the blocking read
-        Ok(fcs_data)
+        Ok(Arc::new(fcs_data))
     })
     .await; // Await the result of the blocking task
+    let inner_result = result.map_err(|e| FcsError::IoError(e.into()))?;
+    inner_result
+}
+
+async fn get_data_to_display(
+    fs: Option<Arc<FlowSample>>,
+    col1_name: &str,
+    col2_name: &str,
+    col1_cofactor: f64,
+    col2_cofactor: f64,) -> Result<Arc<Vec<(f64, f64)>>, FcsError> {
+    
+    let ts_fs = fs.ok_or(FcsError::InvalidData("No Data".to_string()))?;
+    let binding = ts_fs.clone();
+    // let ts_df = (binding.data);
+
+    // let ts_df = Arc::new(df);
+    let c1 = Arc::new(col1_name.to_string());
+    let c2 = Arc::new(col2_name.to_string());
+    let result = tokio::task::spawn_blocking(move || {
+        let scaled_cols = apply_arcsinh_scaling(&binding.data, &c1, &c2, col1_cofactor, col2_cofactor)?;
+        let zipped_data = get_zipped_column_data(&scaled_cols, &c1, &c2).map_err(|_| FcsError::InvalidData("Columns not valid".to_string()))?;
+        Ok(Arc::new(zipped_data))
+    }).await;
     let inner_result = result.map_err(|e| FcsError::IoError(e.into()))?;
     inner_result
 }
@@ -37,51 +63,74 @@ fn get_zipped_column_data(
     Ok(zipped_data)
 }
 
-fn arcsinh_transform_f64(s: Series, cofactor: f64) -> Result<Series, PolarsError> {
-    if cofactor == 0.0 {
-        // Return a series of NaNs or an error here, depending on desired behavior.
-        // For simplicity, let's return a series of NaNs if cofactor is zero.
-        Ok(Series::new(s.name().clone(), vec![f64::NAN; s.len()]))
-    } else {
-        let res = s.f64()
-            .expect("Series was not f64, but it should be") // Expect f64 as per type hint
-            .apply(|value| Some(value?.asinh() / cofactor))
-            .into_series();
-        Ok(res)
-    }
+fn arcsinh_transform_series(col_data: Column, cofactor: f64) -> PolarsResult<Option<Column>> {
+    // Convert the Column into a Series to use Series-specific methods like .cast() and .f64()
+    let s = col_data.as_series().ok_or(PolarsError::ColumnNotFound("error transforming column".into()))?;
+
+    let cast_s = s.cast(&DataType::Float64)?; // Ensure it's f64
+
+    let transformed_chunked = cast_s
+        .f64()
+        .expect("Series was not f64 after casting; this should not happen.")
+        .apply(|value| Some(value?.asinh()/cofactor)); // Apply arcsinh scaling
+
+    // Ok(transformed_chunked.into_series())
+    Ok(Some(transformed_chunked.into_column()))
 }
 
 pub fn apply_arcsinh_scaling(
     df: &DataFrame,
     col1_name: &str,
     col2_name: &str,
-    col1_cofactor: f64, // Separate cofactor for col1
-    col2_cofactor: f64, // Separate cofactor for col2
+    col1_cofactor: f64,
+    col2_cofactor: f64,
 ) -> Result<DataFrame, FcsError> {
-    // Basic validation for cofactors
+    // Validate cofactors early to prevent division by zero
     if col1_cofactor == 0.0 || col2_cofactor == 0.0 {
         return Err(FcsError::InvalidData("Cofactors for arcsinh scaling cannot be zero.".to_string()));
     }
 
-    let df_transformed = df
-        .clone() // Clone if you want to modify a copy, or modify in place if `df` is `&mut`
+    // --- OPTIMIZATION START ---
+    // 1. Select only the columns of interest from the original DataFrame.
+    // This creates a new, smaller DataFrame containing only these two columns.
+    let selected_df = df
+        .select([col1_name, col2_name])
+        .map_err(|e| FcsError::InvalidData(format!("Failed to select columns: {}", e)))?;
+
+    // 2. Convert this *smaller* DataFrame to a LazyFrame.
+    // The clone happens on this smaller DataFrame's data, not the original full DataFrame.
+    let lazy_df = selected_df.lazy();
+    // --- OPTIMIZATION END ---
+
+
+
+    let transformed_lazy_df = lazy_df
         .with_columns([
-            // Apply arcsinh transform to col1
+            // Expression for the first column
             col(col1_name)
                 .map(
-                    move |s| Ok(arcsinh_transform_f64(s, col1_cofactor)),
-                    Get  ::ref_null_bytes_lengths_buffers(DataType::Float64)
+
+                    move |s| arcsinh_transform_series(s, col1_cofactor),
+                    // Specify the output type of the transformation
+                    GetOutput::from_type(DataType::Float64),
                 )
-                .alias(col1_name), // Keep the original column name
-            // Apply arcsinh transform to col2
+                .alias(col1_name), // Re-alias to maintain original column name
+
+            // Expression for the second column
             col(col2_name)
                 .map(
-                    move |s| Ok(arcsinh_transform_f64(s, col2_cofactor)),
-                    Get  ::ref_null_bytes_lengths_buffers(DataType::Float64)
+                    // CRITICAL FIX: Convert Series to Column and wrap in Some
+                    move |s| arcsinh_transform_series(s, col2_cofactor),
+                    // Specify the output type of the transformation
+                    GetOutput::from_type(DataType::Float64),
                 )
-                .alias(col2_name), // Keep the original column name
-        ])
-        .map_err(|e| FcsError::InvalidData(format!("Failed to apply arcsinh scaling: {}", e)))?;
+                .alias(col2_name), // Re-alias to maintain original column name
+        ]);
+
+    // Execute the lazy plan and collect the result into an eager DataFrame
+    let df_transformed = transformed_lazy_df
+        .collect()
+        .map_err(|e| FcsError::InvalidData(format!("Failed to collect transformed DataFrame: {}", e)))?;
 
     Ok(df_transformed)
 }
@@ -90,17 +139,66 @@ pub fn apply_arcsinh_scaling(
 
 #[component]
 fn App() -> Element {
-    let mut data_version = use_signal_sync(|| {
-        "C:/Users/ts286220/Documents/FACS Temp/ELX21208_Th17MAITHUPDBMXA/Unmixed/Plate_001/DN 382/G7 FMX_1_Plate_001.fcs".to_string()
-    });
-    let mut data = use_signal(|| None);
-    let mut message = use_signal(|| "No data loaded".to_string());
-    // let mut data_version = use_signal_sync(|| 0);
+    let samples = use_signal(||vec![
+        "C:/Users/ts286220/Documents/FACS Temp/ELX21208_Th17MAITHUPDBMXA/Unmixed/Plate_001/DN 382/G7 FMX_1_Plate_001.fcs".to_string(),
+    "C:/Users/ts286220/Documents/FACS Temp/ELX21208_Th17MAITHUPDBMXA/Unmixed/Plate_001/DN 382/G8 FMX_2_Plate_001.fcs"
+                                    .to_string()]);
 
-    let mut fcs_file = use_resource(move || async move {
-        println!("resouce running");
-        get_flow_data(data_version()).await
+    let mut sample_index = use_signal(||0);
+
+
+    let mut sample = use_signal(|| {
+        samples.read()[0].clone()
     });
+    // let mut fcs_data: Signal<Option<FlowSample>> = use_signal(|| None);
+    let mut processed_data = use_signal(||None);
+    let mut message = use_signal(|| "No data loaded".to_string());
+
+    let x_axis_parameter = use_signal(|| "CD4".to_string());
+    let y_axis_parameter = use_signal(|| "CD8".to_string());
+
+    use_effect(move || {
+        sample.set(samples.read()[*sample_index.read()].clone());
+
+    });
+    let fcs_file = use_resource(move || {
+        let name = sample.read().clone();
+        async move {
+            println!("resouce running");
+            get_flow_data(name).await
+    }});
+
+    let fcs_file_data = use_memo(move || {
+        println!("data read memo called");
+        match &*fcs_file.read() {
+            Some(Ok(d)) => {
+
+                Some(d.clone())
+                
+            }
+            Some(Err(e)) => {
+                let error_s = format!("Error loading data: {}", e.to_string());
+                message.set(error_s);
+                None
+            }
+            None => {
+                message.set("Loading data.".to_string());
+                None
+            }
+        }
+    });
+
+    let data_to_display = use_resource(move || {
+        let x = x_axis_parameter.read().clone();
+        let y = y_axis_parameter.read().clone();
+        let data =  fcs_file_data.read().clone();
+        async move {
+            get_data_to_display(data, &x, &y, 4000_f64, 4000_f64).await
+    }
+    
+        
+
+        });
 
     // --- Optional Event Handlers for the Plotters Component ---
     // These functions demonstrate how you can receive events from the plot image.
@@ -126,41 +224,51 @@ fn App() -> Element {
         );
     };
 
-    use_effect(move || {
-        println!("data read memo called");
-        match &*fcs_file.read() {
-            Some(Ok(d)) => {
-                let x = d;
-                match get_zipped_column_data(&x.data, "CD4", "CD8"){
-                    Ok(d) => data.set(Some(d)),
-                    Err(e) => {
-                        data.set(None);
-                        message.set(e.to_string());
-                    },
-                };
+    
+    // let _fcs_file_data = use_memo(move || {
+    //     println!("data read memo called");
+    //     match &*fcs_file.read() {
+    //         Some(Ok(d)) => {
+
+    //             Some(d.clone())
                 
-            }
+    //         }
+    //         Some(Err(e)) => {
+    //             let error_s = format!("Error loading data: {}", e.to_string());
+    //             message.set(error_s);
+    //             None
+    //         }
+    //         None => {
+    //             message.set("Loading data.".to_string());
+    //             None
+    //         }
+    //     }
+    // });
+
+    use_effect(move || {
+
+        match &*data_to_display.read() {
+            Some(Ok(d)) => processed_data.set(Some(d.clone())),
             Some(Err(e)) => {
-                let error_s = format!("Error loading data: {}", e.to_string());
-                message.set(error_s);
-                data.set(None)
+                processed_data.set(None);
+                message.set(format!("Error processing data: {}", e.to_string()));
             }
             None => {
-                message.set("Loading data.".to_string());
-                data.set(None)
-            }
+                processed_data.set(None);
+                message.set(format!("No data"));
+            },
         }
     });
 
     let element = use_memo(move || {
         println!("plot memo called");
-        match data() {
+        match processed_data() {
             Some(_) => {
                 rsx! {
                     div {
                         Plotters {
                             size: (400, 400), // Define the size of the plot image
-                            data, // Pass a clone of the generated data
+                            data: processed_data, // Pass a clone of the generated data
 
                             // Pass optional event handlers
                             on_click: handle_click,
@@ -195,16 +303,20 @@ fn App() -> Element {
                 button {
                     // style: "padding: 10px 20px; font-size: 16px; border-radius: 8px; border: 1px solid #ccc; background-color: #f0f0f0; cursor: pointer;",
                     onclick: move |_| {
-                        data_version
-                            .set(
-                                "C:/Users/ts286220/Documents/FACS Temp/ELX21208_Th17MAITHUPDBMXA/Unmixed/Plate_001/DN 382/G8 FMX_2_Plate_001.fcs"
-                                    .to_string(),
-                            );
-                        fcs_file.restart();
+                        let mut curr = sample_index();
+                        let length = samples.len() - 1;
+                        println!("curr: {}, samples.len: {}", curr, length);
+                        if curr == length {
+                            curr = 0;
+                        } else {
+                            curr += 1;
+                        };
+                        println!("{}", curr);
+                        sample_index.set(curr);
                     },
                     "Update Data"
                 }
-                div { margin_top: "1rem", {data_version()} }
+                div { margin_top: "1rem", {sample()} }
             }
 
             div { {element} }

@@ -12,12 +12,13 @@ use image::codecs::png::PngEncoder;
 
 use std::io::Cursor;
 use std::rc::Rc;
+use std::sync::Arc;
 
 pub type DioxusDrawingArea<'a> = DrawingArea<BitMapBackend<'a>, Shift>;
 
 #[component]
 pub fn Plotters(
-    data: Signal<Option<Vec<(f64, f64)>>>,
+    data: Signal<Option<Arc<Vec<(f64, f64)>>>>,
     size: (u32, u32),
     #[props(optional)] on_click: Option<EventHandler<Rc<MouseData>>>,
     #[props(optional)] on_dblclick: Option<EventHandler<Rc<MouseData>>>,
