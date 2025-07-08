@@ -3,23 +3,28 @@ use dioxus::prelude::*;
 use plotters::coord::Shift;
 use plotters::prelude::*;
 use plotters_bitmap::BitMapBackend;
-
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
-
 use image::ImageEncoder;
 use image::codecs::png::PngEncoder;
-
 use std::io::Cursor;
 use std::rc::Rc;
 use std::sync::Arc;
 
 pub type DioxusDrawingArea<'a> = DrawingArea<BitMapBackend<'a>, Shift>;
 
+#[derive(Debug, Clone, PartialEq, Props)]
+pub struct AxisLimits{
+    pub lower: f64,
+    pub upper: f64
+}
+
 #[component]
 pub fn Plotters(
-    data: Signal<Option<Arc<Vec<(f64, f64)>>>>,
-    size: (u32, u32),
+    #[props] data: Arc<Vec<(f64, f64)>>,
+    #[props] size: (u32, u32),
+    #[props] x_axis_limits: AxisLimits,
+    #[props] y_axis_limits: AxisLimits,
     #[props(optional)] on_click: Option<EventHandler<Rc<MouseData>>>,
     #[props(optional)] on_dblclick: Option<EventHandler<Rc<MouseData>>>,
     #[props(optional)] on_mousemove: Option<EventHandler<Rc<MouseData>>>,
@@ -40,12 +45,10 @@ pub fn Plotters(
 ) -> Element {
     let mut plot_image_src = use_signal(|| String::new());
 
-    use_effect(move || {
+    use_effect(use_reactive!( |size, data, x_axis_limits, y_axis_limits| {
         let (width, height) = size;
-        if data().is_none() {
-            plot_image_src.set(String::new());
-        } else {
-            let data = data.unwrap();
+        let data = data.clone();
+
             spawn(async move {
                 let buffer_size = (width * height * 3) as usize;
                 let mut buffer = vec![0u8; buffer_size];
@@ -63,17 +66,12 @@ pub fn Plotters(
                         // Default ranges if data is empty
                         (0.0, 1.0, 0.0, 1.0)
                     } else {
-                        let mut min_x = f64::INFINITY;
-                        let mut max_x = f64::NEG_INFINITY;
-                        let mut min_y = f64::INFINITY;
-                        let mut max_y = f64::NEG_INFINITY;
+                        let min_x = x_axis_limits.lower;
+                        let max_x = x_axis_limits.upper;
+                        let min_y = y_axis_limits.lower;
+                        let max_y = y_axis_limits.upper;
 
-                        for &(x, y) in data.iter() {
-                            min_x = min_x.min(x);
-                            max_x = max_x.max(x);
-                            min_y = min_y.min(y);
-                            max_y = max_y.max(y);
-                        }
+                    
                         (min_x, max_x, min_y, max_y)
                     };
 
@@ -120,8 +118,9 @@ pub fn Plotters(
 
                 plot_image_src.set(format!("data:image/png;base64,{}", buffer_base64));
             });
-        };
-    });
+        }
+    // }
+    ));
 
     rsx! {
 
@@ -172,41 +171,41 @@ pub fn Plotters(
                 }
             },
 
-            ondrag: move |evt| {
-                if let Some(cb) = &on_drag {
-                    cb.call(evt.data)
-                }
-            },
-            ondragend: move |evt| {
-                if let Some(cb) = &on_dragend {
-                    cb.call(evt.data)
-                }
-            },
-            ondragenter: move |evt| {
-                if let Some(cb) = &on_dragenter {
-                    cb.call(evt.data)
-                }
-            },
-            ondragleave: move |evt| {
-                if let Some(cb) = &on_dragleave {
-                    cb.call(evt.data)
-                }
-            },
-            ondragover: move |evt| {
-                if let Some(cb) = &on_dragover {
-                    cb.call(evt.data)
-                }
-            },
-            ondragstart: move |evt| {
-                if let Some(cb) = &on_dragstart {
-                    cb.call(evt.data)
-                }
-            },
-            ondrop: move |evt| {
-                if let Some(cb) = &on_drop {
-                    cb.call(evt.data)
-                }
-            },
+            // ondrag: move |evt| {
+            //     if let Some(cb) = &on_drag {
+            //         cb.call(evt.data)
+            //     }
+            // },
+            // ondragend: move |evt| {
+            //     if let Some(cb) = &on_dragend {
+            //         cb.call(evt.data)
+            //     }
+            // },
+            // ondragenter: move |evt| {
+            //     if let Some(cb) = &on_dragenter {
+            //         cb.call(evt.data)
+            //     }
+            // },
+            // ondragleave: move |evt| {
+            //     if let Some(cb) = &on_dragleave {
+            //         cb.call(evt.data)
+            //     }
+            // },
+            // ondragover: move |evt| {
+            //     if let Some(cb) = &on_dragover {
+            //         cb.call(evt.data)
+            //     }
+            // },
+            // ondragstart: move |evt| {
+            //     if let Some(cb) = &on_dragstart {
+            //         cb.call(evt.data)
+            //     }
+            // },
+            // ondrop: move |evt| {
+            //     if let Some(cb) = &on_drop {
+            //         cb.call(evt.data)
+            //     }
+            // },
 
             onscroll: move |evt| {
                 if let Some(cb) = &on_scroll {
