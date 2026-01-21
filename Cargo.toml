@@ -3,10 +3,10 @@ resolver = "1"
 members = ["plotters-dioxus", "gui"]
 
 [workspace.dependencies]
-dioxus = { version = "0.7.0-alpha.2", features = ["desktop"] }
+dioxus = { version = "0.7.3", features = ["desktop"] }
 plotters = "0.3.5"
 thiserror = "2.0.12"
-polars = "0.49"
+polars = {version = "0.52", default-features = false, features = ["lazy", "performant"]}
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 anyhow = "1"
-fcs-rs-2 = {path = "../fcs-rs-2"}
+fcs-rs-2 = {git = "https://github.com/czarop/fcs-rs-2", rev = "e0f0bb7"}
