@@ -54,7 +54,8 @@ impl DensityPlot {
 
                 for i in start..end {
                     let x_bin = ((x_data[i] - x_range.0) * x_scale) as isize;
-                    let y_bin = ((y_data[i] - y_range.0) * y_scale) as isize;
+                    // let y_bin = ((y_data[i] - y_range.0) * y_scale) as isize;
+                    let y_bin = (grid_size as isize - 1) - ((y_data[i] - y_range.0) * y_scale) as isize;
 
                     // Bounds check
                     if x_bin >= 0
@@ -124,11 +125,13 @@ pub fn density_plot_to_base64(
     grid_size: usize,
     colormap: &ColorMap,
 ) -> Result<String, Box<dyn std::error::Error>> {
+    let x_range = Some((-2.0, 6.0));
+    let y_range = Some((-2.0, 6.0));
     // Unzip the points into separate x and y vectors
     let (x_data, y_data): (Vec<f64>, Vec<f64>) = points.iter().copied().unzip();
 
     // Create density plot
-    let plot = DensityPlot::new(&x_data, &y_data, grid_size, None, None);
+    let plot = DensityPlot::new(&x_data, &y_data, grid_size, x_range, y_range);
 
     // Get RGB data
     let rgb_data = plot.to_rgb(colormap);
