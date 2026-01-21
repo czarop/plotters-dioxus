@@ -11,6 +11,8 @@ use std::io::Cursor;
 use std::rc::Rc;
 use std::sync::Arc;
 
+use crate::colormap;
+
 pub type DioxusDrawingArea<'a> = DrawingArea<BitMapBackend<'a>, Shift>;
 
 #[derive(Debug, Clone, PartialEq, Props)]
@@ -49,75 +51,81 @@ pub fn Plotters(
         let (width, height) = size;
         let data = data.clone();
 
-            spawn(async move {
-                let buffer_size = (width * height * 3) as usize;
-                let mut buffer = vec![0u8; buffer_size];
+            // spawn(async move {
+            //     let buffer_size = (width * height * 3) as usize;
+            //     let mut buffer = vec![0u8; buffer_size];
 
-                {
-                    let drawing_area =
-                        BitMapBackend::with_buffer(buffer.as_mut_slice(), (width, height))
-                            .into_drawing_area();
+            //     {
+            //         let drawing_area =
+            //             BitMapBackend::with_buffer(buffer.as_mut_slice(), (width, height))
+            //                 .into_drawing_area();
 
-                    drawing_area
-                        .fill(&WHITE)
-                        .expect("Failed to fill drawing area");
+            //         drawing_area
+            //             .fill(&WHITE)
+            //             .expect("Failed to fill drawing area");
 
-                    let (x_min, x_max, y_min, y_max) = if data.is_empty() {
-                        // Default ranges if data is empty
-                        (0.0, 1.0, 0.0, 1.0)
-                    } else {
-                        let min_x = x_axis_limits.lower;
-                        let max_x = x_axis_limits.upper;
-                        let min_y = y_axis_limits.lower;
-                        let max_y = y_axis_limits.upper;
+            //         let (x_min, x_max, y_min, y_max) = if data.is_empty() {
+            //             // Default ranges if data is empty
+            //             (0.0, 1.0, 0.0, 1.0)
+            //         } else {
+            //             let min_x = x_axis_limits.lower;
+            //             let max_x = x_axis_limits.upper;
+            //             let min_y = y_axis_limits.lower;
+            //             let max_y = y_axis_limits.upper;
 
                     
-                        (min_x, max_x, min_y, max_y)
-                    };
+            //             (min_x, max_x, min_y, max_y)
+            //         };
 
-                    let x_range_margin = (x_max - x_min) * 0.1;
-                    let y_range_margin = (y_max - y_min) * 0.1;
 
-                    // Ensure ranges are std::ops::Range (exclusive end)
-                    let x_range = (x_min - x_range_margin)..(x_max + x_range_margin);
-                    let y_range = (y_min - y_range_margin)..(y_max + y_range_margin);
-
-                    // Let plotters infer the coordinate system from the `Range<f64>` inputs.
-                    let mut chart = ChartBuilder::on(&drawing_area)
-                        .caption("Dynamic Dot Plot", ("sans-serif", 20).into_font())
-                        .margin(5)
-                        .x_label_area_size(30)
-                        .y_label_area_size(30)
-                        .build_cartesian_2d(x_range, y_range)
-                        .expect("Failed to build chart");
-
-                    chart.configure_mesh().draw().expect("Failed to draw mesh");
+            //         let x_range = (x_min)..((4194304_f64 / 6000.0).asinh());
+            //         let y_range = (y_min)..((4194304_f64 / 6000.0).asinh());
                     
-                    let coord_spec = chart.plotting_area().as_coord_spec();
 
-                    for &(x, y) in data.iter() {
-                        let (px, py) = coord_spec.translate(&(x, y));
-                        drawing_area.draw_pixel((px, py), &RED).expect("Failed to draw pixel");
-                    }
+            //         // Let plotters infer the coordinate system from the `Range<f64>` inputs.
+            //         let mut chart = ChartBuilder::on(&drawing_area)
+            //             .caption("Dynamic Dot Plot", ("sans-serif", 20).into_font())
+            //             .margin(5)
+            //             .x_label_area_size(30)
+            //             .y_label_area_size(30)
+            //             .build_cartesian_2d(x_range, y_range)
+            //             .expect("Failed to build chart");
 
-                    drawing_area
-                        .present()
-                        .expect("Failed to present drawing area");
-                }
+            //         chart.configure_mesh().draw().expect("Failed to draw mesh");
 
-                let mut png_data = Vec::new();
-                let cursor = Cursor::new(&mut png_data);
-                let encoder = PngEncoder::new(cursor);
-                let color = image::ColorType::Rgb8;
+            //         chart.draw_series(
+            //             data.iter().map(|&(x, y)| {
+            //                 Pixel::new((x, y), RED.filled())
+            //             })
+            //         ).expect("Failed to draw points");
 
-                encoder
-                    .write_image(buffer.as_slice(), width, height, color.into())
-                    .expect("Failed to write the image");
+            //         drawing_area
+            //             .present()
+            //             .expect("Failed to present drawing area");
+            //     }
 
-                let buffer_base64 = BASE64_STANDARD.encode(png_data);
+            //     let mut png_data = Vec::new();
+            //     let cursor = Cursor::new(&mut png_data);
+            //     let encoder = PngEncoder::new(cursor);
+            //     let color = image::ColorType::Rgb8;
 
-                plot_image_src.set(format!("data:image/png;base64,{}", buffer_base64));
-            });
+            //     encoder
+            //         .write_image(buffer.as_slice(), width, height, color.into())
+            //         .expect("Failed to write the image");
+
+            //     let buffer_base64 = BASE64_STANDARD.encode(png_data);
+
+            //     plot_image_src.set(format!("data:image/png;base64,{}", buffer_base64));
+            // });
+
+            // When you want to update the plot
+            let data_uri = crate::densityplot::density_plot_to_base64(
+                &data,
+                256,
+                &colormap::ColorMap::Jet,
+            ).expect("Failed to create density plot");
+
+            plot_image_src.set(data_uri);
         }
     // }
     ));
@@ -206,7 +214,6 @@ pub fn Plotters(
             //         cb.call(evt.data)
             //     }
             // },
-
             onscroll: move |evt| {
                 if let Some(cb) = &on_scroll {
                     cb.call(evt.data)
