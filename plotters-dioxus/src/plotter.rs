@@ -11,7 +11,9 @@ use std::io::Cursor;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use crate::colormap;
+// use crate::colormap;
+
+use flow_plots::{BasePlotOptions, ColorMaps, DensityPlot, DensityPlotOptions, Plot, options::AxisOptionsBuilder, render::RenderConfig};
 
 pub type DioxusDrawingArea<'a> = DrawingArea<BitMapBackend<'a>, Shift>;
 
@@ -119,13 +121,52 @@ pub fn Plotters(
             // });
 
             // When you want to update the plot
-            let data_uri = crate::densityplot::density_plot_to_base64(
-                &data,
-                256,
-                &colormap::ColorMap::Jet,
-            ).expect("Failed to create density plot");
+            // let data_uri = crate::densityplot::density_plot_to_base64(
+            //     &data,
+            //     256,
+            //     &colormap::ColorMap::Jet,
+            // ).expect("Failed to create density plot");
 
-            plot_image_src.set(data_uri);
+            // plot_image_src.set(data_uri);
+
+            let plot = DensityPlot::new();
+            let base_options = BasePlotOptions::new()
+                .width(800_u32)
+                .height(600_u32)
+                .title("My Density Plot")
+                .build()
+                .expect("shouldn't fail");
+
+            let x_axis_options = flow_plots::AxisOptions::new()
+            .range(-2f32..=7f32)
+            .label("CD4")
+            .build().expect("axis options failed");
+            let y_axis_options = flow_plots::AxisOptions::new()
+                .range(-2f32..=7f32)
+                .label("CD8")
+                .build().expect("axis options failed");
+
+            let options = DensityPlotOptions::new()
+            .base(base_options
+            )
+                .colormap(ColorMaps::Jet)
+                .x_axis(x_axis_options)
+                .y_axis(y_axis_options)
+                .build().expect("shouldn't fail");
+ 
+            let mut render_config = RenderConfig::default();
+            let vec_f32: Vec<(f32, f32)> = data.clone()
+                .iter()
+                .map(|(x, y)| (*x as f32, *y as f32))
+                .collect();
+            println!("length of vec_f32: {}", vec_f32.len());
+            let bytes = plot.render(vec_f32, &options, &mut render_config).expect("failed to render plot");
+            // 2. Base64 encode the JPEG data
+            let base64_str = BASE64_STANDARD.encode(&bytes);
+ 
+            // 3. Set the Dioxus signal with the JPEG MIME type
+            // Change "image/png" -> "image/jpeg"
+            plot_image_src.set(format!("data:image/jpeg;base64,{}", base64_str));
         }
     // }
     ));
