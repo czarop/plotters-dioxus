@@ -1,68 +1,64 @@
 #![allow(non_snake_case)]
 
-// use gui::file_load;
-
-
-
-
-
 use dioxus::{
     desktop::{Config, LogicalSize, WindowBuilder},
     prelude::*,
 };
-use fcs_rs_2::{FcsError, FcsFile, FlowSample};
-use std::rc::Rc;
-use std::sync::{Arc, RwLock};
+use flow_fcs::{Fcs, Transformable, TransformType};
+use std::{collections::HashMap, rc::Rc};
+use std::sync::{Arc};
 use tokio::task;
-
-// Import your Plotters component from the `plotters-dioxus` crate.
 use plotters_dioxus::{AxisLimits, Plotters};
 use polars::prelude::*;
 
-// --- Helper Functions (No changes needed, they're already good) ---
-async fn get_flow_data(path: String) -> Result<Arc<RwLock<FlowSample>>, FcsError> {
+
+async fn get_flow_data(path: String) -> Result<Arc<Fcs>, Arc<anyhow::Error>> {
     println!("Loading FCS file: {}", path);
     task::spawn_blocking(move || {
-        let fcs_file = FcsFile::open(&path)?;
-        let fcs_data = fcs_file.read()?; // This is the blocking read
-        Ok(Arc::new(RwLock::new(fcs_data)))
+        let fcs_file = Fcs::open(&path)?;
+        Ok(Arc::new(fcs_file))
     })
-    .await?
+    .await.map_err(|e| Arc::new(e.into()))?
 }
 
 async fn get_data_to_display(
-    fs: Option<Arc<RwLock<FlowSample>>>,
+    fs: Option<Arc<Fcs>>,
     col1_name: &str,
     col2_name: &str,
-    col1_cofactor: f64,
-    col2_cofactor: f64,
-) -> Result<Arc<Vec<(f64, f64)>>, FcsError> {
+    col1_cofactor: f32,
+    col2_cofactor: f32,
+) -> Result<Arc<Vec<(f32, f32)>>, anyhow::Error> {
     let ts_fs = fs.ok_or_else(|| {
-        FcsError::InvalidData("No FCS data available for processing.".to_string())
+        anyhow::anyhow!("No FCS data available for processing.".to_string())
     })?;
-
-    let col_names = vec![col1_name.to_string(), col2_name.to_string()];
-    let cofactors = vec![col1_cofactor, col2_cofactor];
+    // let col_names = vec![col1_name.to_string(), col2_name.to_string()];
+    // let cofactors = vec![col1_cofactor, col2_cofactor];
     let ts_fs_clone = ts_fs.clone();
     let col1_name = col1_name.to_string();
     let col2_name = col2_name.to_string();
-    let result: std::result::Result<Arc<Vec<(f64, f64)>>, FcsError>  = task::spawn_blocking(move || -> Result<Arc<Vec<(f64, f64)>>, FcsError>{
-        ts_fs_clone.write().unwrap().arcsinh_transform(&cofactors, &col_names).map_err(|e| FcsError::InvalidData(e.to_string()))?;
-        let zipped_cols =get_zipped_column_data(&ts_fs.read().unwrap().data, &col1_name, &col2_name).map_err(|_| FcsError::InvalidData("invalid columns".to_string()))?;
+    task::spawn_blocking(move || -> Result<Arc<Vec<(f32, f32)>>, anyhow::Error>{
+        // let params: Vec<(&str, f32)> = col_names.iter().map(|s| s.as_str()).zip(cofactors).collect();
+        // let df = ts_fs_clone.apply_arcsinh_transforms(params.as_slice())?;
+        // let zipped_cols = get_zipped_column_data(df, &col1_name, &col2_name)?;
+        let cols = ts_fs_clone.get_xy_pairs(&col1_name, &col2_name).expect("");
+        let t = TransformType::Arcsinh { cofactor: col1_cofactor };
+        let t2 = TransformType::Arcsinh { cofactor: col2_cofactor };
+        let zipped_cols: Vec<(f32, f32)> = cols.into_iter().map(|(x, y)| (t.transform(&x), t2.transform(&y))).collect();
+
         Ok(Arc::new(zipped_cols))
     })
-    .await.map_err(|e| FcsError::InvalidData(e.to_string()))?;
+    .await?
 
-    result
+
 }
 
 fn get_zipped_column_data(
-    df: &DataFrame,
+    df: Arc<DataFrame>,
     col1_name: &str,
     col2_name: &str,
-) -> Result<Vec<(f64, f64)>, PolarsError> {
-    let float_series1 = df.column(col1_name)?.f64()?;
-    let float_series2 = df.column(col2_name)?.f64()?;
+) -> Result<Vec<(f32, f32)>, PolarsError> {
+    let float_series1 = df.column(col1_name)?.f32()?;
+    let float_series2 = df.column(col2_name)?.f32()?;
     let zipped_data = float_series1
         .into_no_null_iter()
         .zip(float_series2.into_no_null_iter())
@@ -70,7 +66,7 @@ fn get_zipped_column_data(
     Ok(zipped_data)
 }
 
-fn asinh_transform_f64(value: f64, cofactor: f64) -> f64 {
+fn asinh_transform_f32(value: f32, cofactor: f32) -> f32 {
     if value.is_nan() || value.is_infinite() {
         return value;
     }
@@ -96,37 +92,49 @@ fn App() -> Element {
     // Primary States
     let mut sample_index = use_signal(|| 0);
     let current_sample_path = use_memo(move || samples.read()[*sample_index.read()].clone());
+    
 
     let mut x_axis_param = use_signal(|| "CD4".to_string());
     let mut y_axis_param = use_signal(|| "CD8".to_string());
-    let mut x_cofactor = use_signal(|| 6000.0f64);
-    let mut y_cofactor = use_signal(|| 6000.0f64);
+    let mut x_cofactor = use_signal(|| 6000.0f32);
+    let mut y_cofactor = use_signal(|| 6000.0f32);
 
     let x_axis_limits = use_memo(move || {
         let x_co = *x_cofactor.read();
-        let scaled_x_lower = asinh_transform_f64(-10000_f64, x_co);
-        let scaled_x_upper = asinh_transform_f64(4194304_f64, x_co);
+        let scaled_x_lower = asinh_transform_f32(-10000_f32, x_co);
+        let scaled_x_upper = asinh_transform_f32(4194304_f32, x_co);
         AxisLimits {
-            lower: scaled_x_lower,
-            upper: scaled_x_upper,
+            lower: scaled_x_lower as f64,
+            upper: scaled_x_upper as f64,
         }
     });
 
     let y_axis_limits = use_memo(move || {
         let y_co = *y_cofactor.read();
-        let scaled_y_lower = asinh_transform_f64(-10000_f64, y_co);
-        let scaled_y_upper = asinh_transform_f64(4194304_f64, y_co);
+        let scaled_y_lower = asinh_transform_f32(-10000_f32, y_co);
+        let scaled_y_upper = asinh_transform_f32(4194304_f32, y_co);
         AxisLimits {
-            lower: scaled_y_lower,
-            upper: scaled_y_upper,
+            lower: scaled_y_lower as f64,
+            upper: scaled_y_upper as f64,
         }
     });
 
     // RESOURCE 1: Load FCS File
     // This resource re-runs when `current_sample_path` changes
-    let fcs_file_resource: Resource<Result<Arc<RwLock<FlowSample>>, FcsError>> = use_resource(move || {
+    let fcs_file_resource: Resource<Result<Arc<Fcs>, Arc<anyhow::Error>>> = use_resource(move || {
         let path = current_sample_path.read().clone();
         async move { get_flow_data(path).await }
+    });
+
+    let marker_to_fluoro_map = use_memo(move || {
+        if let Some(Ok(fcs_file)) = fcs_file_resource.read().clone(){
+            let name_param:HashMap<String, String> = fcs_file.parameters.iter().map(|param| {
+            (param.1.label_name.to_string(), param.0.to_string())
+            }).collect();
+            name_param
+        } else {
+            HashMap::new()
+        }
     });
 
     // RESOURCE 2: Process Data for Display
@@ -138,6 +146,9 @@ fn App() -> Element {
         let data = fcs_file_resource.read().clone(); // Read the current state of the FCS file resource
         let x_param = x_axis_param.read().clone();
         let y_param = y_axis_param.read().clone();
+        // let map = *;
+        let x_param = marker_to_fluoro_map.read().get(&x_param).unwrap_or(&x_param).clone();
+        let y_param = marker_to_fluoro_map.read().get(&y_param).unwrap_or(&y_param).clone();
         let x_cf = *x_cofactor.read();
         let y_cf = *y_cofactor.read();
 
@@ -223,7 +234,7 @@ fn App() -> Element {
                         r#type: "number",
                         value: "{x_cofactor.read()}",
                         oninput: move |evt| {
-                            if let Ok(val) = evt.value().parse::<f64>() {
+                            if let Ok(val) = evt.value().parse::<f32>() {
                                 x_cofactor.set(val);
                             }
                         },
@@ -247,7 +258,7 @@ fn App() -> Element {
                         r#type: "number",
                         value: "{y_cofactor.read()}",
                         oninput: move |evt| {
-                            if let Ok(val) = evt.value().parse::<f64>() {
+                            if let Ok(val) = evt.value().parse::<f32>() {
                                 y_cofactor.set(val);
                             }
                         },

@@ -9,8 +9,6 @@ thiserror = "2.0.12"
 polars = {version = "0.52", default-features = false, features = ["lazy", "performant"]}
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 anyhow = "1"
-fcs-rs-2 = {git = "https://github.com/czarop/fcs-rs-2", rev = "1faada1"}
-ndarray = "0.17"
-ndarray-ndimage = "0.5.0"
-flow-fcs = {git = "https://github.com/czarop/flow_ts_fork", branch = "main"}
-flow-plots = {git = "https://github.com/czarop/flow_ts_fork", branch = "main"}
+flow-fcs = {git = "https://github.com/czarop/flow_ts_fork", rev = "3714ca5"}
+flow-plots = {git = "https://github.com/czarop/flow_ts_fork", rev = "3714ca5"}
+flow-gates = {git = "https://github.com/czarop/flow_ts_fork", rev = "3714ca5"}

@@ -14,4 +14,4 @@ plotters.workspace = true
 tokio.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true
-fcs-rs-2.workspace = true
+flow-fcs.workspace = true

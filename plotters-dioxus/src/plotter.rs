@@ -5,15 +5,12 @@ use plotters::prelude::*;
 use plotters_bitmap::BitMapBackend;
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
-use image::ImageEncoder;
-use image::codecs::png::PngEncoder;
-use std::io::Cursor;
 use std::rc::Rc;
 use std::sync::Arc;
 
 // use crate::colormap;
 
-use flow_plots::{BasePlotOptions, ColorMaps, DensityPlot, DensityPlotOptions, Plot, options::AxisOptionsBuilder, render::RenderConfig};
+use flow_plots::{BasePlotOptions, ColorMaps, DensityPlot, DensityPlotOptions, Plot, render::RenderConfig};
 
 pub type DioxusDrawingArea<'a> = DrawingArea<BitMapBackend<'a>, Shift>;
 
@@ -25,7 +22,7 @@ pub struct AxisLimits{
 
 #[component]
 pub fn Plotters(
-    #[props] data: Arc<Vec<(f64, f64)>>,
+    #[props] data: Arc<Vec<(f32, f32)>>,
     #[props] size: (u32, u32),
     #[props] x_axis_limits: AxisLimits,
     #[props] y_axis_limits: AxisLimits,
@@ -53,98 +50,29 @@ pub fn Plotters(
         let (width, height) = size;
         let data = data.clone();
 
-            // spawn(async move {
-            //     let buffer_size = (width * height * 3) as usize;
-            //     let mut buffer = vec![0u8; buffer_size];
-
-            //     {
-            //         let drawing_area =
-            //             BitMapBackend::with_buffer(buffer.as_mut_slice(), (width, height))
-            //                 .into_drawing_area();
-
-            //         drawing_area
-            //             .fill(&WHITE)
-            //             .expect("Failed to fill drawing area");
-
-            //         let (x_min, x_max, y_min, y_max) = if data.is_empty() {
-            //             // Default ranges if data is empty
-            //             (0.0, 1.0, 0.0, 1.0)
-            //         } else {
-            //             let min_x = x_axis_limits.lower;
-            //             let max_x = x_axis_limits.upper;
-            //             let min_y = y_axis_limits.lower;
-            //             let max_y = y_axis_limits.upper;
-
-                    
-            //             (min_x, max_x, min_y, max_y)
-            //         };
-
-
-            //         let x_range = (x_min)..((4194304_f64 / 6000.0).asinh());
-            //         let y_range = (y_min)..((4194304_f64 / 6000.0).asinh());
-                    
-
-            //         // Let plotters infer the coordinate system from the `Range<f64>` inputs.
-            //         let mut chart = ChartBuilder::on(&drawing_area)
-            //             .caption("Dynamic Dot Plot", ("sans-serif", 20).into_font())
-            //             .margin(5)
-            //             .x_label_area_size(30)
-            //             .y_label_area_size(30)
-            //             .build_cartesian_2d(x_range, y_range)
-            //             .expect("Failed to build chart");
-
-            //         chart.configure_mesh().draw().expect("Failed to draw mesh");
-
-            //         chart.draw_series(
-            //             data.iter().map(|&(x, y)| {
-            //                 Pixel::new((x, y), RED.filled())
-            //             })
-            //         ).expect("Failed to draw points");
-
-            //         drawing_area
-            //             .present()
-            //             .expect("Failed to present drawing area");
-            //     }
-
-            //     let mut png_data = Vec::new();
-            //     let cursor = Cursor::new(&mut png_data);
-            //     let encoder = PngEncoder::new(cursor);
-            //     let color = image::ColorType::Rgb8;
-
-            //     encoder
-            //         .write_image(buffer.as_slice(), width, height, color.into())
-            //         .expect("Failed to write the image");
-
-            //     let buffer_base64 = BASE64_STANDARD.encode(png_data);
-
-            //     plot_image_src.set(format!("data:image/png;base64,{}", buffer_base64));
-            // });
-
-            // When you want to update the plot
-            // let data_uri = crate::densityplot::density_plot_to_base64(
-            //     &data,
-            //     256,
-            //     &colormap::ColorMap::Jet,
-            // ).expect("Failed to create density plot");
-
-            // plot_image_src.set(data_uri);
-
             let plot = DensityPlot::new();
             let base_options = BasePlotOptions::new()
-                .width(800_u32)
-                .height(600_u32)
+                .width(size.0)
+                .height(size.1)
                 .title("My Density Plot")
                 .build()
                 .expect("shouldn't fail");
 
             let x_axis_options = flow_plots::AxisOptions::new()
+
             .range(-2f32..=7f32)
+            .transform(flow_fcs::TransformType::Arcsinh { cofactor: 6000.0 })
+
+                // .transform(flow_fcs::TransformType::Arcsinh { cofactor: 6000.0 })
+
             .label("CD4")
             .build().expect("axis options failed");
             let y_axis_options = flow_plots::AxisOptions::new()
                 .range(-2f32..=7f32)
+                .transform(flow_fcs::TransformType::Arcsinh { cofactor: 6000.0 })
                 .label("CD8")
                 .build().expect("axis options failed");
+
 
             let options = DensityPlotOptions::new()
             .base(base_options
@@ -155,17 +83,8 @@ pub fn Plotters(
                 .build().expect("shouldn't fail");
  
             let mut render_config = RenderConfig::default();
-            let vec_f32: Vec<(f32, f32)> = data.clone()
-                .iter()
-                .map(|(x, y)| (*x as f32, *y as f32))
-                .collect();
-            println!("length of vec_f32: {}", vec_f32.len());
-            let bytes = plot.render(vec_f32, &options, &mut render_config).expect("failed to render plot");
-            // 2. Base64 encode the JPEG data
+            let bytes = plot.render(data, &options, &mut render_config).expect("failed to render plot");
             let base64_str = BASE64_STANDARD.encode(&bytes);
- 
-            // 3. Set the Dioxus signal with the JPEG MIME type
-            // Change "image/png" -> "image/jpeg"
             plot_image_src.set(format!("data:image/jpeg;base64,{}", base64_str));
         }
     // }
