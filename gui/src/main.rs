@@ -8,8 +8,7 @@ use flow_fcs::{Fcs, Transformable, TransformType};
 use std::{collections::HashMap, rc::Rc};
 use std::sync::{Arc};
 use tokio::task;
-use plotters_dioxus::{AxisLimits, Plotters};
-use polars::prelude::*;
+use plotters_dioxus::{AxisInfo, Plotters};
 
 
 async fn get_flow_data(path: String) -> Result<Arc<Fcs>, Arc<anyhow::Error>> {
@@ -31,39 +30,20 @@ async fn get_data_to_display(
     let ts_fs = fs.ok_or_else(|| {
         anyhow::anyhow!("No FCS data available for processing.".to_string())
     })?;
-    // let col_names = vec![col1_name.to_string(), col2_name.to_string()];
-    // let cofactors = vec![col1_cofactor, col2_cofactor];
+
     let ts_fs_clone = ts_fs.clone();
     let col1_name = col1_name.to_string();
     let col2_name = col2_name.to_string();
     task::spawn_blocking(move || -> Result<Arc<Vec<(f32, f32)>>, anyhow::Error>{
-        // let params: Vec<(&str, f32)> = col_names.iter().map(|s| s.as_str()).zip(cofactors).collect();
-        // let df = ts_fs_clone.apply_arcsinh_transforms(params.as_slice())?;
-        // let zipped_cols = get_zipped_column_data(df, &col1_name, &col2_name)?;
         let cols = ts_fs_clone.get_xy_pairs(&col1_name, &col2_name).expect("");
-        let t = TransformType::Arcsinh { cofactor: col1_cofactor };
+        let t1 = TransformType::Arcsinh { cofactor: col1_cofactor };
         let t2 = TransformType::Arcsinh { cofactor: col2_cofactor };
-        let zipped_cols: Vec<(f32, f32)> = cols.into_iter().map(|(x, y)| (t.transform(&x), t2.transform(&y))).collect();
-
+        let zipped_cols: Vec<(f32, f32)> = cols.into_iter().map(|(x, y)| (t1.transform(&x), t2.transform(&y))).collect();
         Ok(Arc::new(zipped_cols))
     })
     .await?
 
 
-}
-
-fn get_zipped_column_data(
-    df: Arc<DataFrame>,
-    col1_name: &str,
-    col2_name: &str,
-) -> Result<Vec<(f32, f32)>, PolarsError> {
-    let float_series1 = df.column(col1_name)?.f32()?;
-    let float_series2 = df.column(col2_name)?.f32()?;
-    let zipped_data = float_series1
-        .into_no_null_iter()
-        .zip(float_series2.into_no_null_iter())
-        .collect();
-    Ok(zipped_data)
 }
 
 fn asinh_transform_f32(value: f32, cofactor: f32) -> f32 {
@@ -103,9 +83,11 @@ fn App() -> Element {
         let x_co = *x_cofactor.read();
         let scaled_x_lower = asinh_transform_f32(-10000_f32, x_co);
         let scaled_x_upper = asinh_transform_f32(4194304_f32, x_co);
-        AxisLimits {
-            lower: scaled_x_lower as f64,
-            upper: scaled_x_upper as f64,
+        AxisInfo {
+            title: x_axis_param(),
+            lower: scaled_x_lower,
+            upper: scaled_x_upper,
+            transform: TransformType::Arcsinh { cofactor: x_co },
         }
     });
 
@@ -113,9 +95,11 @@ fn App() -> Element {
         let y_co = *y_cofactor.read();
         let scaled_y_lower = asinh_transform_f32(-10000_f32, y_co);
         let scaled_y_upper = asinh_transform_f32(4194304_f32, y_co);
-        AxisLimits {
-            lower: scaled_y_lower as f64,
-            upper: scaled_y_upper as f64,
+        AxisInfo {
+            title: y_axis_param(),
+            lower: scaled_y_lower,
+            upper: scaled_y_upper,
+            transform: TransformType::Arcsinh { cofactor: y_co },
         }
     });
 
@@ -297,8 +281,8 @@ fn App() -> Element {
                             Plotters {
                                 size: (600, 600),
                                 data: plot_data.clone(),
-                                x_axis_limits: x_axis_limits.read().clone(),
-                                y_axis_limits: y_axis_limits.read().clone(),
+                                x_axis_info: x_axis_limits.read().clone(),
+                                y_axis_info: y_axis_limits.read().clone(),
                                 on_click: handle_click,
                                 on_mousemove: handle_mousemove,
                                 on_mousedown: handle_mousedown,

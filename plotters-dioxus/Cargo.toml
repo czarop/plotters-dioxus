@@ -11,3 +11,4 @@ base64 = "0.22.1"
 plotters-bitmap = "0.3.3"
 flow-plots.workspace = true
 flow-fcs.workspace = true
+flow-gates.workspace = true

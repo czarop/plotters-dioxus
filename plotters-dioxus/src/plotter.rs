@@ -7,6 +7,7 @@ use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use std::rc::Rc;
 use std::sync::Arc;
+use flow_gates::*;
 
 // use crate::colormap;
 
@@ -14,18 +15,22 @@ use flow_plots::{BasePlotOptions, ColorMaps, DensityPlot, DensityPlotOptions, Pl
 
 pub type DioxusDrawingArea<'a> = DrawingArea<BitMapBackend<'a>, Shift>;
 
+
+
 #[derive(Debug, Clone, PartialEq, Props)]
-pub struct AxisLimits{
-    pub lower: f64,
-    pub upper: f64
+pub struct AxisInfo{
+    pub title: String,
+    pub lower: f32,
+    pub upper: f32,
+    pub transform: flow_fcs::TransformType,
 }
 
 #[component]
 pub fn Plotters(
     #[props] data: Arc<Vec<(f32, f32)>>,
     #[props] size: (u32, u32),
-    #[props] x_axis_limits: AxisLimits,
-    #[props] y_axis_limits: AxisLimits,
+    #[props] x_axis_info: AxisInfo,
+    #[props] y_axis_info: AxisInfo,
     #[props(optional)] on_click: Option<EventHandler<Rc<MouseData>>>,
     #[props(optional)] on_dblclick: Option<EventHandler<Rc<MouseData>>>,
     #[props(optional)] on_mousemove: Option<EventHandler<Rc<MouseData>>>,
@@ -45,32 +50,34 @@ pub fn Plotters(
     #[props(optional)] on_scroll: Option<EventHandler<Rc<ScrollData>>>,
 ) -> Element {
     let mut plot_image_src = use_signal(|| String::new());
+    let mut plot_map = use_signal(|| None::<flow_plots::render::plotmap::PlotMapper>);
+    
 
-    use_effect(use_reactive!( |size, data, x_axis_limits, y_axis_limits| {
+    use_effect(use_reactive!( |size, data, x_axis_info, y_axis_info| {
         let (width, height) = size;
         let data = data.clone();
 
             let plot = DensityPlot::new();
             let base_options = BasePlotOptions::new()
-                .width(size.0)
-                .height(size.1)
+                .width(width)
+                .height(height)
                 .title("My Density Plot")
                 .build()
                 .expect("shouldn't fail");
 
             let x_axis_options = flow_plots::AxisOptions::new()
 
-            .range(-2f32..=7f32)
-            .transform(flow_fcs::TransformType::Arcsinh { cofactor: 6000.0 })
+            .range(x_axis_info.lower..=x_axis_info.upper)
+            .transform(x_axis_info.transform)
 
                 // .transform(flow_fcs::TransformType::Arcsinh { cofactor: 6000.0 })
 
-            .label("CD4")
+            .label(x_axis_info.title)
             .build().expect("axis options failed");
             let y_axis_options = flow_plots::AxisOptions::new()
-                .range(-2f32..=7f32)
-                .transform(flow_fcs::TransformType::Arcsinh { cofactor: 6000.0 })
-                .label("CD8")
+                .range(y_axis_info.lower..=y_axis_info.upper)
+                .transform(y_axis_info.transform)
+                .label(y_axis_info.title)
                 .build().expect("axis options failed");
 
 
@@ -83,12 +90,18 @@ pub fn Plotters(
                 .build().expect("shouldn't fail");
  
             let mut render_config = RenderConfig::default();
-            let bytes = plot.render(data, &options, &mut render_config).expect("failed to render plot");
+            let plot_data = plot.render(data, &options, &mut render_config).expect("failed to render plot");
+            let bytes = plot_data.plot_bytes;
+            let mapper = plot_data.plot_map;
             let base64_str = BASE64_STANDARD.encode(&bytes);
             plot_image_src.set(format!("data:image/jpeg;base64,{}", base64_str));
+            plot_map.set(Some(mapper));
+            
         }
     // }
     ));
+
+    let mut coords = use_signal(|| Vec::<(f32, f32)>::new());
 
     rsx! {
 
@@ -99,6 +112,13 @@ pub fn Plotters(
             draggable: "{draggable}",
             onclick: move |evt| {
                 if let Some(cb) = &on_click {
+                    let coords = &evt.data.client_coordinates();
+                    if let Some(mapper) = plot_map() {
+                        let actual_coords = mapper
+                            .pixel_to_data(coords.x as f32, coords.y as f32)
+                            .unwrap();
+                        println!("{}, {}", actual_coords.0, actual_coords.1);
+                    }
                     cb.call(evt.data)
                 }
             },
