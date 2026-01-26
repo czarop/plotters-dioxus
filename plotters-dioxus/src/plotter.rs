@@ -112,12 +112,20 @@ pub fn Plotters(
             draggable: "{draggable}",
             onclick: move |evt| {
                 if let Some(cb) = &on_click {
-                    let coords = &evt.data.client_coordinates();
+                    let coords = &evt.data.coordinates().element();
                     if let Some(mapper) = plot_map() {
-                        let actual_coords = mapper
-                            .pixel_to_data(coords.x as f32, coords.y as f32)
-                            .unwrap();
-                        println!("{}, {}", actual_coords.0, actual_coords.1);
+                        // let base_width = 600 as f32;
+                        // let base_height = 600 as f32;
+                        // let norm_x = (coords.x as f32 / size.0 as f32) * base_width as f32;
+                        // let norm_y = (coords.y as f32 / size.1 as f32) * base_height as f32;
+                        let norm_x = coords.x as f32;
+                        let norm_y = coords.y as f32;
+                        // println!("normalised Data: {}, {}", norm_x, norm_y);
+                        if let Some((data_x, data_y)) = mapper.pixel_to_data(norm_x, norm_y) {
+                            println!("Clicked Data: {}, {}", data_x, data_y);
+                        } else {
+                            println!("Clicked outside plot area");
+                        }
                     }
                     cb.call(evt.data)
                 }
