@@ -1,5 +1,7 @@
 [target.x86_64-pc-windows-msvc]
-linker = "lld-link.exe"
+rustflags = [
+    "-C", "link-arg=/INCREMENTAL"
+]
 
 [net]
 git-fetch-with-cli = true

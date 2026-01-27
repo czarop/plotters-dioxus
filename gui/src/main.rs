@@ -62,16 +62,37 @@ static CSS_STYLE: Asset = asset!("assets/styles.css");
 #[component]
 fn App() -> Element {
     // Hardcoded paths (will be selectable later)
-    let samples = use_signal(|| {
-        vec![
-        "/Users/czarop/Downloads/unscaled_t/[PMA_IONO_STIM] H8 FMX_Plate_001.fcs".to_string(),
-        "/Users/czarop/Downloads/unscaled_t/[PMA_IONO_STIM] H9 FS_Plate_001.fcs".to_string()
-    ]
+    let mut samples: Signal<Vec<String>> = use_signal(|| {
+        vec![]
+    });
+
+    let _ = use_resource(move || async move {
+        // Read the file from the project root
+        if let Ok(content) = std::fs::read_to_string("file_paths.txt") {
+            let paths: Vec<String> = content
+                .lines()
+                .map(|line| line.trim().to_string())
+                .filter(|line| !line.is_empty())
+                .collect();
+            
+            // 3. Update the signal with the new list
+            samples.set(paths);
+        }
     });
 
     // Primary States
     let mut sample_index = use_signal(|| 0);
-    let current_sample_path = use_memo(move || samples.read()[*sample_index.read()].clone());
+    let current_sample_path = use_memo(move || {
+        let s = samples.read();
+        let s_len = s.len();
+        let index = *sample_index.read();
+        if index < s_len {
+            Some(s[index].clone())
+        } else {
+            None
+        }
+        
+    });
     
 
     let mut x_axis_param = use_signal(|| "CD4".to_string());
@@ -105,9 +126,15 @@ fn App() -> Element {
 
     // RESOURCE 1: Load FCS File
     // This resource re-runs when `current_sample_path` changes
-    let fcs_file_resource: Resource<Result<Arc<Fcs>, Arc<anyhow::Error>>> = use_resource(move || {
-        let path = current_sample_path.read().clone();
-        async move { get_flow_data(path).await }
+    let fcs_file_resource = use_resource(move || {
+        async move {
+        if let Some(path) = current_sample_path.read().clone(){
+             get_flow_data(path).await
+        } else {
+            Err(Arc::new(anyhow::anyhow!("No file path selected."))) 
+        }
+    }
+        
     });
 
     let marker_to_fluoro_map = use_memo(move || {
@@ -137,9 +164,10 @@ fn App() -> Element {
         let y_cf = *y_cofactor.read();
 
         async move {
+            let d = data.and_then(|res| res.ok());
             // Pass the inner `Ok` value if available, or `None` if still loading/errored
             get_data_to_display(
-                data.and_then(|res| res.ok()),
+                d,
                 &x_param,
                 &y_param,
                 x_cf,
@@ -198,7 +226,7 @@ fn App() -> Element {
                         "Next FCS File"
                     }
                     p {
-                        "Current File: {current_sample_path.read().split('/').last().unwrap_or_default()}"
+                        "Current File: {current_sample_path().unwrap_or_default().split('/').last().unwrap_or_default()}"
                     }
                 }
 
