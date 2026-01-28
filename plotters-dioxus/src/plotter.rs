@@ -29,8 +29,8 @@ pub struct AxisInfo{
 pub fn Plotters(
     #[props] data: Arc<Vec<(f32, f32)>>,
     #[props] size: (u32, u32),
-    #[props] x_axis_info: AxisInfo,
-    #[props] y_axis_info: AxisInfo,
+    #[props] x_axis_info: ReadSignal<AxisInfo>,
+    #[props] y_axis_info: ReadSignal<AxisInfo>,
     #[props(optional)] on_click: Option<EventHandler<Rc<MouseData>>>,
     #[props(optional)] on_dblclick: Option<EventHandler<Rc<MouseData>>>,
     #[props(optional)] on_mousemove: Option<EventHandler<Rc<MouseData>>>,
@@ -51,9 +51,36 @@ pub fn Plotters(
 ) -> Element {
     let mut plot_image_src = use_signal(|| String::new());
     let mut plot_map = use_signal(|| None::<flow_plots::render::plotmap::PlotMapper>);
-    
+    let mut coords = use_signal(|| Vec::<(f32, f32)>::new());
+    let mut gate_signal = use_signal(|| None::<flow_gates::Gate>);
 
-    use_effect(use_reactive!( |size, data, x_axis_info, y_axis_info| {
+    use_effect(move || {
+        let cur_coords = coords();
+        match flow_gates::geometry::create_polygon_geometry(cur_coords, &x_axis_info().title, &y_axis_info().title){
+            Ok(gate) => {
+                let gate = Gate::new (
+                    "my first gate",
+                    "My first gate".to_string(),
+                    gate,
+                    x_axis_info().title.as_str(),
+                    y_axis_info().title.as_str()
+                
+                );
+
+                gate_signal.set(Some(gate));
+
+            },
+            Err(e) =>{
+                println!("{}", e.to_string());
+                gate_signal.set(None);
+            }
+        
+        }
+    });
+
+    use_effect(use_reactive!( |size, data| {
+        let x_axis_info = x_axis_info();
+        let y_axis_info = y_axis_info();
         let (width, height) = size;
         let data = data.clone();
 
@@ -90,7 +117,16 @@ pub fn Plotters(
                 .build().expect("shouldn't fail");
  
             let mut render_config = RenderConfig::default();
-            let plot_data = plot.render(data, &options, &mut render_config).expect("failed to render plot");
+            let gate_option = gate_signal();
+            let refs: [ &dyn flow_plots::plots::traits::PlotDrawable; 1 ];
+            let gates_slice: Option<&[&dyn flow_plots::plots::traits::PlotDrawable]> = if let Some(ref g) = gate_option {
+                refs = [g as &dyn flow_plots::plots::traits::PlotDrawable];
+                Some(&refs[..])
+            } else {
+                None
+            };
+            
+            let plot_data = plot.render(data, &options, &mut render_config, gates_slice).expect("failed to render plot");
             let bytes = plot_data.plot_bytes;
             let mapper = plot_data.plot_map;
             let base64_str = BASE64_STANDARD.encode(&bytes);
@@ -101,14 +137,9 @@ pub fn Plotters(
     // }
     ));
 
-    let mut coords = use_signal(|| Vec::<(f32, f32)>::new());
+    
 
-    use_effect(move || {
-        let cur_coords = coords();
-        for (i, coord) in cur_coords.iter().enumerate() {
-            println!("Stored Coord {}: {}, {}", i, coord.0, coord.1);
-        }
-    });
+     
 
     rsx! {
 

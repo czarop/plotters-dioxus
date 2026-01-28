@@ -2,7 +2,7 @@
 name = "gui"
 version = "0.1.0"
 edition = "2024"
-resolver = "1"
+resolver = "2"
 
 [dependencies.plotters-dioxus]
 path = "../plotters-dioxus"
@@ -15,3 +15,8 @@ tokio.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true
 flow-fcs.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+polars = {version = "0.52", default-features = false, features = ["lazy", "performant", "timezones"]}
+[target.'cfg(not(windows))'.dependencies]
+polars = {version = "0.52", default-features = false, features = ["lazy", "performant", "dtype-full"]}
