@@ -63,7 +63,7 @@ impl GateState {
         );
         self.gate_ids_by_view
             .entry(key)
-            .and_modify(|l| {l.retain(|name|  name != &*gate.id)});
+            .and_modify(|l| l.retain(|name| name != &*gate.id));
 
         self.hierarchy
             .add_gate_child(parental_gate_id.unwrap_or("root"), gate.id.clone())?;

@@ -1,23 +1,26 @@
 #![allow(non_snake_case)]
 
+use clingate::{
+    file_load::FcsFiles,
+    plotters_dioxus::{AxisInfo, Plotters},
+};
 use dioxus::{
     desktop::{Config, LogicalSize, WindowBuilder},
     prelude::*,
 };
-use flow_fcs::{Fcs, Transformable, TransformType};
+use flow_fcs::{Fcs, TransformType, Transformable};
 use std::collections::HashMap;
-use std::sync::{Arc};
+use std::sync::Arc;
 use tokio::task;
-use clingate::plotters_dioxus::{AxisInfo, Plotters};
 
-
-async fn get_flow_data(path: String) -> Result<Arc<Fcs>, Arc<anyhow::Error>> {
-    println!("Loading FCS file: {}", path);
+async fn get_flow_data(path: std::path::PathBuf) -> Result<Arc<Fcs>, Arc<anyhow::Error>> {
+    println!("Loading FCS file: {:?}", path);
     task::spawn_blocking(move || {
-        let fcs_file = Fcs::open(&path)?;
+        let fcs_file = Fcs::open(path.to_str().unwrap_or_default())?;
         Ok(Arc::new(fcs_file))
     })
-    .await.map_err(|e| Arc::new(e.into()))?
+    .await
+    .map_err(|e| Arc::new(e.into()))?
 }
 
 async fn get_data_to_display(
@@ -27,23 +30,27 @@ async fn get_data_to_display(
     col1_cofactor: f32,
     col2_cofactor: f32,
 ) -> Result<Arc<Vec<(f32, f32)>>, anyhow::Error> {
-    let ts_fs = fs.ok_or_else(|| {
-        anyhow::anyhow!("No FCS data available for processing.".to_string())
-    })?;
+    let ts_fs =
+        fs.ok_or_else(|| anyhow::anyhow!("No FCS data available for processing.".to_string()))?;
 
     let ts_fs_clone = ts_fs.clone();
     let col1_name = col1_name.to_string();
     let col2_name = col2_name.to_string();
-    task::spawn_blocking(move || -> Result<Arc<Vec<(f32, f32)>>, anyhow::Error>{
+    task::spawn_blocking(move || -> Result<Arc<Vec<(f32, f32)>>, anyhow::Error> {
         let cols = ts_fs_clone.get_xy_pairs(&col1_name, &col2_name).expect("");
-        let t1 = TransformType::Arcsinh { cofactor: col1_cofactor };
-        let t2 = TransformType::Arcsinh { cofactor: col2_cofactor };
-        let zipped_cols: Vec<(f32, f32)> = cols.into_iter().map(|(x, y)| (t1.transform(&x), t2.transform(&y))).collect();
+        let t1 = TransformType::Arcsinh {
+            cofactor: col1_cofactor,
+        };
+        let t2 = TransformType::Arcsinh {
+            cofactor: col2_cofactor,
+        };
+        let zipped_cols: Vec<(f32, f32)> = cols
+            .into_iter()
+            .map(|(x, y)| (t1.transform(&x), t2.transform(&y)))
+            .collect();
         Ok(Arc::new(zipped_cols))
     })
     .await?
-
-
 }
 
 fn asinh_transform_f32(value: f32, cofactor: f32) -> f32 {
@@ -53,8 +60,6 @@ fn asinh_transform_f32(value: f32, cofactor: f32) -> f32 {
     (value / cofactor).asinh()
 }
 
-
-
 // --- Dioxus App Component ---
 
 static CSS_STYLE: Asset = asset!("assets/styles.css");
@@ -62,38 +67,49 @@ static CSS_STYLE: Asset = asset!("assets/styles.css");
 #[component]
 fn App() -> Element {
     // Hardcoded paths (will be selectable later)
-    let mut samples: Signal<Vec<String>> = use_signal(|| {
-        vec![]
-    });
+    let mut filehandler: Signal<Option<FcsFiles>> = use_signal(|| None);
 
     let _ = use_resource(move || async move {
         // Read the file from the project root
-        if let Ok(content) = std::fs::read_to_string("file_paths.txt") {
-            let paths: Vec<String> = content
-                .lines()
-                .map(|line| line.trim().to_string())
-                .filter(|line| !line.is_empty())
-                .collect();
-            
-            // 3. Update the signal with the new list
-            samples.set(paths);
+        let result = (|| -> anyhow::Result<FcsFiles> {
+            let content = std::fs::read_to_string("file_paths.txt")?;
+            let path = content.lines().find(|l| !l.trim().is_empty())
+                .ok_or_else(|| anyhow::anyhow!("No path found"))?;
+                
+            FcsFiles::create(path.trim())
+        })();
+
+        if let Ok(files) = result {
+            filehandler.set(Some(files));
         }
     });
 
     // Primary States
     let mut sample_index = use_signal(|| 0);
-    let current_sample_path = use_memo(move || {
-        let s = samples.read();
-        let s_len = s.len();
-        let index = *sample_index.read();
-        if index < s_len {
-            Some(s[index].clone())
-        } else {
-            None
-        }
-        
-    });
+    // let current_sample_path = use_memo(move || {
+    //     let s = samples.read();
+    //     let s_len = s.len();
+    //     let index = *sample_index.read();
+    //     if index < s_len {
+    //         let sample_name = s[index].clone();
+    //         let directory_name = filehandler.peek().as_ref().unwrap().directory_path().to_string();
+    //         Some(format!("{directory_name}/{sample_name}"))
+    //     } else {
+    //         None
+    //     }
+    // });
+    let current_sample = use_memo(move || {
+    let handler = filehandler.read();
+    let index = *sample_index.read();
     
+
+    if handler.is_some(){
+        Some(handler.as_ref().unwrap().file_list()[index].clone())
+    } else {
+        None
+    }
+    
+});
 
     let mut x_axis_param = use_signal(|| "CD4".to_string());
     let mut y_axis_param = use_signal(|| "CD8".to_string());
@@ -125,23 +141,22 @@ fn App() -> Element {
     });
 
     // RESOURCE 1: Load FCS File
-    // This resource re-runs when `current_sample_path` changes
-    let fcs_file_resource = use_resource(move || {
-        async move {
-        if let Some(path) = current_sample_path.read().clone(){
-             get_flow_data(path).await
+    // This resource re-runs when `current_sample` changes
+    let fcs_file_resource = use_resource(move || async move {
+        if let Some(sample) = current_sample() {
+            get_flow_data(sample.full_path).await
         } else {
-            Err(Arc::new(anyhow::anyhow!("No file path selected."))) 
+            Err(Arc::new(anyhow::anyhow!("No file path selected.")))
         }
-    }
-        
     });
 
     let marker_to_fluoro_map = use_memo(move || {
-        if let Some(Ok(fcs_file)) = fcs_file_resource.read().clone(){
-            let name_param:HashMap<String, String> = fcs_file.parameters.iter().map(|param| {
-            (param.1.label_name.to_string(), param.0.to_string())
-            }).collect();
+        if let Some(Ok(fcs_file)) = fcs_file_resource.read().clone() {
+            let name_param: HashMap<String, String> = fcs_file
+                .parameters
+                .iter()
+                .map(|param| (param.1.label_name.to_string(), param.0.to_string()))
+                .collect();
             name_param
         } else {
             HashMap::new()
@@ -158,22 +173,22 @@ fn App() -> Element {
         let x_param = x_axis_param.read().clone();
         let y_param = y_axis_param.read().clone();
         // let map = *;
-        let x_param = marker_to_fluoro_map.read().get(&x_param).unwrap_or(&x_param).clone();
-        let y_param = marker_to_fluoro_map.read().get(&y_param).unwrap_or(&y_param).clone();
+        let x_param = marker_to_fluoro_map
+            .read()
+            .get(&x_param)
+            .unwrap_or(&x_param)
+            .clone();
+        let y_param = marker_to_fluoro_map
+            .read()
+            .get(&y_param)
+            .unwrap_or(&y_param)
+            .clone();
         let x_cf = *x_cofactor.read();
         let y_cf = *y_cofactor.read();
 
         async move {
             let d = data.and_then(|res| res.ok());
-            // Pass the inner `Ok` value if available, or `None` if still loading/errored
-            get_data_to_display(
-                d,
-                &x_param,
-                &y_param,
-                x_cf,
-                y_cf,
-            )
-            .await
+            get_data_to_display(d, &x_param, &y_param, x_cf, y_cf).await
         }
     });
 
@@ -209,7 +224,7 @@ fn App() -> Element {
     //         last_mouse_pos.set((current_x, current_y));
     //     }
     // };
-
+    
     rsx! {
         document::Stylesheet { href: CSS_STYLE }
         div {
@@ -219,13 +234,19 @@ fn App() -> Element {
                 div { class: "control-group",
                     button {
                         onclick: move |_| {
-                            let next_index = (*sample_index.read() + 1) % samples.read().len();
-                            sample_index.set(next_index);
+                            if let Some(fcsfiles) = &*filehandler.read() {
+                                let next_index = (*sample_index.read() + 1) % fcsfiles.sample_count();
+                                sample_index.set(next_index);
+                            }
+
                         },
                         "Next FCS File"
                     }
                     p {
-                        "Current File: {current_sample_path().unwrap_or_default().split('/').last().unwrap_or_default()}"
+                        match current_sample() {
+                            Some(sample) => format!("Current File: {}", sample.name),
+                            None => "No Files".to_string(),
+                        }
                     }
                 }
 
