@@ -11,7 +11,7 @@ use flow_gates::*;
 
 // use crate::colormap;
 
-use flow_plots::{BasePlotOptions, ColorMaps, DensityPlot, DensityPlotOptions, Plot, render::RenderConfig};
+use flow_plots::{BasePlotOptions, ColorMaps, DensityPlot, DensityPlotOptions, Plot, plots::traits::PlotDrawable, render::RenderConfig};
 
 pub type DioxusDrawingArea<'a> = DrawingArea<BitMapBackend<'a>, Shift>;
 
@@ -27,8 +27,8 @@ pub struct AxisInfo{
 
 #[component]
 pub fn Plotters(
-    #[props] data: Arc<Vec<(f32, f32)>>,
-    #[props] size: (u32, u32),
+    #[props] data: ReadSignal<Arc<Vec<(f32, f32)>>>,
+    #[props] size: ReadSignal<(u32, u32)>,
     #[props] x_axis_info: ReadSignal<AxisInfo>,
     #[props] y_axis_info: ReadSignal<AxisInfo>,
     #[props(optional)] on_click: Option<EventHandler<Rc<MouseData>>>,
@@ -52,36 +52,26 @@ pub fn Plotters(
     let mut plot_image_src = use_signal(|| String::new());
     let mut plot_map = use_signal(|| None::<flow_plots::render::plotmap::PlotMapper>);
     let mut coords = use_signal(|| Vec::<(f32, f32)>::new());
-    let mut gate_signal = use_signal(|| None::<flow_gates::Gate>);
+    let mut curr_gate_signal = use_signal(|| None::<super::gate_draft::GateDraft>);
+    let mut gates: Signal<Vec<flow_gates::Gate>> = use_signal(|| vec![]);
+    let mut curr_gate_id = use_signal(|| 0);
+
+    
 
     use_effect(move || {
         let cur_coords = coords();
-        match flow_gates::geometry::create_polygon_geometry(cur_coords, &x_axis_info().title, &y_axis_info().title){
-            Ok(gate) => {
-                let gate = Gate::new (
-                    "my first gate",
-                    "My first gate".to_string(),
-                    gate,
-                    x_axis_info().title.as_str(),
-                    y_axis_info().title.as_str()
-                
-                );
 
-                gate_signal.set(Some(gate));
+        let gate_draft = super::gate_draft::GateDraft::new_polygon(cur_coords, &x_axis_info().title, &y_axis_info().title);
+        curr_gate_signal.set(Some(gate_draft));
 
-            },
-            Err(e) =>{
-                println!("{}", e.to_string());
-                gate_signal.set(None);
-            }
-        
-        }
+
+
     });
 
-    use_effect(use_reactive!( |size, data| {
+    use_effect(move ||{
         let x_axis_info = x_axis_info();
         let y_axis_info = y_axis_info();
-        let (width, height) = size;
+        let (width, height) = size();
         let data = data.clone();
 
             let plot = DensityPlot::new();
@@ -117,16 +107,16 @@ pub fn Plotters(
                 .build().expect("shouldn't fail");
  
             let mut render_config = RenderConfig::default();
-            let gate_option = gate_signal();
-            let refs: [ &dyn flow_plots::plots::traits::PlotDrawable; 1 ];
-            let gates_slice: Option<&[&dyn flow_plots::plots::traits::PlotDrawable]> = if let Some(ref g) = gate_option {
-                refs = [g as &dyn flow_plots::plots::traits::PlotDrawable];
-                Some(&refs[..])
-            } else {
-                None
-            };
+
+            let gate_vec: Vec<flow_gates::Gate> = gates();
+            let mut gate_refs: Vec<&dyn flow_plots::plots::traits::PlotDrawable> = gate_vec.iter().map(|g| g as &dyn flow_plots::plots::traits::PlotDrawable).collect();
+            let curr_gate_binding = curr_gate_signal.read();
+            if let Some(gate) = curr_gate_binding.as_ref() {
+                gate_refs.push(gate as &dyn flow_plots::plots::traits::PlotDrawable);
+            }
             
-            let plot_data = plot.render(data, &options, &mut render_config, gates_slice).expect("failed to render plot");
+            
+            let plot_data = plot.render(data(), &options, &mut render_config, Some(gate_refs.as_slice()), None).expect("failed to render plot");
             let bytes = plot_data.plot_bytes;
             let mapper = plot_data.plot_map;
             let base64_str = BASE64_STANDARD.encode(&bytes);
@@ -134,8 +124,8 @@ pub fn Plotters(
             plot_map.set(Some(mapper));
             
         }
-    // }
-    ));
+    
+    );
 
     
 
@@ -144,9 +134,10 @@ pub fn Plotters(
     rsx! {
 
         img {
+            style: "user-select: none; -webkit-user-select: none; cursor: crosshair;",
             src: "{plot_image_src()}",
-            width: "{size.0}",
-            height: "{size.1}",
+            width: "{size().0}",
+            height: "{size().1}",
             draggable: "{draggable}",
             onclick: move |evt| {
                 if let Some(cb) = &on_click {
@@ -167,7 +158,37 @@ pub fn Plotters(
                 }
             },
             ondoubleclick: move |evt| {
-                if let Some(cb) = &on_dblclick {
+                // Finalise the current gate
+                if let Some(curr_gate) = curr_gate_signal.write().take() {
+
+                    let finalised_gate = match flow_gates::geometry::create_polygon_geometry(
+                        curr_gate.get_points(),
+                        &x_axis_info().title,
+                        &y_axis_info().title,
+                    ) {
+                        Ok(gate) => {
+                            let id = *curr_gate_id.peek();
+                            Some(
+                                Gate::new(
+                                    id.to_string(),
+                                    id.to_string(),
+                                    gate,
+                                    x_axis_info().title.as_str(),
+                                    y_axis_info().title.as_str(),
+                                ),
+                            )
+                        }
+                        Err(e) => {
+                            println!("{}", e.to_string());
+                            return;
+                        }
+                    };
+                    gates.write().push(finalised_gate.unwrap());
+                    coords.write().clear();
+                    *curr_gate_id.write() += 1;
+                }
+
+                if let Some(cb) = &on_mousemove {
                     cb.call(evt.data)
                 }
             },

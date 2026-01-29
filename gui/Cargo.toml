@@ -15,6 +15,7 @@ tokio.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true
 flow-fcs.workspace = true
+flow-gates.workspace = true
 
 [target.'cfg(windows)'.dependencies]
 polars = {version = "0.52", default-features = false, features = ["lazy", "performant", "timezones"]}
