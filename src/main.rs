@@ -5,10 +5,10 @@ use dioxus::{
     prelude::*,
 };
 use flow_fcs::{Fcs, Transformable, TransformType};
-use std::{collections::HashMap, rc::Rc};
+use std::collections::HashMap;
 use std::sync::{Arc};
 use tokio::task;
-use plotters_dioxus::{AxisInfo, Plotters};
+use clingate::plotters_dioxus::{AxisInfo, Plotters};
 
 
 async fn get_flow_data(path: String) -> Result<Arc<Fcs>, Arc<anyhow::Error>> {
@@ -153,7 +153,7 @@ fn App() -> Element {
     // - fcs_file_resource's value becomes available (or changes if it were mutable)
     // - x_axis_param, y_axis_param, x_cofactor, or y_cofactor changes
     let processed_data_resource = use_resource(move || {
-        println!("processed_data_resource future started");
+        // println!("processed_data_resource future started");
         let data = fcs_file_resource.read().clone(); // Read the current state of the FCS file resource
         let x_param = x_axis_param.read().clone();
         let y_param = y_axis_param.read().clone();
@@ -178,43 +178,42 @@ fn App() -> Element {
     });
 
     // --- Event Handlers for Plotters Component (Optional, as before) ---
-    let handle_click = move |event: Rc<MouseData>| {
-        println!(
-            "Click event on plot: x={}, y={}",
-            event.client_coordinates().x,
-            event.client_coordinates().y
-        );
-    };
+    // let handle_click = move |event: Rc<MouseData>| {
+    //     println!(
+    //         "Click event on plot: x={}, y={}",
+    //         event.client_coordinates().x,
+    //         event.client_coordinates().y
+    //     );
+    // };
 
-    let mut is_dragging = use_signal(|| false);
-    let mut last_mouse_pos = use_signal(|| (0.0, 0.0));
+    // let mut is_dragging = use_signal(|| false);
+    // let mut last_mouse_pos = use_signal(|| (0.0, 0.0));
 
-    let handle_mousedown = move |evt: Rc<MouseData>| {
-        is_dragging.set(true);
-        last_mouse_pos.set((evt.client_coordinates().x, evt.client_coordinates().y));
-    };
+    // let handle_mousedown = move |evt: Rc<MouseData>| {
+    //     is_dragging.set(true);
+    //     last_mouse_pos.set((evt.client_coordinates().x, evt.client_coordinates().y));
+    // };
 
-    let handle_mouseup = move |_evt: Rc<MouseData>| {
-        is_dragging.set(false);
-    };
+    // let handle_mouseup = move |_evt: Rc<MouseData>| {
+    //     is_dragging.set(false);
+    // };
 
-    let handle_mousemove = move |evt: Rc<MouseData>| {
-        if *is_dragging.read() {
-            let (last_x, last_y) = *last_mouse_pos.read();
-            let (current_x, current_y) = (evt.client_coordinates().x, evt.client_coordinates().y);
+    // let handle_mousemove = move |evt: Rc<MouseData>| {
+    //     if *is_dragging.read() {
+    //         let (last_x, last_y) = *last_mouse_pos.read();
+    //         let (current_x, current_y) = (evt.client_coordinates().x, evt.client_coordinates().y);
 
-            let dx = current_x - last_x;
-            let dy = current_y - last_y;
+    //         let dx = current_x - last_x;
+    //         let dy = current_y - last_y;
 
-            last_mouse_pos.set((current_x, current_y));
-        }
-    };
+    //         last_mouse_pos.set((current_x, current_y));
+    //     }
+    // };
 
     rsx! {
         document::Stylesheet { href: CSS_STYLE }
         div {
-            h1 { "FCS Plot Viewer" }
-
+            // h1 { "FCS Plot Viewer" }
             div { class: "controls",
                 // File selection
                 div { class: "control-group",
@@ -311,10 +310,10 @@ fn App() -> Element {
                                 data: plot_data.clone(),
                                 x_axis_info: x_axis_limits.read().clone(),
                                 y_axis_info: y_axis_limits.read().clone(),
-                                on_click: handle_click,
-                                on_mousemove: handle_mousemove,
-                                on_mousedown: handle_mousedown,
-                                on_mouseup: handle_mouseup,
+                                // on_click: handle_click,
+                            // on_mousemove: handle_mousemove,
+                            // on_mousedown: handle_mousedown,
+                            // on_mouseup: handle_mouseup,
                             }
                         }
                     }

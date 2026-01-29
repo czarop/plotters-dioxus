@@ -1,24 +1,25 @@
 #![allow(non_snake_case)]
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use dioxus::prelude::*;
+use flow_gates::*;
 use plotters::coord::Shift;
 use plotters::prelude::*;
 use plotters_bitmap::BitMapBackend;
-use base64::Engine as _;
-use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use std::rc::Rc;
 use std::sync::Arc;
-use flow_gates::*;
 
 // use crate::colormap;
 
-use flow_plots::{BasePlotOptions, ColorMaps, DensityPlot, DensityPlotOptions, Plot, plots::traits::PlotDrawable, render::RenderConfig};
+use flow_plots::{
+    BasePlotOptions, ColorMaps, DensityPlot, DensityPlotOptions, Plot, plots::traits::PlotDrawable,
+    render::RenderConfig,
+};
 
 pub type DioxusDrawingArea<'a> = DrawingArea<BitMapBackend<'a>, Shift>;
 
-
-
 #[derive(Debug, Clone, PartialEq, Props)]
-pub struct AxisInfo{
+pub struct AxisInfo {
     pub title: String,
     pub lower: f32,
     pub upper: f32,
@@ -56,80 +57,80 @@ pub fn Plotters(
     let mut gates: Signal<Vec<flow_gates::Gate>> = use_signal(|| vec![]);
     let mut curr_gate_id = use_signal(|| 0);
 
-    
-
     use_effect(move || {
         let cur_coords = coords();
 
-        let gate_draft = super::gate_draft::GateDraft::new_polygon(cur_coords, &x_axis_info().title, &y_axis_info().title);
+        let gate_draft = super::gate_draft::GateDraft::new_polygon(
+            cur_coords,
+            &x_axis_info().title,
+            &y_axis_info().title,
+        );
         curr_gate_signal.set(Some(gate_draft));
-
-
-
     });
 
-    use_effect(move ||{
+    use_effect(move || {
         let x_axis_info = x_axis_info();
         let y_axis_info = y_axis_info();
         let (width, height) = size();
         let data = data.clone();
 
-            let plot = DensityPlot::new();
-            let base_options = BasePlotOptions::new()
-                .width(width)
-                .height(height)
-                .title("My Density Plot")
-                .build()
-                .expect("shouldn't fail");
+        let plot = DensityPlot::new();
+        let base_options = BasePlotOptions::new()
+            .width(width)
+            .height(height)
+            .title("My Density Plot")
+            .build()
+            .expect("shouldn't fail");
 
-            let x_axis_options = flow_plots::AxisOptions::new()
-
+        let x_axis_options = flow_plots::AxisOptions::new()
             .range(x_axis_info.lower..=x_axis_info.upper)
             .transform(x_axis_info.transform)
-
-                // .transform(flow_fcs::TransformType::Arcsinh { cofactor: 6000.0 })
-
+            // .transform(flow_fcs::TransformType::Arcsinh { cofactor: 6000.0 })
             .label(x_axis_info.title)
-            .build().expect("axis options failed");
-            let y_axis_options = flow_plots::AxisOptions::new()
-                .range(y_axis_info.lower..=y_axis_info.upper)
-                .transform(y_axis_info.transform)
-                .label(y_axis_info.title)
-                .build().expect("axis options failed");
+            .build()
+            .expect("axis options failed");
+        let y_axis_options = flow_plots::AxisOptions::new()
+            .range(y_axis_info.lower..=y_axis_info.upper)
+            .transform(y_axis_info.transform)
+            .label(y_axis_info.title)
+            .build()
+            .expect("axis options failed");
 
+        let options = DensityPlotOptions::new()
+            .base(base_options)
+            .colormap(ColorMaps::Jet)
+            .x_axis(x_axis_options)
+            .y_axis(y_axis_options)
+            .build()
+            .expect("shouldn't fail");
 
-            let options = DensityPlotOptions::new()
-            .base(base_options
-            )
-                .colormap(ColorMaps::Jet)
-                .x_axis(x_axis_options)
-                .y_axis(y_axis_options)
-                .build().expect("shouldn't fail");
- 
-            let mut render_config = RenderConfig::default();
+        let mut render_config = RenderConfig::default();
 
-            let gate_vec: Vec<flow_gates::Gate> = gates();
-            let mut gate_refs: Vec<&dyn flow_plots::plots::traits::PlotDrawable> = gate_vec.iter().map(|g| g as &dyn flow_plots::plots::traits::PlotDrawable).collect();
-            let curr_gate_binding = curr_gate_signal.read();
-            if let Some(gate) = curr_gate_binding.as_ref() {
-                gate_refs.push(gate as &dyn flow_plots::plots::traits::PlotDrawable);
-            }
-            
-            
-            let plot_data = plot.render(data(), &options, &mut render_config, Some(gate_refs.as_slice()), None).expect("failed to render plot");
-            let bytes = plot_data.plot_bytes;
-            let mapper = plot_data.plot_map;
-            let base64_str = BASE64_STANDARD.encode(&bytes);
-            plot_image_src.set(format!("data:image/jpeg;base64,{}", base64_str));
-            plot_map.set(Some(mapper));
-            
+        let gate_vec: Vec<flow_gates::Gate> = gates();
+        let mut gate_refs: Vec<&dyn flow_plots::plots::traits::PlotDrawable> = gate_vec
+            .iter()
+            .map(|g| g as &dyn flow_plots::plots::traits::PlotDrawable)
+            .collect();
+        let curr_gate_binding = curr_gate_signal.read();
+        if let Some(gate) = curr_gate_binding.as_ref() {
+            gate_refs.push(gate as &dyn flow_plots::plots::traits::PlotDrawable);
         }
-    
-    );
 
-    
-
-     
+        let plot_data = plot
+            .render(
+                data(),
+                &options,
+                &mut render_config,
+                Some(gate_refs.as_slice()),
+                None,
+            )
+            .expect("failed to render plot");
+        let bytes = plot_data.plot_bytes;
+        let mapper = plot_data.plot_map;
+        let base64_str = BASE64_STANDARD.encode(&bytes);
+        plot_image_src.set(format!("data:image/jpeg;base64,{}", base64_str));
+        plot_map.set(Some(mapper));
+    });
 
     rsx! {
 
@@ -268,19 +269,6 @@ pub fn Plotters(
     }
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 // #![allow(non_snake_case)]
 // use dioxus::prelude::*;
 // use plotters::coord::Shift;
@@ -343,11 +331,10 @@ pub fn Plotters(
 
 //     use_effect(move || {
 //         let (width, height) = size;
-        
+
 //         if fcs.read().is_none() {
 //             plot_image_src.set(String::new());
 //         } else {
-
 
 //             let df = fcs.clone();
 //             spawn(async move {

@@ -1,23 +1,23 @@
-[workspace]
+[package]
+name = "clingate"
+version = "0.1.0"
+edition = "2024"
 resolver = "2"
-members = ["plotters-dioxus", "gui"]
 
-[workspace.dependencies]
+[dependencies]
 dioxus = { version = "0.7.3", features = ["desktop"] }
 plotters = "0.3.5"
 thiserror = "2.0.12"
 polars = {version = "0.52", default-features = false}
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 anyhow = "1"
-# flow-fcs = {git = "https://github.com/czarop/flow_ts_fork", rev = "300743d"}
-# flow-plots = {git = "https://github.com/czarop/flow_ts_fork", rev = "300743d"}
-# flow-gates = {git = "https://github.com/czarop/flow_ts_fork", rev = "300743d"}
 flow-fcs = {path = "../flow_ts_fork/fcs"}
 flow-plots = {path = "../flow_ts_fork/plots"}
 flow-gates = {path = "../flow_ts_fork/gates"}
+base64 = "0.22.1"
+plotters-bitmap = "0.3.3"
 
-
-
-[profile.dev]
-incremental = true
-debug = true
+[target.'cfg(windows)'.dependencies]
+polars = {version = "0.52", default-features = false, features = ["lazy", "performant", "timezones"]}
+[target.'cfg(not(windows))'.dependencies]
+polars = {version = "0.52", default-features = false, features = ["lazy", "performant", "dtype-full"]}

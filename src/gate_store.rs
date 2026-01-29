@@ -30,7 +30,7 @@ impl GateKey {
 #[derive(Default, Store)]
 pub struct GateState {
     // For the Renderer: "What gates do I draw on this Plot?"
-    pub gates_by_view: HashMap<GateKey, Vec<flow_gates::Gate>>,
+    pub gate_ids_by_view: HashMap<GateKey, Vec<String>>,
     // For the Logic: "What is the actual data for Gate X?"
     pub gate_registry: HashMap<std::sync::Arc<str>, flow_gates::Gate>,
     // For the Filtering: "How are these gates nested?"
@@ -44,10 +44,26 @@ impl GateState {
             gate.y_parameter_channel_name(),
             parental_gate_id,
         );
-        self.gates_by_view
+        self.gate_ids_by_view
             .entry(key)
-            .or_insert(vec![gate.clone()])
-            .push(gate.clone());
+            .or_insert(vec![])
+            .push(gate.id.to_string());
+
+        self.hierarchy
+            .add_gate_child(parental_gate_id.unwrap_or("root"), gate.id.clone())?;
+
+        Ok(())
+    }
+
+    pub fn remove_gate(&mut self, gate: &Gate, parental_gate_id: Option<&str>) -> Result<()> {
+        let key = GateKey::new(
+            gate.x_parameter_channel_name(),
+            gate.y_parameter_channel_name(),
+            parental_gate_id,
+        );
+        self.gate_ids_by_view
+            .entry(key)
+            .and_modify(|l| {l.retain(|name|  name != &*gate.id)});
 
         self.hierarchy
             .add_gate_child(parental_gate_id.unwrap_or("root"), gate.id.clone())?;
