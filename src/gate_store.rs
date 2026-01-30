@@ -51,7 +51,7 @@ pub struct GateState {
     // For the Renderer: "What gates do I draw on this Plot?"
     pub gate_ids_by_view: HashMap<GatesOnPlotKey, Vec<GateKey>>,
     // For the Logic: "What is the actual data for Gate X?"
-    pub gate_registry: HashMap<GateKey, flow_gates::Gate>,
+    pub gate_registry: HashMap<GateKey, Arc<flow_gates::Gate>>,
     // For the Filtering: "How are these gates nested?"
     pub hierarchy: GateHierarchy,
     // are there file-specific overrides for gate positions
@@ -92,17 +92,12 @@ impl GateState {
         Ok(())
     }
 
-    pub fn get_gates_for_plot(&self, key: &GatesOnPlotKey) -> impl Iterator<Item = &Gate> {
-        // match self.gate_ids_by_view.get(key){
-        //     Some(gate_ids) => {
-        //         gate_ids.iter().filter_map(|id| self.gate_registry.get(id)).collect()
-        //     },
-        //     None => vec![],
-        // }
-self.gate_ids_by_view
-        .get(key)
-        .into_iter() // Turns Option into 0 or 1 items
-        .flatten()    // Turns Vec<Id> into an iterator of Ids
-        .filter_map(|id| self.gate_registry.get(id))
+    pub fn get_gates_for_plot(&self, key: &GatesOnPlotKey) -> impl Iterator<Item = Arc<Gate>> {
+
+        self.gate_ids_by_view
+            .get(key)
+            .into_iter()
+            .flatten()
+            .filter_map(|id| self.gate_registry.get(id).cloned())
     }
-}
+    }

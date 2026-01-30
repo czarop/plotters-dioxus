@@ -16,7 +16,7 @@ use flow_plots::{
     render::RenderConfig,
 };
 
-use crate::gate_store::GateState;
+use crate::gate_store::{GateState, GatesOnPlotKey};
 
 pub type DioxusDrawingArea<'a> = DrawingArea<BitMapBackend<'a>, Shift>;
 
@@ -52,12 +52,20 @@ pub fn Plotters(
     #[props(optional)] on_drop: Option<EventHandler<Rc<DragData>>>,
     #[props(optional)] on_scroll: Option<EventHandler<Rc<ScrollData>>>,
 ) -> Element {
-    let mut gate_store = use_context::<GateState>();
+    let mut gate_store: Store<GateState> = use_context::<Store<GateState>>();
     let mut plot_image_src = use_signal(|| String::new());
     let mut plot_map = use_signal(|| None::<flow_gates::plotmap::PlotMapper>);
     let mut coords = use_signal(|| Vec::<(f32, f32)>::new());
     let mut curr_gate_signal = use_signal(|| None::<super::gate_draft::GateDraft>);
-    let mut gates: Signal<Vec<flow_gates::Gate>> = use_signal(|| gate_store.get_gates_for_plot(key));
+    let mut gates: Memo<Vec<Arc<flow_gates::Gate>>> = use_memo(move || {
+        let key = GatesOnPlotKey::new(
+            &x_axis_info().title,
+            &y_axis_info().title,
+            None
+        );
+        let gates = gate_store().get_gates_for_plot(&key).collect();
+        gates
+    }); 
     let mut curr_gate_id = use_signal(|| 0);
 
     use_effect(move || {
@@ -88,7 +96,6 @@ pub fn Plotters(
         let x_axis_options = flow_plots::AxisOptions::new()
             .range(x_axis_info.lower..=x_axis_info.upper)
             .transform(x_axis_info.transform)
-            // .transform(flow_fcs::TransformType::Arcsinh { cofactor: 6000.0 })
             .label(x_axis_info.title)
             .build()
             .expect("axis options failed");
@@ -109,10 +116,10 @@ pub fn Plotters(
 
         let mut render_config = RenderConfig::default();
 
-        let gate_vec: Vec<flow_gates::Gate> = gates();
+        let gate_vec= gates();
         let mut gate_refs: Vec<&dyn PlotDrawable> = gate_vec
             .iter()
-            .map(|g| g as &dyn PlotDrawable)
+            .map(|g| g.as_ref() as &dyn PlotDrawable)
             .collect();
         let curr_gate_binding = curr_gate_signal.read();
         if let Some(gate) = curr_gate_binding.as_ref() {
@@ -193,7 +200,7 @@ pub fn Plotters(
                             return;
                         }
                     };
-                    gates.write().push(finalised_gate.unwrap());
+                    gates.write().push(Arc::new(finalised_gate.unwrap()));
                     coords.write().clear();
                     *curr_gate_id.write() += 1;
                 }
