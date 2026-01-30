@@ -1,8 +1,7 @@
 #![allow(non_snake_case)]
 
 use clingate::{
-    file_load::FcsFiles,
-    plotters_dioxus::{AxisInfo, Plotters},
+    file_load::FcsFiles, gate_store::GateState, plotters_dioxus::{AxisInfo, Plotters}
 };
 use dioxus::{
     desktop::{Config, LogicalSize, WindowBuilder},
@@ -68,6 +67,10 @@ static CSS_STYLE: Asset = asset!("assets/styles.css");
 fn App() -> Element {
     // Hardcoded paths (will be selectable later)
     let mut filehandler: Signal<Option<FcsFiles>> = use_signal(|| None);
+    let mut message = use_signal(|| None::<String>);
+    let gate_store = use_store(|| GateState::default());
+    use_context_provider(|| gate_store);
+    
 
     let _ = use_resource(move || async move {
         // Read the file from the project root
@@ -79,33 +82,26 @@ fn App() -> Element {
             FcsFiles::create(path.trim())
         })();
 
-        if let Ok(files) = result {
-            filehandler.set(Some(files));
+        match result {
+            Ok(files) => {
+                message.set(None);
+                filehandler.set(Some(files));
+            },
+            Err(e) => message.set(Some(e.to_string())),
         }
     });
 
     // Primary States
     let mut sample_index = use_signal(|| 0);
-    // let current_sample_path = use_memo(move || {
-    //     let s = samples.read();
-    //     let s_len = s.len();
-    //     let index = *sample_index.read();
-    //     if index < s_len {
-    //         let sample_name = s[index].clone();
-    //         let directory_name = filehandler.peek().as_ref().unwrap().directory_path().to_string();
-    //         Some(format!("{directory_name}/{sample_name}"))
-    //     } else {
-    //         None
-    //     }
-    // });
     let current_sample = use_memo(move || {
     let handler = filehandler.read();
     let index = *sample_index.read();
     
-
     if handler.is_some(){
+        message.set(None);
         Some(handler.as_ref().unwrap().file_list()[index].clone())
     } else {
+        message.set(Some("Select working directory to load files".to_string()));
         None
     }
     
@@ -192,39 +188,6 @@ fn App() -> Element {
         }
     });
 
-    // --- Event Handlers for Plotters Component (Optional, as before) ---
-    // let handle_click = move |event: Rc<MouseData>| {
-    //     println!(
-    //         "Click event on plot: x={}, y={}",
-    //         event.client_coordinates().x,
-    //         event.client_coordinates().y
-    //     );
-    // };
-
-    // let mut is_dragging = use_signal(|| false);
-    // let mut last_mouse_pos = use_signal(|| (0.0, 0.0));
-
-    // let handle_mousedown = move |evt: Rc<MouseData>| {
-    //     is_dragging.set(true);
-    //     last_mouse_pos.set((evt.client_coordinates().x, evt.client_coordinates().y));
-    // };
-
-    // let handle_mouseup = move |_evt: Rc<MouseData>| {
-    //     is_dragging.set(false);
-    // };
-
-    // let handle_mousemove = move |evt: Rc<MouseData>| {
-    //     if *is_dragging.read() {
-    //         let (last_x, last_y) = *last_mouse_pos.read();
-    //         let (current_x, current_y) = (evt.client_coordinates().x, evt.client_coordinates().y);
-
-    //         let dx = current_x - last_x;
-    //         let dy = current_y - last_y;
-
-    //         last_mouse_pos.set((current_x, current_y));
-    //     }
-    // };
-    
     rsx! {
         document::Stylesheet { href: CSS_STYLE }
         div {
@@ -267,7 +230,13 @@ fn App() -> Element {
                         value: "{x_cofactor.read()}",
                         oninput: move |evt| {
                             if let Ok(val) = evt.value().parse::<f32>() {
-                                x_cofactor.set(val);
+                                if val > 0_f32 {
+                                    message.set(None);
+                                    x_cofactor.set(val);
+                                } else {
+                                    message.set(Some("Arcsinh cofactor must be > 0".to_string()));
+                                }
+
                             }
                         },
                         step: "any",
@@ -291,7 +260,12 @@ fn App() -> Element {
                         value: "{y_cofactor.read()}",
                         oninput: move |evt| {
                             if let Ok(val) = evt.value().parse::<f32>() {
-                                y_cofactor.set(val);
+                                if val > 0_f32 {
+                                    message.set(None);
+                                    y_cofactor.set(val);
+                                } else {
+                                    message.set(Some("Arcsinh cofactor must be > 0".to_string()));
+                                }
                             }
                         },
                         step: "any",
