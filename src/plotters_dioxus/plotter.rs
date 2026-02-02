@@ -12,17 +12,16 @@ use std::sync::Arc;
 // use crate::colormap;
 
 use flow_plots::{
-    BasePlotOptions, ColorMaps, DensityPlot, DensityPlotOptions, Plot, plots::traits::PlotDrawable,
-    render::RenderConfig,
+    BasePlotOptions, ColorMaps, DensityPlot, DensityPlotOptions, Plot, plots::traits::PlotDrawable, render::RenderConfig
 };
 
-use crate::gate_store::{GateState, GatesOnPlotKey};
+use crate::{gate_store::{GateState, GateStateImplExt, GateStateStoreExt, GatesOnPlotKey}, plotters_dioxus::gate_helpers::{GateDraft, GateFinal}};
 
 pub type DioxusDrawingArea<'a> = DrawingArea<BitMapBackend<'a>, Shift>;
 
 #[derive(Debug, Clone, PartialEq, Props)]
 pub struct AxisInfo {
-    pub title: String,
+    pub title: Arc<str>,
     pub lower: f32,
     pub upper: f32,
     pub transform: flow_fcs::TransformType,
@@ -56,30 +55,26 @@ pub fn Plotters(
     let mut plot_image_src = use_signal(|| String::new());
     let mut plot_map = use_signal(|| None::<flow_gates::plotmap::PlotMapper>);
     let mut coords = use_signal(|| Vec::<(f32, f32)>::new());
-    let mut curr_gate_signal = use_signal(|| None::<super::gate_draft::GateDraft>);
-    let mut gates: Memo<Vec<Arc<flow_gates::Gate>>> = use_memo(move || {
-        let key = GatesOnPlotKey::new(
-            &x_axis_info().title,
-            &y_axis_info().title,
-            None
-        );
-        let gates = gate_store().get_gates_for_plot(&key).collect();
-        gates
-    }); 
+    let mut curr_gate_signal = use_signal(|| None::<GateDraft>);
+    
     let mut curr_gate_id = use_signal(|| 0);
 
     use_effect(move || {
         let cur_coords = coords();
 
-        let gate_draft = super::gate_draft::GateDraft::new_polygon(
-            cur_coords,
-            &x_axis_info().title,
-            &y_axis_info().title,
-        );
-        curr_gate_signal.set(Some(gate_draft));
+        if cur_coords.len() > 0 {
+            let gate_draft = GateDraft::new_polygon(
+                cur_coords,
+                &x_axis_info().title,
+                &y_axis_info().title,
+            );
+            curr_gate_signal.set(Some(gate_draft));
+        }
+        
     });
 
     use_effect(move || {
+        println!("Use effect redrawing");
         let x_axis_info = x_axis_info();
         let y_axis_info = y_axis_info();
         let (width, height) = size();
@@ -96,13 +91,13 @@ pub fn Plotters(
         let x_axis_options = flow_plots::AxisOptions::new()
             .range(x_axis_info.lower..=x_axis_info.upper)
             .transform(x_axis_info.transform)
-            .label(x_axis_info.title)
+            .label(&x_axis_info.title.to_string())
             .build()
             .expect("axis options failed");
         let y_axis_options = flow_plots::AxisOptions::new()
             .range(y_axis_info.lower..=y_axis_info.upper)
             .transform(y_axis_info.transform)
-            .label(y_axis_info.title)
+            .label(y_axis_info.title.to_string())
             .build()
             .expect("axis options failed");
 
@@ -115,23 +110,32 @@ pub fn Plotters(
             .expect("shouldn't fail");
 
         let mut render_config = RenderConfig::default();
+        
+        let gates = get_gates_for_plot(
+            x_axis_info.title.clone(), 
+            y_axis_info.title.clone(), 
+            &gate_store
+        ).unwrap_or_default();
 
-        let gate_vec= gates();
-        let mut gate_refs: Vec<&dyn PlotDrawable> = gate_vec
+        let mut drawables: Vec<&dyn PlotDrawable> = gates
             .iter()
-            .map(|g| g.as_ref() as &dyn PlotDrawable)
+            .map(|d| d.as_ref() as &dyn PlotDrawable)
             .collect();
-        let curr_gate_binding = curr_gate_signal.read();
-        if let Some(gate) = curr_gate_binding.as_ref() {
-            gate_refs.push(gate as &dyn PlotDrawable);
+
+        // 2. Add the current gate from the signal
+        let gate_draft_option = curr_gate_signal.read();
+        if let Some(gate) = &*gate_draft_option {
+
+            drawables.push(gate as &dyn PlotDrawable);
         }
+
 
         let plot_data = plot
             .render(
                 data(),
                 &options,
                 &mut render_config,
-                Some(gate_refs.as_slice()),
+                Some(drawables.as_slice()),
                 None,
             )
             .expect("failed to render plot");
@@ -143,6 +147,7 @@ pub fn Plotters(
         plot_map.set(Some(mapper));
     });
 
+    
     rsx! {
 
         img {
@@ -164,15 +169,44 @@ pub fn Plotters(
                         .pixel_to_data(norm_x, norm_y, None, None)
                     {
                         println!("Clicked Data: {}, {}", data_x, data_y);
-                        coords.write().push((data_x, data_y));
-                    } else {
-                        println!("Clicked outside plot area");
+                        let mut closest_gate = None;
+                        if curr_gate_signal.peek().is_none() {
+                            let x_axis_title = x_axis_info.peek().title.clone();
+                            let y_axis_title = y_axis_info.peek().title.clone();
+                            if let Some(gates) = get_gates_for_plot(
+                                x_axis_title,
+                                y_axis_title,
+                                &gate_store,
+                            ) {
+                                let tolerance = mapper.get_data_tolerance(5.0);
+                                let mut closest_dist = std::f32::INFINITY;
+
+                                for gate in gates {
+                                    if let Some(dist) = gate
+                                        .is_point_on_perimeter((data_x, data_y), tolerance)
+                                    {
+                                        println!("You clicked on a gate!");
+                                        if dist < closest_dist {
+                                            closest_dist = dist;
+                                            closest_gate = Some(gate.clone());
+                                        }
+
+                                    }
+                                }
+                            }
+                        }
+                        if closest_gate.is_none() {
+                            println!("You didn't click on a gate");
+                            coords.write().push((data_x, data_y));
+                        } else {
+                            let gate_name = closest_gate.unwrap().name.clone();
+                            println!("closest gate was {}", gate_name);
+                        }
+
                     }
-
+                } else {
+                    println!("Clicked outside plot area");
                 }
-
-                // cb.call(evt.data)
-                // }
             },
             ondoubleclick: move |evt| {
                 // Finalise the current gate
@@ -186,12 +220,13 @@ pub fn Plotters(
                         Ok(gate) => {
                             let id = *curr_gate_id.peek();
                             Some(
+
                                 Gate::new(
                                     id.to_string(),
                                     id.to_string(),
                                     gate,
-                                    x_axis_info().title.as_str(),
-                                    y_axis_info().title.as_str(),
+                                    x_axis_info().title.clone(),
+                                    y_axis_info().title.clone(),
                                 ),
                             )
                         }
@@ -200,13 +235,11 @@ pub fn Plotters(
                             return;
                         }
                     };
-                    gates.write().push(Arc::new(finalised_gate.unwrap()));
+                    gate_store
+                        .add_gate(finalised_gate.unwrap(), None)
+                        .expect("gate failed");
                     coords.write().clear();
                     *curr_gate_id.write() += 1;
-                }
-
-                if let Some(cb) = &on_mousemove {
-                    cb.call(evt.data)
                 }
             },
             onmousemove: move |evt| {
@@ -283,4 +316,29 @@ pub fn Plotters(
             },
         }
     }
+}
+
+fn get_gates_for_plot(x_axis_title: Arc<str>, y_axis_title: Arc<str>, gate_store: &Store<GateState>) -> Option<Vec<Arc<GateFinal>>> {
+    let key = GatesOnPlotKey::new(
+            x_axis_title,
+            y_axis_title,
+            None
+        );
+       let key_options = gate_store.gate_ids_by_view().get(key);
+       let mut gate_list = vec![];
+       if let Some(key_store) = key_options {
+            
+            let ids = key_store.read().clone(); 
+            let registry = gate_store.gate_registry();
+            let registry_guard = registry.read();
+            for k in ids {
+                if let Some(gate_store_entry) = registry_guard.get(&k) {
+                    gate_list.push(gate_store_entry.clone());
+                }
+            }
+        } else {
+            println!("No gates for plot");
+            return None;
+        }
+        return Some(gate_list);
 }

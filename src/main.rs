@@ -117,7 +117,7 @@ fn App() -> Element {
         let scaled_x_lower = asinh_transform_f32(-10000_f32, x_co);
         let scaled_x_upper = asinh_transform_f32(4194304_f32, x_co);
         AxisInfo {
-            title: x_axis_param(),
+            title: Arc::from(x_axis_param()),
             lower: scaled_x_lower,
             upper: scaled_x_upper,
             transform: TransformType::Arcsinh { cofactor: x_co },
@@ -129,7 +129,7 @@ fn App() -> Element {
         let scaled_y_lower = asinh_transform_f32(-10000_f32, y_co);
         let scaled_y_upper = asinh_transform_f32(4194304_f32, y_co);
         AxisInfo {
-            title: y_axis_param(),
+            title: Arc::from(y_axis_param()),
             lower: scaled_y_lower,
             upper: scaled_y_upper,
             transform: TransformType::Arcsinh { cofactor: y_co },
