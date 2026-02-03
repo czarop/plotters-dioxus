@@ -1,16 +1,14 @@
 #![allow(non_snake_case)]
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
-use dioxus::{html::{input_data::MouseButton, u::z_index}, prelude::*};
+use dioxus::{html::{input_data::MouseButton}, prelude::*};
 use flow_gates::{plotmap::PlotMapper, *};
 use plotters::coord::Shift;
 use plotters::prelude::*;
 use plotters_bitmap::BitMapBackend;
-use std::rc::Rc;
+use std::{rc::Rc, sync::RwLock};
 use std::sync::Arc;
 
-
-// use crate::colormap;
 
 use flow_plots::{
     BasePlotOptions, ColorMaps, DensityPlot, DensityPlotOptions, Plot, plots::traits::PlotDrawable, render::RenderConfig
@@ -55,12 +53,13 @@ pub fn Plotters(
     let mut gate_store: Store<GateState> = use_context::<Store<GateState>>();
     let mut plot_image_src = use_signal(|| String::new());
     let mut plot_map = use_signal(|| None::<flow_gates::plotmap::PlotMapper>);
-    let mut coords = use_signal(|| Vec::<(f32, f32)>::new());
-    let mut curr_gate_signal = use_signal(|| None::<GateDraft>);
-    let mut curr_gate_id = use_signal(|| 0);
+    let mut draft_gate_coords = use_signal(|| Vec::<(f32, f32)>::new());
+    let mut draft_gate = use_signal(|| None::<GateDraft>);
+    let mut next_gate_id = use_signal(|| 0);
+    let mut selected_gate_id = use_signal(|| None::<Arc<str>>);
 
     use_effect(move || {
-        let cur_coords = coords();
+        let cur_coords = draft_gate_coords();
 
         if cur_coords.len() > 0 {
             let gate_draft = GateDraft::new_polygon(
@@ -68,9 +67,9 @@ pub fn Plotters(
                 &x_axis_info().title,
                 &y_axis_info().title,
             );
-            curr_gate_signal.set(Some(gate_draft));
+            draft_gate.set(Some(gate_draft));
         } else {
-            curr_gate_signal.set(None);
+            draft_gate.set(None);
         }
         
     });
@@ -148,7 +147,7 @@ pub fn Plotters(
                         {
                             println!("Clicked Data: {}, {}", data_x, data_y);
                             let mut closest_gate = None;
-                            if curr_gate_signal.peek().is_none() {
+                            if draft_gate.peek().is_none() {
                                 let x_axis_title = x_axis_info.peek().title.clone();
                                 let y_axis_title = y_axis_info.peek().title.clone();
                                 if let Some(gates) = get_gates_for_plot(
@@ -175,11 +174,16 @@ pub fn Plotters(
                             }
                             if closest_gate.is_none() {
                                 println!("You didn't click on a gate");
-
-                                coords.write().push((data_x, data_y));
+                                draft_gate_coords.write().push((data_x, data_y));
+                                selected_gate_id.set(None);
 
                             } else {
-                                let gate_name = closest_gate.unwrap().name.clone();
+                                let closest_gate = closest_gate.unwrap();
+                                let gate_name = closest_gate.name.clone();
+                                let gate_id = closest_gate.id.clone();
+                                selected_gate_id.set(Some(gate_id));
+
+                                // let gate_id =
                                 println!("closest gate was {}", gate_name);
                             }
 
@@ -190,7 +194,7 @@ pub fn Plotters(
                 },
                 ondoubleclick: move |evt| {
                     // Finalise the current gate
-                    if let Some(curr_gate) = curr_gate_signal.write().take() {
+                    if let Some(curr_gate) = draft_gate.write().take() {
                         // last point is duplicated from the double click
                         let mut points = curr_gate.get_points();
                         points.pop();
@@ -201,7 +205,7 @@ pub fn Plotters(
                             &y_axis_info().title,
                         ) {
                             Ok(gate) => {
-                                let id = *curr_gate_id.peek();
+                                let id = *next_gate_id.peek();
                                 Some(
 
                                     Gate::new(
@@ -214,15 +218,15 @@ pub fn Plotters(
                                 )
                             }
                             Err(e) => {
-                                coords.write().clear();
+                                draft_gate_coords.write().clear();
                                 return;
                             }
                         };
                         gate_store
                             .add_gate(finalised_gate.unwrap(), None)
                             .expect("gate failed");
-                        coords.write().clear();
-                        *curr_gate_id.write() += 1;
+                        draft_gate_coords.write().clear();
+                        *next_gate_id.write() += 1;
                     }
                 },
                 onmousemove: move |evt| {
@@ -243,7 +247,7 @@ pub fn Plotters(
                 onmousedown: move |evt| {
                     match evt.trigger_button() {
                         Some(MouseButton::Secondary) => {
-                            coords.set(vec![]);
+                            draft_gate_coords.set(vec![]);
                         }
                         _ => {}
                     }
@@ -305,7 +309,8 @@ pub fn Plotters(
                 plot_map,
                 x_channel: x_axis_info().title.clone(),
                 y_channel: y_axis_info().title.clone(),
-                draft_gate: curr_gate_signal,
+                draft_gate,
+                selected_gate_id,
             }
         }
     }
@@ -337,7 +342,7 @@ fn get_gates_for_plot(x_axis_title: Arc<str>, y_axis_title: Arc<str>, gate_store
 }
 
 #[component]
-fn GateLayer(plot_map: ReadSignal<Option<PlotMapper>>, x_channel: ReadSignal<Arc<str>>, y_channel: ReadSignal<Arc<str>>, draft_gate: ReadSignal<Option<GateDraft>>) -> Element {
+fn GateLayer(plot_map: ReadSignal<Option<PlotMapper>>, x_channel: ReadSignal<Arc<str>>, y_channel: ReadSignal<Arc<str>>, draft_gate: ReadSignal<Option<GateDraft>>, selected_gate_id: ReadSignal<Option<Arc<str>>>) -> Element {
     
     let gate_store: Store<GateState> = use_context::<Store<GateState>>();
 
