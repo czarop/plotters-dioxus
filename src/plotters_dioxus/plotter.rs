@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
-use dioxus::prelude::*;
+use dioxus::{html::u::z_index, prelude::*};
 use flow_gates::{plotmap::PlotMapper, *};
 use plotters::coord::Shift;
 use plotters::prelude::*;
@@ -112,17 +112,18 @@ pub fn Plotters(
 
         let mut render_config = RenderConfig::default();
         
-        let gates = get_gates_for_plot(
-            x_axis_info.title.clone(), 
-            y_axis_info.title.clone(), 
-            &gate_store
-        ).unwrap_or_default();
+        // let gates = get_gates_for_plot(
+        //     x_axis_info.title.clone(), 
+        //     y_axis_info.title.clone(), 
+        //     &gate_store
+        // ).unwrap_or_default();
 
-        let mut drawables: Vec<&dyn PlotDrawable> = gates
-            .iter()
-            .map(|d| d.as_ref() as &dyn PlotDrawable)
-            .collect();
+        // let mut drawables: Vec<&dyn PlotDrawable> = gates
+        //     .iter()
+        //     .map(|d| d.as_ref() as &dyn PlotDrawable)
+        //     .collect();
 
+        let mut drawables = vec![];
         // 2. Add the current gate from the signal
         let gate_draft_option = curr_gate_signal.read();
         if let Some(gate) = &*gate_draft_option {
@@ -150,171 +151,177 @@ pub fn Plotters(
 
     
     rsx! {
+        div { style: "position: relative; width: {size().0}px; height: {size().1}px;",
+            img {
+                style: "user-select: none; -webkit-user-select: none; cursor: crosshair;",
+                src: "{plot_image_src()}",
+                width: "{size().0}",
+                height: "{size().1}",
+                draggable: "{draggable}",
+                onclick: move |evt| {
+                    // if let Some(cb) = &on_click {
+                    let local_coords = &evt.data.coordinates().element();
 
-        img {
-            style: "user-select: none; -webkit-user-select: none; cursor: crosshair;",
-            src: "{plot_image_src()}",
-            width: "{size().0}",
-            height: "{size().1}",
-            draggable: "{draggable}",
-            onclick: move |evt| {
-                // if let Some(cb) = &on_click {
-                let local_coords = &evt.data.coordinates().element();
+                    if let Some(mapper) = plot_map() {
 
-                if let Some(mapper) = plot_map() {
+                        let norm_x = local_coords.x as f32;
+                        let norm_y = local_coords.y as f32;
+                        println!("Clicked Pixel: {}, {}", norm_x, norm_y);
+                        if let Some((data_x, data_y)) = mapper
+                            .pixel_to_data(norm_x, norm_y, None, None)
+                        {
+                            println!("Clicked Data: {}, {}", data_x, data_y);
+                            let mut closest_gate = None;
+                            if curr_gate_signal.peek().is_none() {
+                                let x_axis_title = x_axis_info.peek().title.clone();
+                                let y_axis_title = y_axis_info.peek().title.clone();
+                                if let Some(gates) = get_gates_for_plot(
+                                    x_axis_title,
+                                    y_axis_title,
+                                    &gate_store,
+                                ) {
+                                    let tolerance = mapper.get_data_tolerance(5.0);
+                                    let mut closest_dist = std::f32::INFINITY;
 
-                    let norm_x = local_coords.x as f32;
-                    let norm_y = local_coords.y as f32;
+                                    for gate in gates {
+                                        if let Some(dist) = gate
+                                            .is_point_on_perimeter((data_x, data_y), tolerance)
+                                        {
+                                            println!("You clicked on a gate!");
+                                            if dist < closest_dist {
+                                                closest_dist = dist;
+                                                closest_gate = Some(gate.clone());
+                                            }
 
-                    if let Some((data_x, data_y)) = mapper
-                        .pixel_to_data(norm_x, norm_y, None, None)
-                    {
-                        println!("Clicked Data: {}, {}", data_x, data_y);
-                        let mut closest_gate = None;
-                        if curr_gate_signal.peek().is_none() {
-                            let x_axis_title = x_axis_info.peek().title.clone();
-                            let y_axis_title = y_axis_info.peek().title.clone();
-                            if let Some(gates) = get_gates_for_plot(
-                                x_axis_title,
-                                y_axis_title,
-                                &gate_store,
-                            ) {
-                                let tolerance = mapper.get_data_tolerance(5.0);
-                                let mut closest_dist = std::f32::INFINITY;
-
-                                for gate in gates {
-                                    if let Some(dist) = gate
-                                        .is_point_on_perimeter((data_x, data_y), tolerance)
-                                    {
-                                        println!("You clicked on a gate!");
-                                        if dist < closest_dist {
-                                            closest_dist = dist;
-                                            closest_gate = Some(gate.clone());
                                         }
-
                                     }
                                 }
                             }
-                        }
-                        if closest_gate.is_none() {
-                            println!("You didn't click on a gate");
-                            coords.write().push((data_x, data_y));
-                        } else {
-                            let gate_name = closest_gate.unwrap().name.clone();
-                            println!("closest gate was {}", gate_name);
-                        }
+                            if closest_gate.is_none() {
+                                println!("You didn't click on a gate");
+                                coords.write().push((data_x, data_y));
+                            } else {
+                                let gate_name = closest_gate.unwrap().name.clone();
+                                println!("closest gate was {}", gate_name);
+                            }
 
+                        }
+                    } else {
+                        println!("Clicked outside plot area");
                     }
-                } else {
-                    println!("Clicked outside plot area");
-                }
-            },
-            ondoubleclick: move |evt| {
-                // Finalise the current gate
-                if let Some(curr_gate) = curr_gate_signal.write().take() {
+                },
+                ondoubleclick: move |evt| {
+                    // Finalise the current gate
+                    if let Some(curr_gate) = curr_gate_signal.write().take() {
 
-                    let finalised_gate = match flow_gates::geometry::create_polygon_geometry(
-                        curr_gate.get_points(),
-                        &x_axis_info().title,
-                        &y_axis_info().title,
-                    ) {
-                        Ok(gate) => {
-                            let id = *curr_gate_id.peek();
-                            Some(
+                        let finalised_gate = match flow_gates::geometry::create_polygon_geometry(
+                            curr_gate.get_points(),
+                            &x_axis_info().title,
+                            &y_axis_info().title,
+                        ) {
+                            Ok(gate) => {
+                                let id = *curr_gate_id.peek();
+                                Some(
 
-                                Gate::new(
-                                    id.to_string(),
-                                    id.to_string(),
-                                    gate,
-                                    x_axis_info().title.clone(),
-                                    y_axis_info().title.clone(),
-                                ),
-                            )
-                        }
-                        Err(e) => {
-                            println!("{}", e.to_string());
-                            return;
-                        }
-                    };
-                    gate_store
-                        .add_gate(finalised_gate.unwrap(), None)
-                        .expect("gate failed");
-                    coords.write().clear();
-                    *curr_gate_id.write() += 1;
-                }
-            },
-            onmousemove: move |evt| {
-                if let Some(cb) = &on_mousemove {
-                    cb.call(evt.data)
-                }
-            },
-            onmouseout: move |evt| {
-                if let Some(cb) = &on_mouseout {
-                    cb.call(evt.data)
-                }
-            },
-            onmouseover: move |evt| {
-                if let Some(cb) = &on_mouseover {
-                    cb.call(evt.data)
-                }
-            },
-            onmousedown: move |evt| {
-                if let Some(cb) = &on_mousedown {
-                    cb.call(evt.data)
-                }
-            },
-            onmouseup: move |evt| {
-                if let Some(cb) = &on_mouseup {
-                    cb.call(evt.data)
-                }
-            },
+                                    Gate::new(
+                                        id.to_string(),
+                                        id.to_string(),
+                                        gate,
+                                        x_axis_info().title.clone(),
+                                        y_axis_info().title.clone(),
+                                    ),
+                                )
+                            }
+                            Err(e) => {
+                                println!("{}", e.to_string());
+                                return;
+                            }
+                        };
+                        gate_store
+                            .add_gate(finalised_gate.unwrap(), None)
+                            .expect("gate failed");
+                        coords.write().clear();
+                        *curr_gate_id.write() += 1;
+                    }
+                },
+                onmousemove: move |evt| {
+                    if let Some(cb) = &on_mousemove {
+                        cb.call(evt.data)
+                    }
+                },
+                onmouseout: move |evt| {
+                    if let Some(cb) = &on_mouseout {
+                        cb.call(evt.data)
+                    }
+                },
+                onmouseover: move |evt| {
+                    if let Some(cb) = &on_mouseover {
+                        cb.call(evt.data)
+                    }
+                },
+                onmousedown: move |evt| {
+                    if let Some(cb) = &on_mousedown {
+                        cb.call(evt.data)
+                    }
+                },
+                onmouseup: move |evt| {
+                    if let Some(cb) = &on_mouseup {
+                        cb.call(evt.data)
+                    }
+                },
 
-            onwheel: move |evt| {
-                if let Some(cb) = &on_wheel {
-                    cb.call(evt.data)
-                }
-            },
+                onwheel: move |evt| {
+                    if let Some(cb) = &on_wheel {
+                        cb.call(evt.data)
+                    }
+                },
 
-            // ondrag: move |evt| {
-            //     if let Some(cb) = &on_drag {
-            //         cb.call(evt.data)
-            //     }
-            // },
-            // ondragend: move |evt| {
-            //     if let Some(cb) = &on_dragend {
-            //         cb.call(evt.data)
-            //     }
-            // },
-            // ondragenter: move |evt| {
-            //     if let Some(cb) = &on_dragenter {
-            //         cb.call(evt.data)
-            //     }
-            // },
-            // ondragleave: move |evt| {
-            //     if let Some(cb) = &on_dragleave {
-            //         cb.call(evt.data)
-            //     }
-            // },
-            // ondragover: move |evt| {
-            //     if let Some(cb) = &on_dragover {
-            //         cb.call(evt.data)
-            //     }
-            // },
-            // ondragstart: move |evt| {
-            //     if let Some(cb) = &on_dragstart {
-            //         cb.call(evt.data)
-            //     }
-            // },
-            // ondrop: move |evt| {
-            //     if let Some(cb) = &on_drop {
-            //         cb.call(evt.data)
-            //     }
-            // },
-            onscroll: move |evt| {
-                if let Some(cb) = &on_scroll {
-                    cb.call(evt.data)
-                }
-            },
+                // ondrag: move |evt| {
+                //     if let Some(cb) = &on_drag {
+                //         cb.call(evt.data)
+                //     }
+                // },
+                // ondragend: move |evt| {
+                //     if let Some(cb) = &on_dragend {
+                //         cb.call(evt.data)
+                //     }
+                // },
+                // ondragenter: move |evt| {
+                //     if let Some(cb) = &on_dragenter {
+                //         cb.call(evt.data)
+                //     }
+                // },
+                // ondragleave: move |evt| {
+                //     if let Some(cb) = &on_dragleave {
+                //         cb.call(evt.data)
+                //     }
+                // },
+                // ondragover: move |evt| {
+                //     if let Some(cb) = &on_dragover {
+                //         cb.call(evt.data)
+                //     }
+                // },
+                // ondragstart: move |evt| {
+                //     if let Some(cb) = &on_dragstart {
+                //         cb.call(evt.data)
+                //     }
+                // },
+                // ondrop: move |evt| {
+                //     if let Some(cb) = &on_drop {
+                //         cb.call(evt.data)
+                //     }
+                // },
+                onscroll: move |evt| {
+                    if let Some(cb) = &on_scroll {
+                        cb.call(evt.data)
+                    }
+                },
+            }
+            GateLayer {
+                plot_map,
+                x_channel: x_axis_info().title.clone(),
+                y_channel: y_axis_info().title.clone(),
+            }
         }
     }
 }
@@ -345,61 +352,77 @@ fn get_gates_for_plot(x_axis_title: Arc<str>, y_axis_title: Arc<str>, gate_store
 }
 
 #[component]
-fn GatingPlot(size: (f32, f32), plot_data: flow_plots::render::plothelper::PlotData, gates: ReadSignal<Vec<GateFinal>>, x_channel: ReadSignal<Arc<str>>, y_channel: ReadSignal<Arc<str>>) -> Element {
-    let mapper = PlotMapper::from_plot_helper(
-        &plot_data.plot_helper, 
-        size.0, 
-        size.1
-    );
-    let bytes = plot_data.plot_bytes;
+fn GateLayer(plot_map: ReadSignal<Option<PlotMapper>>, x_channel: ReadSignal<Arc<str>>, y_channel: ReadSignal<Arc<str>>) -> Element {
+    
+    let mut gate_store: Store<GateState> = use_context::<Store<GateState>>();
 
-    let base64_str = BASE64_STANDARD.encode(&bytes);
-    // plot_image_src.set(format!("data:image/jpeg;base64,{}", base64_str));
+    let gates = use_memo(move || {
+        println!("memor run");
+        match get_gates_for_plot(x_channel(), y_channel(), &gate_store) {
+            Some(g) => g,
+            None => vec![],
+        }
+    });
 
     rsx! {
-        div { style: "position: relative; width: {mapper.view_width}px; height: {mapper.view_height}px;",
+        match plot_map() {
+            Some(mapper) => rsx! {
+                // div { style: "position: relative; width: {mapper.view_width}px; height: {mapper.view_height}px;",
 
-            // Layer 1: The Static Background (JPEG)
-            img {
-                src: format!("data:image/jpeg;base64,{}", base64_str),
-                style: "position: absolute; top: 0; left: 0; display: block;",
-            }
+                // Layer 1: The Static Background (JPEG)
+                // img {
+                //     src: format!("data:image/jpeg;base64,{}", base64_str),
+                //     style: "position: absolute; top: 0; left: 0; display: block;",
+                // }
 
-            // Layer 2: The Interactive Overlay (SVG)
-            svg {
-                // Viewbox matches JPEG pixels exactly
-                view_box: "0 0 {mapper.view_width} {mapper.view_height}",
-                style: "position: absolute; top: 0; left: 0; pointer-events: none;",
+                // Layer 2: The Interactive Overlay (SVG)
+                svg {
+                    // Viewbox matches JPEG pixels exactly
+                    width: "100%",
+                    height: "100%",
+                    view_box: "0 0 {mapper.view_width} {mapper.view_height}",
+                    style: "position: absolute; top: 0; left: 0; pointer-events: none; z-index: 2;",
 
-                for gate in &*gates.read() {
+                    for gate in &*gates.read() {
 
-                    match &gate.geometry {
-                        GateGeometry::Polygon { nodes, closed } => {
-                            let id = gate.id.clone();
-                            let points_attr = gate
-                                .get_points()
-                                .iter()
-                                .map(|v| {
-                                    let (px, py) = mapper.map_to_svg(v.0, v.1);
-                                    format!("{px},{py}")
-                                })
-                                .collect::<Vec<_>>()
-                                .join(" ");
-                            rsx! {
-                                polygon {
-                                    points: "{points_attr}",
-                                    fill: "rgba(0, 255, 255, 0.2)",
-                                    stroke: "cyan",
-                                    stroke_width: "2",
-                                    pointer_events: "auto",
-                                    onclick: move |_| println!("Clicked gate: {id}"),
+                        match &gate.geometry {
+                            GateGeometry::Polygon { nodes, closed } => {
+                                // let id = gate.id.clone();
+                                let points_attr = gate
+                                    .get_points()
+                                    .iter()
+                                    .map(|v| {
+                                        let (px, py) = mapper.map_to_svg(v.0, v.1);
+                                        format!("{px},{py}")
+                                    })
+                                    .collect::<Vec<_>>()
+                                    .join(" ");
+                                {
+                                    println!("SVG Points: {}", points_attr);
+                                }
+                                rsx! {
+                                    polygon {
+                                        points: "{points_attr}",
+                                        fill: "rgba(0, 255, 255, 0.2)",
+                                        stroke: "cyan",
+                                        stroke_width: "2",
+                                        pointer_events: "none",
+
+                                    // onclick: move |_| println!("Clicked gate: {id}"),
+                                    }
                                 }
                             }
+
+                            _ => rsx! {},
                         }
-                        _ => rsx! {},
                     }
                 }
-            }
+            },
+            None => rsx! {},
         }
+
     }
-}
+    
+    }
+
+
