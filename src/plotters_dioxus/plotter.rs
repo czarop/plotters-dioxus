@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
-use dioxus::{html::u::z_index, prelude::*};
+use dioxus::{html::{input_data::MouseButton, u::z_index}, prelude::*};
 use flow_gates::{plotmap::PlotMapper, *};
 use plotters::coord::Shift;
 use plotters::prelude::*;
@@ -57,7 +57,6 @@ pub fn Plotters(
     let mut plot_map = use_signal(|| None::<flow_gates::plotmap::PlotMapper>);
     let mut coords = use_signal(|| Vec::<(f32, f32)>::new());
     let mut curr_gate_signal = use_signal(|| None::<GateDraft>);
-    
     let mut curr_gate_id = use_signal(|| 0);
 
     use_effect(move || {
@@ -70,12 +69,13 @@ pub fn Plotters(
                 &y_axis_info().title,
             );
             curr_gate_signal.set(Some(gate_draft));
+        } else {
+            curr_gate_signal.set(None);
         }
         
     });
 
     use_effect(move || {
-        println!("Use effect redrawing");
         let x_axis_info = x_axis_info();
         let y_axis_info = y_axis_info();
         let (width, height) = size();
@@ -111,34 +111,12 @@ pub fn Plotters(
             .expect("shouldn't fail");
 
         let mut render_config = RenderConfig::default();
-        
-        // let gates = get_gates_for_plot(
-        //     x_axis_info.title.clone(), 
-        //     y_axis_info.title.clone(), 
-        //     &gate_store
-        // ).unwrap_or_default();
-
-        // let mut drawables: Vec<&dyn PlotDrawable> = gates
-        //     .iter()
-        //     .map(|d| d.as_ref() as &dyn PlotDrawable)
-        //     .collect();
-
-        let mut drawables = vec![];
-        // 2. Add the current gate from the signal
-        let gate_draft_option = curr_gate_signal.read();
-        if let Some(gate) = &*gate_draft_option {
-
-            drawables.push(gate as &dyn PlotDrawable);
-        }
-
 
         let plot_data = plot
             .render(
                 data(),
                 &options,
                 &mut render_config,
-                Some(drawables.as_slice()),
-                None,
             )
             .expect("failed to render plot");
         let bytes = plot_data.plot_bytes;
@@ -158,12 +136,10 @@ pub fn Plotters(
                 width: "{size().0}",
                 height: "{size().1}",
                 draggable: "{draggable}",
+                oncontextmenu: move |evt| evt.prevent_default(),
                 onclick: move |evt| {
-                    // if let Some(cb) = &on_click {
-                    let local_coords = &evt.data.coordinates().element();
-
                     if let Some(mapper) = plot_map() {
-
+                        let local_coords = &evt.data.coordinates().element();
                         let norm_x = local_coords.x as f32;
                         let norm_y = local_coords.y as f32;
                         println!("Clicked Pixel: {}, {}", norm_x, norm_y);
@@ -199,23 +175,28 @@ pub fn Plotters(
                             }
                             if closest_gate.is_none() {
                                 println!("You didn't click on a gate");
+
                                 coords.write().push((data_x, data_y));
+
                             } else {
                                 let gate_name = closest_gate.unwrap().name.clone();
                                 println!("closest gate was {}", gate_name);
                             }
 
                         }
-                    } else {
-                        println!("Clicked outside plot area");
+
                     }
+
                 },
                 ondoubleclick: move |evt| {
                     // Finalise the current gate
                     if let Some(curr_gate) = curr_gate_signal.write().take() {
+                        // last point is duplicated from the double click
+                        let mut points = curr_gate.get_points();
+                        points.pop();
 
                         let finalised_gate = match flow_gates::geometry::create_polygon_geometry(
-                            curr_gate.get_points(),
+                            points,
                             &x_axis_info().title,
                             &y_axis_info().title,
                         ) {
@@ -233,7 +214,7 @@ pub fn Plotters(
                                 )
                             }
                             Err(e) => {
-                                println!("{}", e.to_string());
+                                coords.write().clear();
                                 return;
                             }
                         };
@@ -260,8 +241,11 @@ pub fn Plotters(
                     }
                 },
                 onmousedown: move |evt| {
-                    if let Some(cb) = &on_mousedown {
-                        cb.call(evt.data)
+                    match evt.trigger_button() {
+                        Some(MouseButton::Secondary) => {
+                            coords.set(vec![]);
+                        }
+                        _ => {}
                     }
                 },
                 onmouseup: move |evt| {
@@ -321,6 +305,7 @@ pub fn Plotters(
                 plot_map,
                 x_channel: x_axis_info().title.clone(),
                 y_channel: y_axis_info().title.clone(),
+                draft_gate: curr_gate_signal,
             }
         }
     }
@@ -352,12 +337,11 @@ fn get_gates_for_plot(x_axis_title: Arc<str>, y_axis_title: Arc<str>, gate_store
 }
 
 #[component]
-fn GateLayer(plot_map: ReadSignal<Option<PlotMapper>>, x_channel: ReadSignal<Arc<str>>, y_channel: ReadSignal<Arc<str>>) -> Element {
+fn GateLayer(plot_map: ReadSignal<Option<PlotMapper>>, x_channel: ReadSignal<Arc<str>>, y_channel: ReadSignal<Arc<str>>, draft_gate: ReadSignal<Option<GateDraft>>) -> Element {
     
-    let mut gate_store: Store<GateState> = use_context::<Store<GateState>>();
+    let gate_store: Store<GateState> = use_context::<Store<GateState>>();
 
     let gates = use_memo(move || {
-        println!("memor run");
         match get_gates_for_plot(x_channel(), y_channel(), &gate_store) {
             Some(g) => g,
             None => vec![],
@@ -367,27 +351,15 @@ fn GateLayer(plot_map: ReadSignal<Option<PlotMapper>>, x_channel: ReadSignal<Arc
     rsx! {
         match plot_map() {
             Some(mapper) => rsx! {
-                // div { style: "position: relative; width: {mapper.view_width}px; height: {mapper.view_height}px;",
-
-                // Layer 1: The Static Background (JPEG)
-                // img {
-                //     src: format!("data:image/jpeg;base64,{}", base64_str),
-                //     style: "position: absolute; top: 0; left: 0; display: block;",
-                // }
-
-                // Layer 2: The Interactive Overlay (SVG)
                 svg {
-                    // Viewbox matches JPEG pixels exactly
                     width: "100%",
                     height: "100%",
                     view_box: "0 0 {mapper.view_width} {mapper.view_height}",
                     style: "position: absolute; top: 0; left: 0; pointer-events: none; z-index: 2;",
 
                     for gate in &*gates.read() {
-
                         match &gate.geometry {
-                            GateGeometry::Polygon { nodes, closed } => {
-                                // let id = gate.id.clone();
+                            GateGeometry::Polygon { nodes: _, closed: _ } => {
                                 let points_attr = gate
                                     .get_points()
                                     .iter()
@@ -397,9 +369,7 @@ fn GateLayer(plot_map: ReadSignal<Option<PlotMapper>>, x_channel: ReadSignal<Arc
                                     })
                                     .collect::<Vec<_>>()
                                     .join(" ");
-                                {
-                                    println!("SVG Points: {}", points_attr);
-                                }
+
                                 rsx! {
                                     polygon {
                                         points: "{points_attr}",
@@ -407,14 +377,64 @@ fn GateLayer(plot_map: ReadSignal<Option<PlotMapper>>, x_channel: ReadSignal<Arc
                                         stroke: "cyan",
                                         stroke_width: "2",
                                         pointer_events: "none",
-
-                                    // onclick: move |_| println!("Clicked gate: {id}"),
                                     }
                                 }
                             }
 
                             _ => rsx! {},
                         }
+                    }
+
+                    match draft_gate() {
+                        Some(draft) => {
+                            let mut points_attr = draft
+                                .get_points()
+                                .iter()
+                                .map(|v| {
+                                    let (px, py) = mapper.map_to_svg(v.0, v.1);
+                                    format!("{px},{py}")
+                                })
+                                .collect::<Vec<_>>();
+                            if let Some(first) = points_attr.first() && points_attr.len() > 2 {
+                                points_attr.push(first.clone());
+                            }
+                            let draft_string = points_attr.join(" ");
+
+                            match points_attr.len() {
+                                0 => rsx! {},
+                                1 => {
+                                    let points: Vec<&str> = draft_string.split(",").collect();
+                                    rsx! {
+                                        circle {
+                                            cx: "{points[0]}",
+                                            cy: "{points[1]}",
+                                            r: "3",
+                                            fill: "red",
+                                        }
+                                    }
+                                }
+                                2 => rsx! {
+                                    polyline {
+                                        points: "{draft_string}",
+                                        stroke: "red",
+                                        stroke_width: "2",
+                                        fill: "none",
+
+                                    }
+                                },
+                                _ => rsx! {
+                                    polygon {
+                                        points: "{draft_string}",
+                                        fill: "rgba(0, 255, 255, 0.2)",
+                                        stroke: "red",
+                                        stroke_width: "2",
+                                        pointer_events: "none",
+                                    }
+                                },
+
+                            }
+                        }
+                        None => rsx! {},
                     }
                 }
             },
