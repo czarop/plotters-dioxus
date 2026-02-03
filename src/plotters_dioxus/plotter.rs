@@ -9,6 +9,7 @@ use plotters_bitmap::BitMapBackend;
 use std::rc::Rc;
 use std::sync::Arc;
 
+
 // use crate::colormap;
 
 use flow_plots::{
@@ -341,4 +342,64 @@ fn get_gates_for_plot(x_axis_title: Arc<str>, y_axis_title: Arc<str>, gate_store
             return None;
         }
         return Some(gate_list);
+}
+
+#[component]
+fn GatingPlot(size: (f32, f32), plot_data: flow_plots::render::plothelper::PlotData, gates: ReadSignal<Vec<GateFinal>>, x_channel: ReadSignal<Arc<str>>, y_channel: ReadSignal<Arc<str>>) -> Element {
+    let mapper = PlotMapper::from_plot_helper(
+        &plot_data.plot_helper, 
+        size.0, 
+        size.1
+    );
+    let bytes = plot_data.plot_bytes;
+
+    let base64_str = BASE64_STANDARD.encode(&bytes);
+    // plot_image_src.set(format!("data:image/jpeg;base64,{}", base64_str));
+
+    rsx! {
+        div { style: "position: relative; width: {mapper.view_width}px; height: {mapper.view_height}px;",
+
+            // Layer 1: The Static Background (JPEG)
+            img {
+                src: format!("data:image/jpeg;base64,{}", base64_str),
+                style: "position: absolute; top: 0; left: 0; display: block;",
+            }
+
+            // Layer 2: The Interactive Overlay (SVG)
+            svg {
+                // Viewbox matches JPEG pixels exactly
+                view_box: "0 0 {mapper.view_width} {mapper.view_height}",
+                style: "position: absolute; top: 0; left: 0; pointer-events: none;",
+
+                for gate in &*gates.read() {
+
+                    match &gate.geometry {
+                        GateGeometry::Polygon { nodes, closed } => {
+                            let id = gate.id.clone();
+                            let points_attr = gate
+                                .get_points()
+                                .iter()
+                                .map(|v| {
+                                    let (px, py) = mapper.map_to_svg(v.0, v.1);
+                                    format!("{px},{py}")
+                                })
+                                .collect::<Vec<_>>()
+                                .join(" ");
+                            rsx! {
+                                polygon {
+                                    points: "{points_attr}",
+                                    fill: "rgba(0, 255, 255, 0.2)",
+                                    stroke: "cyan",
+                                    stroke_width: "2",
+                                    pointer_events: "auto",
+                                    onclick: move |_| println!("Clicked gate: {id}"),
+                                }
+                            }
+                        }
+                        _ => rsx! {},
+                    }
+                }
+            }
+        }
+    }
 }
