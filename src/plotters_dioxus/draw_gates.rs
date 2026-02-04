@@ -7,17 +7,29 @@ use crate::{
     plotters_dioxus::gate_helpers::GateDraft,
 };
 
+trait DragData{}
+
 #[derive(Clone, PartialEq, Copy)]
 enum GateDragType {
-    Point,
-    Gate,
+    Point(PointDragData),
+    Gate(GateDragData),
 }
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Copy)]
 struct GateDragData {
-    drag_type: GateDragType,
-    index: usize,
-    data: (f32, f32),
+    gate_index: usize,
+    start_loc: (f32, f32),
+    current_loc: (f32, f32)
 }
+
+#[derive(Clone, PartialEq, Copy)]
+struct PointDragData {
+    point_index: usize,
+    loc: (f32, f32),
+}
+
+impl DragData for GateDragData{}
+
+impl DragData for PointDragData {}
 
 #[component]
 pub fn GateLayer(
@@ -43,7 +55,7 @@ pub fn GateLayer(
     });
 
     // for editing a gate's points
-    let mut drag_data = use_signal(|| Option::<GateDragData>::None);
+    let mut drag_data = use_signal(|| Option::<GateDragType>::None);
 
     // the list of finalised gates
     let gates = use_memo(
