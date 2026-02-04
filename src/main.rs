@@ -1,7 +1,9 @@
 #![allow(non_snake_case)]
 
 use clingate::{
-    file_load::FcsFiles, gate_store::GateState, plotters_dioxus::{AxisInfo, PseudoColourPlot}
+    file_load::FcsFiles,
+    gate_store::GateState,
+    plotters_dioxus::{AxisInfo, PseudoColourPlot},
 };
 use dioxus::{
     desktop::{Config, LogicalSize, WindowBuilder},
@@ -70,15 +72,16 @@ fn App() -> Element {
     let mut message = use_signal(|| None::<String>);
     let gate_store = use_store(|| GateState::default());
     use_context_provider(|| gate_store);
-    
 
     let _ = use_resource(move || async move {
         // Read the file from the project root
         let result = (|| -> anyhow::Result<FcsFiles> {
             let content = std::fs::read_to_string("file_paths.txt")?;
-            let path = content.lines().find(|l| !l.trim().is_empty())
+            let path = content
+                .lines()
+                .find(|l| !l.trim().is_empty())
                 .ok_or_else(|| anyhow::anyhow!("No path found"))?;
-                
+
             FcsFiles::create(path.trim())
         })();
 
@@ -86,7 +89,7 @@ fn App() -> Element {
             Ok(files) => {
                 message.set(None);
                 filehandler.set(Some(files));
-            },
+            }
             Err(e) => message.set(Some(e.to_string())),
         }
     });
@@ -94,18 +97,17 @@ fn App() -> Element {
     // Primary States
     let mut sample_index = use_signal(|| 0);
     let current_sample = use_memo(move || {
-    let handler = filehandler.read();
-    let index = *sample_index.read();
-    
-    if handler.is_some(){
-        message.set(None);
-        Some(handler.as_ref().unwrap().file_list()[index].clone())
-    } else {
-        message.set(Some("Select working directory to load files".to_string()));
-        None
-    }
-    
-});
+        let handler = filehandler.read();
+        let index = *sample_index.read();
+
+        if handler.is_some() {
+            message.set(None);
+            Some(handler.as_ref().unwrap().file_list()[index].clone())
+        } else {
+            message.set(Some("Select working directory to load files".to_string()));
+            None
+        }
+    });
 
     let mut x_axis_param = use_signal(|| "CD4".to_string());
     let mut y_axis_param = use_signal(|| "CD8".to_string());

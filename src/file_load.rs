@@ -36,9 +36,9 @@ impl FcsFiles {
                     .ok_or_else(|| anyhow!("Invalid UTF-8 in filename"))?;
                 if name_str.ends_with(".fcs") {
                     let full_path = buf.join(&name_str);
-                    Ok(Some(FcsSampleStub{
+                    Ok(Some(FcsSampleStub {
                         name: name_str.to_string(),
-                        full_path: full_path
+                        full_path: full_path,
                     }))
                 } else {
                     Ok(None)
