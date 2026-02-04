@@ -1,5 +1,6 @@
 pub mod gate_helpers;
-pub mod plotter;
-pub use plotter::AxisInfo;
-pub use plotter::DioxusDrawingArea;
-pub use plotter::Plotters;
+pub mod draw_plot;
+pub mod draw_gates;
+pub use draw_plot::AxisInfo;
+pub use draw_plot::DioxusDrawingArea;
+pub use draw_plot::PseudoColourPlot;

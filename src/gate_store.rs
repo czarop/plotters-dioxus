@@ -42,6 +42,22 @@ pub struct GateKey {
     gate_id: Id,
 }
 
+impl GateKey {
+    pub fn new(id: Id) -> Self {
+        Self {
+            gate_id: id
+        }
+    }
+}
+
+impl From<Arc<str>> for GateKey {
+    fn from(id: Arc<str>) -> Self {
+        Self {
+            gate_id: id
+        }
+    }
+}
+
 /// a plot is selected for a file, 
 /// The currently selected (parental) gate id is stored in a signal and accessed. 
 /// Create a GatesOnPlotKey with the current params and the parental gate id, 
@@ -109,20 +125,53 @@ impl<Lens> Store<GateState, Lens> {
         Ok(())
     }
 
-    // fn get_gates_for_plot(&self, key: GatesOnPlotKey) -> Option<Store<Vec<Arc<Gate>>, impl Readable<Target = Vec<GateKey>>>> {
-    // fn get_gates_for_plot(&self, key: GatesOnPlotKey) -> Vec<Arc<Gate>> {
-    //    let key_options = self.gate_ids_by_view().get(key);
-    //    let mut gate_list = vec![];
-    //    if let Some(key_store) = key_options {
-    //     let key_list = key_store();
-    //     key_list.into_iter().map(|k| {
-    //         if let Some(gate) = self.gate_registry().get(k) {
-    //             gate_list.push(gate().clone());
-    //         }
-    //    });
-        
-    //    }
-
-    //     gate_list
-    // }
+    fn get_gates_for_plot(&self, x_axis_title: Arc<str>, y_axis_title: Arc<str>) -> Option<Vec<Arc<GateFinal>>> {
+        let key = GatesOnPlotKey::new(
+                x_axis_title,
+                y_axis_title,
+                None
+            );
+        let key_options = self.gate_ids_by_view().get(key);
+        let mut gate_list = vec![];
+        if let Some(key_store) = key_options {
+                
+                let ids = key_store.read().clone(); 
+                let registry = self.gate_registry();
+                let registry_guard = registry.read();
+                for k in ids {
+                    if let Some(gate_store_entry) = registry_guard.get(&k) {
+                        gate_list.push(gate_store_entry.clone());
+                    }
+                }
+            } else {
+                println!("No gates for plot");
+                return None;
+            }
+            return Some(gate_list);
+    }
 }
+
+// fn get_gates_for_plot(x_axis_title: Arc<str>, y_axis_title: Arc<str>, gate_store: &Store<GateState>) -> Option<Vec<Arc<GateFinal>>> {
+//     let key = GatesOnPlotKey::new(
+//             x_axis_title,
+//             y_axis_title,
+//             None
+//         );
+//        let key_options = gate_store.gate_ids_by_view().get(key);
+//        let mut gate_list = vec![];
+//        if let Some(key_store) = key_options {
+            
+//             let ids = key_store.read().clone(); 
+//             let registry = gate_store.gate_registry();
+//             let registry_guard = registry.read();
+//             for k in ids {
+//                 if let Some(gate_store_entry) = registry_guard.get(&k) {
+//                     gate_list.push(gate_store_entry.clone());
+//                 }
+//             }
+//         } else {
+//             println!("No gates for plot");
+//             return None;
+//         }
+//         return Some(gate_list);
+// }

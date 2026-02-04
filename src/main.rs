@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 
 use clingate::{
-    file_load::FcsFiles, gate_store::GateState, plotters_dioxus::{AxisInfo, Plotters}
+    file_load::FcsFiles, gate_store::GateState, plotters_dioxus::{AxisInfo, PseudoColourPlot}
 };
 use dioxus::{
     desktop::{Config, LogicalSize, WindowBuilder},
@@ -300,7 +300,7 @@ fn App() -> Element {
                 if let Some(Ok(plot_data)) = &*processed_data_resource.read() {
                     rsx! {
                         div {
-                            Plotters {
+                            PseudoColourPlot {
                                 size: (600, 600),
                                 data: plot_data.clone(),
                                 x_axis_info: x_axis_limits.read().clone(),
