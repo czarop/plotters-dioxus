@@ -7,13 +7,32 @@ use crate::{
     plotters_dioxus::gate_helpers::GateDraft,
 };
 
-trait DragData{}
 
 #[derive(Clone, PartialEq, Copy)]
 enum GateDragType {
     Point(PointDragData),
     Gate(GateDragData),
 }
+
+impl GateDragType {
+    fn clone_with_point(self, point: (f32, f32)) -> Self {
+        match self {
+            GateDragType::Point(point_drag_data) => {
+                GateDragType::Point(
+                    PointDragData { point_index: point_drag_data.point_index, loc: point }
+                )
+            },
+            GateDragType::Gate(gate_drag_data) => {
+                GateDragType::Gate(GateDragData { 
+                    gate_index: gate_drag_data.gate_index, 
+                    start_loc: gate_drag_data.start_loc, 
+                    current_loc: point 
+                })
+            },
+        }
+    }
+}
+
 #[derive(Clone, PartialEq, Copy)]
 struct GateDragData {
     gate_index: usize,
@@ -27,9 +46,8 @@ struct PointDragData {
     loc: (f32, f32),
 }
 
-impl DragData for GateDragData{}
 
-impl DragData for PointDragData {}
+
 
 #[component]
 pub fn GateLayer(
@@ -171,22 +189,13 @@ pub fn GateLayer(
                                     .as_ref()
                                     .unwrap()
                                     .pixel_to_data(px, py, None, None);
-                                match data {
-                                    GateDragType::Point(point_drag_data) => {
-
-                                        if let Some(data_coords) = data_coords_option
+                                if let Some(data_coords) = data_coords_option
                                         {
-                                            let d = PointDragData {
-                                                point_index: point_drag_data.point_index,
-                                                loc: data_coords,
-                                            };
-                                            drag_data.set(Some(GateDragType::Point(d)));
-                                        }
-                                    }
-                                    GateDragType::Gate(gate_drag_data) => {}
+                                    let new_data = data.clone_with_point(data_coords);
+                                    drag_data.set(Some(new_data));
                                 }
                             }
-                            None => todo!(),
+                            None => {}
                         }
                     },
                     onmouseup: move |evt| {
