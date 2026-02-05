@@ -1,5 +1,7 @@
-use flow_plots::plots::traits::PlotDrawable;
+
 use std::ops::Deref;
+
+use crate::plotters_dioxus::PlotDrawable;
 
 #[derive(PartialEq, Clone)]
 pub enum GateDraft {
@@ -11,7 +13,7 @@ pub enum GateDraft {
     // You can add Rectangle or Ellipse drafts here later
 }
 
-impl flow_plots::plots::traits::PlotDrawable for GateDraft {
+impl PlotDrawable for GateDraft {
     fn get_points(&self) -> Vec<(f32, f32)> {
         match self {
             GateDraft::Polygon { points, .. } => points.clone(),
@@ -70,5 +72,18 @@ impl PlotDrawable for GateFinal {
 
     fn is_finalised(&self) -> bool {
         return true;
+    }
+}
+
+
+impl PlotDrawable for flow_gates::Gate {
+    fn get_points(&self) -> Vec<(f32, f32)> {
+        self.geometry.to_render_points(
+            self.x_parameter_channel_name(),
+            self.y_parameter_channel_name(),
+        )
+    }
+    fn is_finalised(&self) -> bool {
+        true
     }
 }

@@ -1,9 +1,10 @@
 use dioxus::prelude::*;
 use flow_gates::{Gate, GateHierarchy};
-use flow_plots::plots::traits::PlotDrawable;
+
 use std::{collections::HashMap, sync::Arc};
 
 use crate::plotters_dioxus::gate_helpers::GateFinal;
+use crate::plotters_dioxus::PlotDrawable;
 
 type Id = std::sync::Arc<str>;
 

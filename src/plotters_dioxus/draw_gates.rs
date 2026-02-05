@@ -1,10 +1,9 @@
 use std::sync::Arc;
 use dioxus::prelude::*;
-use flow_gates::{Gate, GateGeometry, plotmap::PlotMapper};
-use flow_plots::plots::traits::PlotDrawable;
+use flow_gates::{Gate, GateGeometry};
 use crate::{
     gate_store::{GateState, GateStateImplExt},
-    plotters_dioxus::gate_helpers::GateDraft,
+    plotters_dioxus::{PlotDrawable, gate_helpers::GateDraft, plot_helpers::PlotMapper}
 };
 
 
@@ -82,6 +81,7 @@ pub fn GateLayer(
             None => vec![],
         },
     );
+   
     rsx! {
         match plot_map() {
             Some(mapper) => rsx! {
@@ -179,27 +179,7 @@ pub fn GateLayer(
                         }
                     },
                     onmousemove: move |evt| {
-
-                        match drag_data() {
-                            Some(data) => {
-                                let local_coords = &evt.data.coordinates().element();
-                                let px = local_coords.x as f32;
-                                let py = local_coords.y as f32;
-                                let data_coords_option = plot_map
-                                    .as_ref()
-                                    .unwrap()
-                                    .pixel_to_data(px, py, None, None);
-                                if let Some(data_coords) = data_coords_option
-                                        {
-                                    let new_data = data.clone_with_point(data_coords);
-                                    drag_data.set(Some(new_data));
-                                }
-                            }
-                            None => {}
-                        }
-                    },
-                    onmouseup: move |evt| {
-                        if let Some(GateDragData { drag_type, index, data: _ }) = drag_data() {
+                        if let Some(data) = drag_data() {
                             let local_coords = &evt.data.coordinates().element();
                             let px = local_coords.x as f32;
                             let py = local_coords.y as f32;
@@ -207,25 +187,42 @@ pub fn GateLayer(
                                 .as_ref()
                                 .unwrap()
                                 .pixel_to_data(px, py, None, None);
-
-                            match drag_type {
-                                GateDragType::Point => {
-                                    if let Some(data_coords) = data_coords_option {
+                            if let Some(data_coords) = data_coords_option
+                                    {
+                                let new_data = data.clone_with_point(data_coords);
+                                drag_data.set(Some(new_data));
+                            }
+                        }
+                    },
+                    onmouseup: move |evt| {
+                        if let Some(data) = drag_data() {
+                            let local_coords = &evt.data.coordinates().element();
+                            let px = local_coords.x as f32;
+                            let py = local_coords.y as f32;
+                            let data_coords_option = plot_map
+                                .as_ref()
+                                .unwrap()
+                                .pixel_to_data(px, py, None, None);
+                            if let Some(data_coords) = data_coords_option
+                                    {
+                                let new_data = data.clone_with_point(data_coords);
+                                match new_data {
+                                    GateDragType::Point(point_drag_data) => {
                                         if let Some(selected_gate_id) = selected_gate_id() {
                                             gate_store
                                                 .move_gate_point(
                                                     selected_gate_id.into(),
-                                                    index,
+                                                    point_drag_data.point_index,
                                                     data_coords,
                                                 )
                                                 .expect("Gate Move Failed");
                                             drag_data.set(None);
                                         }
                                     }
-
-                                }
-                                GateDragType::Gate => {
-                                    drag_data.set(None);
+                                    GateDragType::Gate(gate_drag_data) => {
+                                        todo!("move whole gate");
+                                        drag_data.set(None);
+                                    }
                                 }
                             }
                         }
@@ -277,19 +274,19 @@ pub fn GateLayer(
                                                         .unwrap()
                                                         .pixel_to_data(px, py, None, None)
                                                     {
+                                                        let gate_drag_data = GateDragData {
+                                                            gate_index,
+                                                            start_loc: data_coords,
+                                                            current_loc: data_coords,
+                                                        };
                                                         drag_data
                                                             .set(
-                                                                Some(GateDragData {
-                                                                    drag_type: GateDragType::Gate,
-                                                                    index: gate_index,
-                                                                    data: data_coords,
-                                                                }),
+                                                                Some(GateDragType::Gate(gate_drag_data))
                                                             );
                                                     }
                                                 }
                                                 Some(dioxus_elements::input_data::MouseButton::Secondary) => {
-                                                    println!("make context menu to delete points");
-                                                    return;
+                                                    todo!("make context menu to delete points");
                                                 }
                                                 _ => return,
                                             }
@@ -306,44 +303,42 @@ pub fn GateLayer(
                                                 cursor: "move",
                                                 onmousedown: move |evt| {
                                                     match evt.trigger_button() {
-                                                        Some(dioxus_elements::input_data::MouseButton::Primary) => {}
+                                                        Some(dioxus_elements::input_data::MouseButton::Primary) => {
+                                                            let local_coords = &evt.data.coordinates().element();
+                                                            let px = local_coords.x as f32;
+                                                            let py = local_coords.y as f32;
+                                                            if let Some(data_coords) = plot_map()
+                                                                .unwrap()
+                                                                .pixel_to_data(px, py, None, None)
+                                                            {
+                                                                let point_drag_data = PointDragData {
+                                                                    point_index: index,
+                                                                    loc: data_coords,
+                                                                };
+                                                                drag_data.set(Some(GateDragType::Point(point_drag_data)));
+                                                            }
+                                                        }
                                                         Some(dioxus_elements::input_data::MouseButton::Secondary) => {
                                                             println!("make context menu to add or delete points");
-                                                            return;
+
                                                         }
-                                                        _ => return,
-                                                    }
-                                                    let local_coords = &evt.data.coordinates().element();
-                                                    let px = local_coords.x as f32;
-                                                    let py = local_coords.y as f32;
-                                                    if let Some(data_coords) = plot_map().unwrap().pixel_to_data(px, py, None, None)
-                                                    {
-                                                        drag_data
-                                                            .set(
-                                                                Some(GateDragData {
-                                                                    drag_type: GateDragType::Point,
-                                                                    index,
-                                                                    data: data_coords,
-                                                                }),
-                                                            );
+                                                        _ => {}
                                                     }
                                                 },
+
                                             }
                                         }
                                         if is_being_edited {
-                                            {
-                                                let GateDragData { drag_type, index: point_index, data } = *drag_data
-                                                    .as_ref()
-                                                    .unwrap();
+                                            if let Some(drag_type) = drag_data() {
                                                 match drag_type {
-                                                    GateDragType::Point => {
+                                                    GateDragType::Point(data) => {
                                                         let n = points.len();
-                                                        let idx_before = (point_index + n - 1) % n;
-                                                        let idx_after = (point_index + 1) % n;
+                                                        let idx_before = (data.point_index + n - 1) % n;
+                                                        let idx_after = (data.point_index + 1) % n;
                                                         let p_prev = points[idx_before];
                                                         let p_next = points[idx_after];
                                                         let (prev_x, prev_y) = (p_prev.0, p_prev.1);
-                                                        let (mouse_x, mouse_y) = mapper.map_to_svg(data.0, data.1);
+                                                        let (mouse_x, mouse_y) = mapper.map_to_svg(data.loc.0, data.loc.1);
                                                         let (next_x, next_y) = (p_next.0, p_next.1);
                                                         rsx! {
                                                             polyline {
@@ -362,13 +357,15 @@ pub fn GateLayer(
                                                             }
                                                         }
                                                     }
-                                                    GateDragType::Gate => {
+                                                    GateDragType::Gate(data) => {
                                                         println!("Draw a ghost gate at the offset.");
                                                         rsx! {}
                                                     }
                                                 }
                                             }
+
                                         }
+
                                     }
                                 }
                             }

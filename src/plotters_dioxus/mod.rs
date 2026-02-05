@@ -4,3 +4,6 @@ pub mod gate_helpers;
 pub use draw_plot::AxisInfo;
 pub use draw_plot::DioxusDrawingArea;
 pub use draw_plot::PseudoColourPlot;
+pub mod traits;
+pub use traits::PlotDrawable;
+pub mod plot_helpers;

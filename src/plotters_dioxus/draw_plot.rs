@@ -2,23 +2,18 @@
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use dioxus::prelude::*;
-use flow_gates::{plotmap::PlotMapper, *};
 use plotters::coord::Shift;
 use plotters::prelude::*;
 use plotters_bitmap::BitMapBackend;
-use std::rc::Rc;
+
 use std::sync::Arc;
 
 use flow_plots::{
-    BasePlotOptions, ColorMaps, DensityPlot, DensityPlotOptions, Plot, plots::traits::PlotDrawable,
+    BasePlotOptions, ColorMaps, DensityPlot, DensityPlotOptions, Plot,
     render::RenderConfig,
 };
 
-use crate::plotters_dioxus::draw_gates::GateLayer;
-use crate::{
-    gate_store::{GateState, GateStateImplExt},
-    plotters_dioxus::gate_helpers::GateDraft,
-};
+use crate::plotters_dioxus::{draw_gates::GateLayer, plot_helpers::PlotMapper};
 
 pub type DioxusDrawingArea<'a> = DrawingArea<BitMapBackend<'a>, Shift>;
 
@@ -38,7 +33,7 @@ pub fn PseudoColourPlot(
     #[props] y_axis_info: ReadSignal<AxisInfo>,
 ) -> Element {
     let mut plot_image_src = use_signal(|| String::new());
-    let mut plot_map = use_signal(|| None::<flow_gates::plotmap::PlotMapper>);
+    let mut plot_map = use_signal(|| None::<PlotMapper>);
 
     use_effect(move || {
         let x_axis_info = x_axis_info();
@@ -100,7 +95,7 @@ pub fn PseudoColourPlot(
                 plot_map,
                 x_channel: x_axis_info().title.clone(),
                 y_channel: y_axis_info().title.clone(),
-
+            
             }
         }
     }
