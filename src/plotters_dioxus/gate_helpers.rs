@@ -27,26 +27,6 @@ impl PlotDrawable for GateDraft {
         todo!()
     }
     
-    fn draw_self_selected(&self, mapper: &super::plot_helpers::PlotMapper) -> Vec<super::plot_helpers::GateShape> {
-        todo!()
-    }
-    
-    fn draw_ghost_point(
-        &self, 
-        mapper: &super::plot_helpers::PlotMapper, 
-        point_idx: usize, 
-        new_pos: (f32, f32)
-    ) -> Vec<super::plot_helpers::GateShape> {
-        todo!()
-    }
-    
-    fn draw_ghost_move(
-        &self, 
-        mapper: &super::plot_helpers::PlotMapper, 
-        delta: (f32, f32)
-    ) -> Vec<super::plot_helpers::GateShape> {
-        todo!()
-    }
 }
 
 impl GateDraft {
@@ -106,26 +86,7 @@ impl PlotDrawable for GateFinal {
         todo!()
     }
     
-    fn draw_self_selected(&self, mapper: &super::plot_helpers::PlotMapper) -> Vec<super::plot_helpers::GateShape> {
-        todo!()
-    }
     
-    fn draw_ghost_point(
-        &self, 
-        mapper: &super::plot_helpers::PlotMapper, 
-        point_idx: usize, 
-        new_pos: (f32, f32)
-    ) -> Vec<super::plot_helpers::GateShape> {
-        todo!()
-    }
-    
-    fn draw_ghost_move(
-        &self, 
-        mapper: &super::plot_helpers::PlotMapper, 
-        delta: (f32, f32)
-    ) -> Vec<super::plot_helpers::GateShape> {
-        todo!()
-    }
 
 }
 

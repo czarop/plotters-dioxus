@@ -59,18 +59,5 @@ pub trait PlotDrawable {
     }
 
     fn draw_self(&self, mapper: &PlotMapper) -> Vec<GateShape>;
-    fn draw_self_selected(&self, mapper: &PlotMapper) -> Vec<GateShape>;
-    fn draw_ghost_point(
-        &self, 
-        mapper: &PlotMapper, 
-        point_idx: usize, 
-        new_pos: (f32, f32)
-    ) -> Vec<GateShape>;
-
     
-    fn draw_ghost_move(
-        &self, 
-        mapper: &PlotMapper, 
-        delta: (f32, f32)
-    ) -> Vec<GateShape>;
 }
