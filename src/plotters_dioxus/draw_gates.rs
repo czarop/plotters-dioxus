@@ -162,23 +162,31 @@ pub fn GateLayer(
                     },
                     onmousemove: move |evt| {
 
-                        if let Some(GateDragData { drag_type, index, data: _ }) = drag_data() {
-                            let local_coords = &evt.data.coordinates().element();
-                            let px = local_coords.x as f32;
-                            let py = local_coords.y as f32;
-                            if let Some(data_coords) = plot_map()
-                                .unwrap()
-                                .pixel_to_data(px, py, None, None)
-                            {
-                                drag_data
-                                    .set(
-                                        Some(GateDragData {
-                                            drag_type,
-                                            index,
-                                            data: data_coords,
-                                        }),
-                                    );
+                        match drag_data() {
+                            Some(data) => {
+                                let local_coords = &evt.data.coordinates().element();
+                                let px = local_coords.x as f32;
+                                let py = local_coords.y as f32;
+                                let data_coords_option = plot_map
+                                    .as_ref()
+                                    .unwrap()
+                                    .pixel_to_data(px, py, None, None);
+                                match data {
+                                    GateDragType::Point(point_drag_data) => {
+
+                                        if let Some(data_coords) = data_coords_option
+                                        {
+                                            let d = PointDragData {
+                                                point_index: point_drag_data.point_index,
+                                                loc: data_coords,
+                                            };
+                                            drag_data.set(Some(GateDragType::Point(d)));
+                                        }
+                                    }
+                                    GateDragType::Gate(gate_drag_data) => {}
+                                }
                             }
+                            None => todo!(),
                         }
                     },
                     onmouseup: move |evt| {
