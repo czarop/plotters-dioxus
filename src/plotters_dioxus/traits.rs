@@ -1,5 +1,7 @@
 use std::f32::INFINITY;
 
+use crate::plotters_dioxus::plot_helpers::{GateShape, PlotMapper};
+
 pub trait PlotDrawable {
     fn get_points(&self) -> Vec<(f32, f32)>;
     fn is_finalised(&self) -> bool;
@@ -55,4 +57,20 @@ pub trait PlotDrawable {
             return Some(closest);
         }
     }
+
+    fn draw_self(&self, mapper: &PlotMapper) -> Vec<GateShape>;
+    fn draw_self_selected(&self, mapper: &PlotMapper) -> Vec<GateShape>;
+    fn draw_ghost_point(
+        &self, 
+        mapper: &PlotMapper, 
+        point_idx: usize, 
+        new_pos: (f32, f32)
+    ) -> Vec<GateShape>;
+
+    
+    fn draw_ghost_move(
+        &self, 
+        mapper: &PlotMapper, 
+        delta: (f32, f32)
+    ) -> Vec<GateShape>;
 }

@@ -64,7 +64,7 @@ pub fn GateLayer(
     use_effect(move || {
         let cur_coords = draft_gate_coords();
         if cur_coords.len() > 0 {
-            let gate_draft = GateDraft::new_polygon(cur_coords, &*x_channel(), &*y_channel());
+            let gate_draft = GateDraft::new_polygon(cur_coords, x_channel(), y_channel());
             draft_gate.set(Some(gate_draft));
         } else {
             draft_gate.set(None);

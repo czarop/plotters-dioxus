@@ -1,5 +1,5 @@
 
-use std::ops::Deref;
+use std::{ops::Deref, sync::Arc};
 
 use crate::plotters_dioxus::PlotDrawable;
 
@@ -7,8 +7,8 @@ use crate::plotters_dioxus::PlotDrawable;
 pub enum GateDraft {
     Polygon {
         points: Vec<(f32, f32)>,
-        x_param: String,
-        y_param: String,
+        x_param: Arc<str>,
+        y_param: Arc<str>,
     },
     // You can add Rectangle or Ellipse drafts here later
 }
@@ -22,28 +22,53 @@ impl PlotDrawable for GateDraft {
     fn is_finalised(&self) -> bool {
         false
     }
+    
+    fn draw_self(&self, mapper: &super::plot_helpers::PlotMapper) -> Vec<super::plot_helpers::GateShape> {
+        todo!()
+    }
+    
+    fn draw_self_selected(&self, mapper: &super::plot_helpers::PlotMapper) -> Vec<super::plot_helpers::GateShape> {
+        todo!()
+    }
+    
+    fn draw_ghost_point(
+        &self, 
+        mapper: &super::plot_helpers::PlotMapper, 
+        point_idx: usize, 
+        new_pos: (f32, f32)
+    ) -> Vec<super::plot_helpers::GateShape> {
+        todo!()
+    }
+    
+    fn draw_ghost_move(
+        &self, 
+        mapper: &super::plot_helpers::PlotMapper, 
+        delta: (f32, f32)
+    ) -> Vec<super::plot_helpers::GateShape> {
+        todo!()
+    }
 }
 
 impl GateDraft {
-    pub fn new_polygon(points: Vec<(f32, f32)>, x_param: &str, y_param: &str) -> Self {
+    pub fn new_polygon(points: Vec<(f32, f32)>, x_param: Arc<str>, y_param: Arc<str>) -> Self {
         GateDraft::Polygon {
             points,
-            x_param: x_param.to_string(),
-            y_param: y_param.to_string(),
+            x_param: x_param,
+            y_param: y_param,
         }
     }
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone)]
 pub struct GateFinal {
-    inner: flow_gates::Gate,
+    inner: Arc<flow_gates::Gate>,
     selected: bool,
 }
 
 impl GateFinal {
     pub fn new(gate: flow_gates::Gate, selected: bool) -> Self {
         GateFinal {
-            inner: gate,
+            inner: Arc::new(gate),
             selected,
         }
     }
@@ -67,23 +92,40 @@ impl Deref for GateFinal {
 
 impl PlotDrawable for GateFinal {
     fn get_points(&self) -> Vec<(f32, f32)> {
-        self.inner.get_points()
+        self.inner.geometry.to_render_points(
+            self.x_parameter_channel_name(),
+            self.y_parameter_channel_name(),
+        )
     }
 
     fn is_finalised(&self) -> bool {
         return true;
     }
+    
+    fn draw_self(&self, mapper: &super::plot_helpers::PlotMapper) -> Vec<super::plot_helpers::GateShape> {
+        todo!()
+    }
+    
+    fn draw_self_selected(&self, mapper: &super::plot_helpers::PlotMapper) -> Vec<super::plot_helpers::GateShape> {
+        todo!()
+    }
+    
+    fn draw_ghost_point(
+        &self, 
+        mapper: &super::plot_helpers::PlotMapper, 
+        point_idx: usize, 
+        new_pos: (f32, f32)
+    ) -> Vec<super::plot_helpers::GateShape> {
+        todo!()
+    }
+    
+    fn draw_ghost_move(
+        &self, 
+        mapper: &super::plot_helpers::PlotMapper, 
+        delta: (f32, f32)
+    ) -> Vec<super::plot_helpers::GateShape> {
+        todo!()
+    }
+
 }
 
-
-impl PlotDrawable for flow_gates::Gate {
-    fn get_points(&self) -> Vec<(f32, f32)> {
-        self.geometry.to_render_points(
-            self.x_parameter_channel_name(),
-            self.y_parameter_channel_name(),
-        )
-    }
-    fn is_finalised(&self) -> bool {
-        true
-    }
-}

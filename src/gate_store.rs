@@ -67,7 +67,7 @@ pub struct GateState {
     // For the Renderer: "What gates do I draw on this Plot?"
     pub gate_ids_by_view: HashMap<GatesOnPlotKey, Vec<GateKey>>,
     // For the Logic: "What is the actual data for Gate X?"
-    pub gate_registry: HashMap<GateKey, Arc<crate::plotters_dioxus::gate_helpers::GateFinal>>,
+    pub gate_registry: HashMap<GateKey, crate::plotters_dioxus::gate_helpers::GateFinal>,
     // For the Filtering: "How are these gates nested?"
     pub hierarchy: GateHierarchy,
     // are there file-specific overrides for gate positions
@@ -101,7 +101,7 @@ impl<Lens> Store<GateState, Lens> {
 
         self.gate_registry()
             .write()
-            .insert(gate_key, Arc::new(GateFinal::new(gate, false)));
+            .insert(gate_key, GateFinal::new(gate, false));
 
         Ok(())
     }
@@ -147,7 +147,7 @@ impl<Lens> Store<GateState, Lens> {
         }
         let new_gate = Gate::polygon(id, name, points, x_param, y_param)?;
         let gate_final = GateFinal::new(new_gate, true);
-        self.gate_registry().insert(gate_id, Arc::new(gate_final));
+        self.gate_registry().insert(gate_id, gate_final);
 
         Ok(())
     }
@@ -156,7 +156,7 @@ impl<Lens> Store<GateState, Lens> {
         &self,
         x_axis_title: Arc<str>,
         y_axis_title: Arc<str>,
-    ) -> Option<Vec<Arc<GateFinal>>> {
+    ) -> Option<Vec<GateFinal>> {
         let key = GatesOnPlotKey::new(x_axis_title, y_axis_title, None);
         let key_options = self.gate_ids_by_view().get(key);
         let mut gate_list = vec![];
