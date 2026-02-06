@@ -31,11 +31,11 @@ impl GateShape {
             GateShape::Circle {
                 center,
                 radius,
-                fill: _,
+                fill,
             } => Self::Circle {
                 center: (center.0 + offset.0, center.1 + offset.1),
                 radius: *radius,
-                fill: style.fill,
+                fill: fill,
             },
             GateShape::Polygon { points, style: _ } => {
                 let p = points
