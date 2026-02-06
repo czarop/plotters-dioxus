@@ -102,15 +102,3 @@ impl PlotMapper {
 
 }
 
-pub enum GateShape {
-    PolyLine { points: ((f32, f32), (f32, f32)), style: DrawingStyle },
-    Circle { center: (f32, f32), radius: f32 , style: DrawingStyle},
-    Polygon { points: Vec<(f32, f32)>, style: DrawingStyle },
-}
-
-pub struct DrawingStyle {
-    pub stroke: String,
-    pub fill: String,
-    pub stroke_width: f32,
-    pub dashed: bool,
-}

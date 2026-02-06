@@ -3,8 +3,8 @@ use flow_gates::{Gate, GateHierarchy};
 
 use std::{collections::HashMap, sync::Arc};
 
-use crate::plotters_dioxus::gate_helpers::GateFinal;
-use crate::plotters_dioxus::PlotDrawable;
+
+use crate::plotters_dioxus::{PlotDrawable, gates::gate_final::GateFinal};
 
 type Id = std::sync::Arc<str>;
 
@@ -67,7 +67,7 @@ pub struct GateState {
     // For the Renderer: "What gates do I draw on this Plot?"
     pub gate_ids_by_view: HashMap<GatesOnPlotKey, Vec<GateKey>>,
     // For the Logic: "What is the actual data for Gate X?"
-    pub gate_registry: HashMap<GateKey, crate::plotters_dioxus::gate_helpers::GateFinal>,
+    pub gate_registry: HashMap<GateKey, GateFinal>,
     // For the Filtering: "How are these gates nested?"
     pub hierarchy: GateHierarchy,
     // are there file-specific overrides for gate positions
