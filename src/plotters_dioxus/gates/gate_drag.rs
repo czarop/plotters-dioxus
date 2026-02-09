@@ -50,3 +50,28 @@ impl PointDragData {
         self.loc
     }
 }
+
+#[derive(Clone, PartialEq, Copy)]
+pub enum GateDragType {
+    Point(PointDragData),
+    Gate(GateDragData),
+}
+
+impl GateDragType {
+    pub fn clone_with_point(self, point: (f32, f32)) -> Self {
+        match self {
+            GateDragType::Point(point_drag_data) => {
+                GateDragType::Point(
+                    PointDragData::clone_from_data(point, point_drag_data)
+                )
+            },
+            GateDragType::Gate(gate_drag_data) => {
+                GateDragType::Gate(
+                    GateDragData::clone_from_data(
+                        point,
+                    gate_drag_data
+                ))
+            },
+        }
+    }
+}

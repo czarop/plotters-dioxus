@@ -6,7 +6,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use crate::plotters_dioxus::{PlotDrawable, gates::gate_final::GateFinal};
 
-type Id = std::sync::Arc<str>;
+pub type Id = std::sync::Arc<str>;
 
 #[derive(Hash, PartialEq, Eq, Clone)]
 pub struct GatesOnPlotKey {

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::plotters_dioxus::{
     PlotDrawable,
-    gates::gate_styles::{DRAFT_LINE, GateShape},
+    gates::gate_styles::{DRAFT_LINE, GateShape, ShapeType},
 };
 
 #[derive(PartialEq, Clone)]
@@ -50,6 +50,7 @@ fn draw_draft_polygon(points: &[(f32, f32)]) -> Vec<GateShape> {
                 center,
                 radius: 3.0,
                 fill: "red",
+                shape_type: ShapeType::GhostGate
             }]
         }
         2 => {
@@ -59,6 +60,7 @@ fn draw_draft_polygon(points: &[(f32, f32)]) -> Vec<GateShape> {
             vec![GateShape::PolyLine {
                 points: vec![start, end],
                 style: &DRAFT_LINE,
+                shape_type: ShapeType::GhostGate
             }]
         }
         _ => {
@@ -71,6 +73,7 @@ fn draw_draft_polygon(points: &[(f32, f32)]) -> Vec<GateShape> {
             vec![GateShape::Polygon {
                 points: points_local,
                 style: &DRAFT_LINE,
+                shape_type: ShapeType::GhostGate
             }]
         }
     }
