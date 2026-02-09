@@ -74,7 +74,7 @@ impl PlotDrawable for GateFinal {
     }
 
     fn draw_self(&self) -> Vec<GateShape> {
-        println!("redraw requested");
+        println!("{} redraw requested", self.id);
         let gate_line_style = if self.is_selected() {
             &SELECTED_LINE
         } else {
@@ -133,15 +133,12 @@ fn draw_circles_for_selected_polygon(points: &[(f32, f32)]) -> Vec<GateShape> {
 }
 
 fn draw_ghost_gate(drag_data: &GateDragData, main_gate: &[GateShape]) -> Option<Vec<GateShape>> {
-    let offset = (
-        drag_data.start_loc().0 - drag_data.current_loc().0,
-        drag_data.start_loc().1 - drag_data.current_loc().1,
-    );
+    let offset = drag_data.offset();
     let style = &DRAGGED_GATE;
-
+    let shape_type = ShapeType::GhostGate(offset);
     let ghost_gate: Vec<GateShape> = main_gate
         .iter()
-        .map(|s| s.clone_with_offset(offset, style))
+        .map( |s| s.clone_with_type( style, shape_type.clone()))
         .collect();
 
     Some(ghost_gate)

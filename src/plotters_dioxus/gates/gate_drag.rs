@@ -25,6 +25,11 @@ impl GateDragData {
     pub fn current_loc(&self) -> (f32, f32) {
         self.current_loc
     }
+    pub fn offset(&self) -> (f32, f32) {
+        let x_offset = self.start_loc.0 - self.current_loc.0;
+        let y_offset = self.start_loc.1 - self.current_loc.1;
+        (x_offset, y_offset)
+    }
 }
 
 #[derive(Clone, PartialEq, Copy)]

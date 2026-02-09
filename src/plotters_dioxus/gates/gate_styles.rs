@@ -4,7 +4,7 @@ use crate::gate_store::Id;
 pub enum ShapeType{
     Gate(Id),
     Point(usize),
-    GhostGate,
+    GhostGate((f32, f32)),
     GhostPoint,
     DraftGate
 }
@@ -30,6 +30,39 @@ pub enum GateShape {
 }
 
 impl GateShape {
+
+    pub fn clone_with_type(&self, style: &'static DrawingStyle, shape_type: ShapeType) -> Self {
+        match self {
+            GateShape::PolyLine { points, style: _ , shape_type:_} => {
+                
+                Self::PolyLine {
+                    points: points.clone(),
+                    style: style,
+                    shape_type: shape_type
+                }
+            }
+            GateShape::Circle {
+                center,
+                radius,
+                fill,
+                shape_type:_
+            } => Self::Circle {
+                center: *center,
+                radius: *radius,
+                fill: fill,
+                shape_type: shape_type.clone()
+            },
+            GateShape::Polygon { points, style: _ , shape_type:_} => {
+                
+                Self::Polygon {
+                    points: points.clone(),
+                    style: style,
+                    shape_type: shape_type.clone()
+                }
+            }
+        }
+    }
+
     pub fn clone_with_offset(&self, offset: (f32, f32), style: &'static DrawingStyle) -> Self {
         match self {
             GateShape::PolyLine { points, style: _ , shape_type} => {
@@ -57,7 +90,7 @@ impl GateShape {
             GateShape::Polygon { points, style: _ , shape_type} => {
                 let p = points
                     .iter()
-                    .map(|(x, y)| (x + offset.0, y + offset.1))
+                    .map(|(x, y)| (x - offset.0, y - offset.1))
                     .collect();
                 Self::Polygon {
                     points: p,
