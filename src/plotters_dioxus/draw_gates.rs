@@ -60,7 +60,9 @@ pub fn GateLayer(
                     match dd {
                         Some(data) => match data{
                             GateDragType::Point(point_drag_data) => gate.set_drag_point(Some(*point_drag_data)),
-                            GateDragType::Gate(gate_drag_data) => gate.set_drag_self(Some(*gate_drag_data)),
+                            GateDragType::Gate(gate_drag_data) => {
+                                // gate.set_drag_self(Some(*gate_drag_data));
+                            },
                         },
                         None => {
                             gate.set_drag_point(None);
@@ -338,7 +340,22 @@ fn RenderShape(
     plot_map: ReadSignal<Option<PlotMapper>>,
 ) -> Element {
 
+    
+    
     if let Some(mapper) = &*plot_map.read(){
+    let transform = {
+        match &*drag_data.read(){
+            Some(GateDragType::Gate(data)) => {
+                let offset = data.offset();
+                let p_start = mapper.data_to_pixel(0.0, 0.0, None, None);
+                let p_current = mapper.data_to_pixel(offset.0, offset.1, None, None);
+                let dx = p_current.0 - p_start.0;
+                let dy = p_current.1 - p_start.1;
+                format!("translate({} {})", -dx, -dy)
+            },
+            _ => format!("none"),
+        }
+    };
     match shape {
         GateShape::PolyLine { points, style, shape_type } => {
             let transform = {
@@ -376,18 +393,18 @@ fn RenderShape(
         }
         GateShape::Circle { center, radius, fill, shape_type } => {
             let p = mapper.data_to_pixel(center.0, center.1, None, None);
-            let transform = {
-                if let ShapeType::GhostGate(offset) = shape_type {
-                    let p_start = mapper.data_to_pixel(0.0, 0.0, None, None);
-                    let p_current = mapper.data_to_pixel(offset.0, offset.1, None, None);
-                    let dx = p_current.0 - p_start.0;
-                    let dy = p_current.1 - p_start.1;
-                    format!("translate({} {})", -dx, -dy)
+            // let transform = {
+            //     if let ShapeType::GhostGate(offset) = shape_type {
+            //         let p_start = mapper.data_to_pixel(0.0, 0.0, None, None);
+            //         let p_current = mapper.data_to_pixel(offset.0, offset.1, None, None);
+            //         let dx = p_current.0 - p_start.0;
+            //         let dy = p_current.1 - p_start.1;
+            //         format!("translate({} {})", -dx, -dy)
 
-                } else {
-                    String::new()
-                }
-            };
+            //     } else {
+            //         String::new()
+            //     }
+            // };
             rsx! {
                 g { transform,
 
@@ -433,18 +450,18 @@ fn RenderShape(
                 })
                 .collect::<Vec<_>>()
                 .join(" ");
-            let transform = {
-                if let ShapeType::GhostGate(offset) = shape_type {
-                    let p_start = mapper.data_to_pixel(0.0, 0.0, None, None);
-                    let p_current = mapper.data_to_pixel(offset.0, offset.1, None, None);
-                    let dx = p_current.0 - p_start.0;
-                    let dy = p_current.1 - p_start.1;
-                    format!("translate({} {})", -dx, -dy)
+            // let transform = {
+            //     if let ShapeType::GhostGate(offset) = shape_type {
+            //         let p_start = mapper.data_to_pixel(0.0, 0.0, None, None);
+            //         let p_current = mapper.data_to_pixel(offset.0, offset.1, None, None);
+            //         let dx = p_current.0 - p_start.0;
+            //         let dy = p_current.1 - p_start.1;
+            //         format!("translate({} {})", -dx, -dy)
 
-                } else {
-                    String::new()
-                }
-            };
+            //     } else {
+            //         String::new()
+            //     }
+            // };
             rsx! {
                 g { transform,
                     polygon {

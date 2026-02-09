@@ -108,21 +108,23 @@ impl PlotDrawable for GateFinal {
                 None
             }
         };
-        let ghost_gate = {
-            if let Some(drag_data) = self.drag_self {
-                match &self.inner.geometry {
-                    flow_gates::GateGeometry::Polygon {
-                        nodes: _,
-                        closed: _,
-                    } => draw_ghost_gate(&drag_data, &main_gate),
-                    _ => todo!(),
-                }
-            } else {
-                None
-            }
-        };
+        // let ghost_gate = {
+        //     if let Some(drag_data) = self.drag_self {
+        //         match &self.inner.geometry {
+        //             flow_gates::GateGeometry::Polygon {
+        //                 nodes: _,
+        //                 closed: _,
+        //             } => draw_ghost_gate(&drag_data, &main_gate),
+        //             _ => todo!(),
+        //         }
+        //     } else {
+        //         None
+        //     }
+        // };
 
-        let items_to_render = crate::collate_vecs!(main_gate, selected_points, ghost_point, ghost_gate);
+        let items_to_render = crate::collate_vecs!(main_gate, selected_points, ghost_point, 
+            // ghost_gate
+        );
 
         items_to_render
     }
