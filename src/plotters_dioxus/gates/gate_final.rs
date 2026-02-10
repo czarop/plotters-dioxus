@@ -5,7 +5,8 @@ use crate::plotters_dioxus::{
     gates::{
         gate_drag::{GateDragData, PointDragData},
         gate_styles::{
-            DEFAULT_LINE, DRAGGED_GATE, DRAGGED_LINE, DrawingStyle, GateShape, SELECTED_LINE, ShapeType,
+            DEFAULT_LINE, DRAGGED_GATE, DRAGGED_LINE, DrawingStyle, GateShape, SELECTED_LINE,
+            ShapeType,
         },
     },
 };
@@ -85,7 +86,11 @@ impl PlotDrawable for GateFinal {
             flow_gates::GateGeometry::Polygon {
                 nodes: _,
                 closed: _,
-            } => draw_polygon(&main_points, gate_line_style, ShapeType::Gate(self.id.clone())),
+            } => draw_polygon(
+                &main_points,
+                gate_line_style,
+                ShapeType::Gate(self.id.clone()),
+            ),
             _ => todo!(),
         };
         let selected_points = {
@@ -122,7 +127,10 @@ impl PlotDrawable for GateFinal {
         //     }
         // };
 
-        let items_to_render = crate::collate_vecs!(main_gate, selected_points, ghost_point, 
+        let items_to_render = crate::collate_vecs!(
+            main_gate,
+            selected_points,
+            ghost_point,
             // ghost_gate
         );
 
@@ -131,7 +139,16 @@ impl PlotDrawable for GateFinal {
 }
 
 fn draw_circles_for_selected_polygon(points: &[(f32, f32)]) -> Vec<GateShape> {
-    points.iter().enumerate().map(|(idx, p)| GateShape::Circle { center: *p, radius: 3.0, fill: "red", shape_type: ShapeType::Point(idx) }).collect()
+    points
+        .iter()
+        .enumerate()
+        .map(|(idx, p)| GateShape::Circle {
+            center: *p,
+            radius: 3.0,
+            fill: "red",
+            shape_type: ShapeType::Point(idx),
+        })
+        .collect()
 }
 
 fn draw_ghost_gate(drag_data: &GateDragData, main_gate: &[GateShape]) -> Option<Vec<GateShape>> {
@@ -140,17 +157,21 @@ fn draw_ghost_gate(drag_data: &GateDragData, main_gate: &[GateShape]) -> Option<
     let shape_type = ShapeType::GhostGate(offset);
     let ghost_gate: Vec<GateShape> = main_gate
         .iter()
-        .map( |s| s.clone_with_type( style, shape_type.clone()))
+        .map(|s| s.clone_with_type(style, shape_type.clone()))
         .collect();
 
     Some(ghost_gate)
 }
 
-fn draw_polygon(points: &[(f32, f32)], style: &'static DrawingStyle, shape_type: ShapeType) -> Vec<GateShape> {
+fn draw_polygon(
+    points: &[(f32, f32)],
+    style: &'static DrawingStyle,
+    shape_type: ShapeType,
+) -> Vec<GateShape> {
     vec![GateShape::Polygon {
         points: points.to_vec(),
         style: style,
-        shape_type
+        shape_type,
     }]
 }
 
@@ -173,13 +194,13 @@ fn draw_ghost_point_for_polygon(
     let line = GateShape::PolyLine {
         points: vec![prev, current, next],
         style: &DRAGGED_LINE,
-        shape_type: ShapeType::GhostPoint
+        shape_type: ShapeType::GhostPoint,
     };
     let point = GateShape::Circle {
         center: current,
         radius: 5.0,
         fill: "yellow",
-        shape_type: ShapeType::GhostPoint
+        shape_type: ShapeType::GhostPoint,
     };
     Some(vec![line, point])
 }

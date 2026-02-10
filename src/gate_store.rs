@@ -3,7 +3,6 @@ use flow_gates::{Gate, GateHierarchy};
 
 use std::{collections::HashMap, sync::Arc};
 
-
 use crate::plotters_dioxus::{PlotDrawable, gates::gate_final::GateFinal};
 
 pub type Id = std::sync::Arc<str>;
@@ -152,11 +151,7 @@ impl<Lens> Store<GateState, Lens> {
         Ok(())
     }
 
-    fn move_gate(
-        &mut self,
-        gate_id: GateKey,
-        data_space_offset: (f32, f32),
-    ) -> Result<()> {
+    fn move_gate(&mut self, gate_id: GateKey, data_space_offset: (f32, f32)) -> Result<()> {
         let current_gate = self
             .gate_registry()
             .remove(&gate_id)
@@ -165,7 +160,11 @@ impl<Lens> Store<GateState, Lens> {
         let name = current_gate.name.clone();
         let x_param = current_gate.x_parameter_channel_name();
         let y_param = current_gate.y_parameter_channel_name();
-        let points = current_gate.get_points().into_iter().map(|(x, y)| (x-data_space_offset.0, y-data_space_offset.1)).collect();
+        let points = current_gate
+            .get_points()
+            .into_iter()
+            .map(|(x, y)| (x - data_space_offset.0, y - data_space_offset.1))
+            .collect();
         let new_gate = Gate::polygon(id, name, points, x_param, y_param)?;
         let gate_final = GateFinal::new(new_gate, true);
         self.gate_registry().insert(gate_id, gate_final);

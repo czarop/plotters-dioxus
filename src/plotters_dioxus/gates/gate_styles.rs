@@ -1,12 +1,12 @@
 use crate::gate_store::Id;
 
 #[derive(PartialEq, Clone)]
-pub enum ShapeType{
+pub enum ShapeType {
     Gate(Id),
     Point(usize),
     GhostGate((f32, f32)),
     GhostPoint,
-    DraftGate
+    DraftGate,
 }
 
 #[derive(PartialEq, Clone)]
@@ -14,58 +14,63 @@ pub enum GateShape {
     PolyLine {
         points: Vec<(f32, f32)>,
         style: &'static DrawingStyle,
-        shape_type: ShapeType
+        shape_type: ShapeType,
     },
     Circle {
         center: (f32, f32),
         radius: f32,
         fill: &'static str,
-        shape_type: ShapeType
+        shape_type: ShapeType,
     },
     Polygon {
         points: Vec<(f32, f32)>,
         style: &'static DrawingStyle,
-        shape_type: ShapeType
+        shape_type: ShapeType,
     },
 }
 
 impl GateShape {
-
     pub fn clone_with_type(&self, style: &'static DrawingStyle, shape_type: ShapeType) -> Self {
         match self {
-            GateShape::PolyLine { points, style: _ , shape_type:_} => {
-                
-                Self::PolyLine {
-                    points: points.clone(),
-                    style: style,
-                    shape_type: shape_type
-                }
-            }
+            GateShape::PolyLine {
+                points,
+                style: _,
+                shape_type: _,
+            } => Self::PolyLine {
+                points: points.clone(),
+                style: style,
+                shape_type: shape_type,
+            },
             GateShape::Circle {
                 center,
                 radius,
                 fill,
-                shape_type:_
+                shape_type: _,
             } => Self::Circle {
                 center: *center,
                 radius: *radius,
                 fill: fill,
-                shape_type: shape_type.clone()
+                shape_type: shape_type.clone(),
             },
-            GateShape::Polygon { points, style: _ , shape_type:_} => {
-                
-                Self::Polygon {
-                    points: points.clone(),
-                    style: style,
-                    shape_type: shape_type.clone()
-                }
-            }
+            GateShape::Polygon {
+                points,
+                style: _,
+                shape_type: _,
+            } => Self::Polygon {
+                points: points.clone(),
+                style: style,
+                shape_type: shape_type.clone(),
+            },
         }
     }
 
     pub fn clone_with_offset(&self, offset: (f32, f32), style: &'static DrawingStyle) -> Self {
         match self {
-            GateShape::PolyLine { points, style: _ , shape_type} => {
+            GateShape::PolyLine {
+                points,
+                style: _,
+                shape_type,
+            } => {
                 let p = points
                     .iter()
                     .map(|(x, y)| (x + offset.0, y + offset.1))
@@ -73,21 +78,25 @@ impl GateShape {
                 Self::PolyLine {
                     points: p,
                     style: style,
-                    shape_type: shape_type.clone()
+                    shape_type: shape_type.clone(),
                 }
             }
             GateShape::Circle {
                 center,
                 radius,
                 fill,
-                shape_type
+                shape_type,
             } => Self::Circle {
                 center: (center.0 + offset.0, center.1 + offset.1),
                 radius: *radius,
                 fill: fill,
-                shape_type: shape_type.clone()
+                shape_type: shape_type.clone(),
             },
-            GateShape::Polygon { points, style: _ , shape_type} => {
+            GateShape::Polygon {
+                points,
+                style: _,
+                shape_type,
+            } => {
                 let p = points
                     .iter()
                     .map(|(x, y)| (x - offset.0, y - offset.1))
@@ -95,7 +104,7 @@ impl GateShape {
                 Self::Polygon {
                     points: p,
                     style: style,
-                    shape_type: shape_type.clone()
+                    shape_type: shape_type.clone(),
                 }
             }
         }

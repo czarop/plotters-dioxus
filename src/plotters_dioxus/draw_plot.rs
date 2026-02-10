@@ -9,8 +9,7 @@ use plotters_bitmap::BitMapBackend;
 use std::sync::Arc;
 
 use flow_plots::{
-    BasePlotOptions, ColorMaps, DensityPlot, DensityPlotOptions, Plot,
-    render::RenderConfig,
+    BasePlotOptions, ColorMaps, DensityPlot, DensityPlotOptions, Plot, render::RenderConfig,
 };
 
 use crate::plotters_dioxus::{draw_gates::GateLayer, plot_helpers::PlotMapper};
@@ -40,7 +39,7 @@ pub fn PseudoColourPlot(
         let y_axis_info = y_axis_info();
         let (width, height) = size();
         let data = data.clone();
-        
+
         let plot = DensityPlot::new();
         let base_options = BasePlotOptions::new()
             .width(width)
@@ -48,7 +47,7 @@ pub fn PseudoColourPlot(
             .title("My Density Plot")
             .build()
             .expect("shouldn't fail");
-        
+
         let x_axis_options = flow_plots::AxisOptions::new()
             .range(x_axis_info.lower..=x_axis_info.upper)
             .transform(x_axis_info.transform.clone())
@@ -62,12 +61,12 @@ pub fn PseudoColourPlot(
             .build()
             .expect("axis options failed");
         let mapper = PlotMapper::new(
-            width as f32, 
-            height as f32, 
-            x_axis_options.range.clone(), 
-            y_axis_options.range.clone(), 
-            x_axis_info.transform.clone(), 
-            y_axis_info.transform.clone() 
+            width as f32,
+            height as f32,
+            x_axis_options.range.clone(),
+            y_axis_options.range.clone(),
+            x_axis_info.transform.clone(),
+            y_axis_info.transform.clone(),
         );
         let options = DensityPlotOptions::new()
             .base(base_options)
@@ -76,8 +75,6 @@ pub fn PseudoColourPlot(
             .y_axis(y_axis_options)
             .build()
             .expect("shouldn't fail");
-
-        
 
         let mut render_config = RenderConfig::default();
 
@@ -103,7 +100,7 @@ pub fn PseudoColourPlot(
                 plot_map,
                 x_channel: x_axis_info().title.clone(),
                 y_channel: y_axis_info().title.clone(),
-            
+
             }
         }
     }

@@ -1,12 +1,16 @@
-#[derive(Clone, PartialEq, Copy)]
+use std::sync::Arc;
+
+#[derive(Clone, PartialEq)]
 pub struct GateDragData {
+    gate_id: Arc<str>,
     start_loc: (f32, f32),
     current_loc: (f32, f32),
 }
 
 impl GateDragData {
-    pub fn new(start_loc: (f32, f32), current_loc: (f32, f32)) -> Self {
+    pub fn new(gate_id: Arc<str>, start_loc: (f32, f32), current_loc: (f32, f32)) -> Self {
         Self {
+            gate_id,
             start_loc,
             current_loc,
         }
@@ -14,6 +18,7 @@ impl GateDragData {
 
     pub fn clone_from_data(new_loc: (f32, f32), old_data: Self) -> Self {
         Self {
+            gate_id: old_data.gate_id.clone(),
             start_loc: old_data.start_loc,
             current_loc: new_loc,
         }
@@ -29,6 +34,9 @@ impl GateDragData {
         let x_offset = self.start_loc.0 - self.current_loc.0;
         let y_offset = self.start_loc.1 - self.current_loc.1;
         (x_offset, y_offset)
+    }
+    pub fn gate_id(&self) -> &str {
+        &self.gate_id
     }
 }
 
@@ -56,7 +64,7 @@ impl PointDragData {
     }
 }
 
-#[derive(Clone, PartialEq, Copy)]
+#[derive(Clone, PartialEq)]
 pub enum GateDragType {
     Point(PointDragData),
     Gate(GateDragData),
@@ -66,17 +74,11 @@ impl GateDragType {
     pub fn clone_with_point(self, point: (f32, f32)) -> Self {
         match self {
             GateDragType::Point(point_drag_data) => {
-                GateDragType::Point(
-                    PointDragData::clone_from_data(point, point_drag_data)
-                )
-            },
+                GateDragType::Point(PointDragData::clone_from_data(point, point_drag_data))
+            }
             GateDragType::Gate(gate_drag_data) => {
-                GateDragType::Gate(
-                    GateDragData::clone_from_data(
-                        point,
-                    gate_drag_data
-                ))
-            },
+                GateDragType::Gate(GateDragData::clone_from_data(point, gate_drag_data))
+            }
         }
     }
 }

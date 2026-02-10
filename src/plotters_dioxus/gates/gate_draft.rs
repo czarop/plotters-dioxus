@@ -50,7 +50,7 @@ fn draw_draft_polygon(points: &[(f32, f32)]) -> Vec<GateShape> {
                 center,
                 radius: 3.0,
                 fill: "red",
-                shape_type: ShapeType::DraftGate
+                shape_type: ShapeType::DraftGate,
             }]
         }
         2 => {
@@ -60,7 +60,7 @@ fn draw_draft_polygon(points: &[(f32, f32)]) -> Vec<GateShape> {
             vec![GateShape::PolyLine {
                 points: vec![start, end],
                 style: &DRAFT_LINE,
-                shape_type: ShapeType::DraftGate
+                shape_type: ShapeType::DraftGate,
             }]
         }
         _ => {
@@ -73,7 +73,7 @@ fn draw_draft_polygon(points: &[(f32, f32)]) -> Vec<GateShape> {
             vec![GateShape::Polygon {
                 points: points_local,
                 style: &DRAFT_LINE,
-                shape_type: ShapeType::DraftGate
+                shape_type: ShapeType::DraftGate,
             }]
         }
     }
