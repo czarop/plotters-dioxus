@@ -24,6 +24,24 @@ pub struct AxisInfo {
     pub transform: flow_fcs::TransformType,
 }
 
+impl Default for AxisInfo{
+    fn default() -> Self {
+        Self { title: Default::default(), lower: 0_f32, upper: 4194304_f32, transform: flow_fcs::TransformType::Linear }
+    }
+}
+
+// impl AxisInfo {
+//     fn clone_with_cofactor(self, cofactor: f32) -> Self {
+//         match self.transform {
+//             flow_fcs::TransformType::Linear => self,
+//             flow_fcs::TransformType::Arcsinh { .. } => {
+//                 Self { title: (), lower: (), upper: (), transform: cofactor }
+//             },
+//             flow_fcs::TransformType::Biexponential { top_of_scale, positive_decades, negative_decades, width } => self,
+//         }
+//     }
+// }
+
 #[component]
 pub fn PseudoColourPlot(
     #[props] data: ReadSignal<Arc<Vec<(f32, f32)>>>,
@@ -100,7 +118,7 @@ pub fn PseudoColourPlot(
                 plot_map,
                 x_channel: x_axis_info().title.clone(),
                 y_channel: y_axis_info().title.clone(),
-
+            
             }
         }
     }
