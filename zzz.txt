@@ -1,0 +1,1 @@
+recalculate the lower and upper limits on cofactor change - need to un-transform them
