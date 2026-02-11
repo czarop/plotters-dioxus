@@ -98,6 +98,13 @@ impl AxisInfo {
         };
         Ok(new_self)
     }
+
+    pub fn is_linear(&self) -> bool {
+        match self.transform {
+            TransformType::Linear => true,
+            _ => false
+        }
+    }
 }
 
 #[component]

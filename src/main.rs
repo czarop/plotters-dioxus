@@ -1,14 +1,12 @@
 #![allow(non_snake_case)]
 
-use clingate::{
-    Select, SelectGroup, SelectGroupLabel, SelectItemIndicator, SelectList, SelectOption, SelectTrigger, SelectValue, file_load::FcsFiles, gate_store::{GateState, Id}, plotters_dioxus::{AxisInfo, PseudoColourPlot}
-};
+use clingate::{file_load::FcsFiles, gate_store::{GateState, Id}, plotters_dioxus::{AxisInfo, PseudoColourPlot}, searchable_select::SearchableSelect};
 use dioxus::{
-    desktop::{Config, LogicalSize, WindowBuilder}, html::param, prelude::*
+    desktop::{Config, LogicalSize, WindowBuilder}, prelude::*
 };
 
-use flow_fcs::{Fcs, TransformType, Transformable, transform};
-use flow_gates::transforms::Axis;
+use flow_fcs::{Fcs, TransformType, Transformable};
+
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::task;
@@ -59,6 +57,7 @@ fn asinh_transform_f32(value: f32, cofactor: f32) -> f32 {
 
 static CSS_STYLE: Asset = asset!("assets/styles.css");
 static COMPONENTS_STYLE: Asset = asset!("assets/dx-components-theme.css");
+static COMPONENTS_STYLE_2: Asset = asset!("assets/searchable_select.css");
 
 #[component]
 fn App() -> Element {
@@ -107,10 +106,7 @@ fn App() -> Element {
         }
     });
 
-    let mut x_axis_marker = use_signal(|| Arc::from("FSC-A"));
-    let mut y_axis_marker = use_signal(|| Arc::from("SSC-A"));
-    let mut x_cofactor = use_signal(|| 6000.0f32);
-    let mut y_cofactor = use_signal(|| 6000.0f32);
+    
 
     // RESOURCE 1: Load FCS File
     // This resource re-runs when `current_sample` changes
@@ -122,33 +118,19 @@ fn App() -> Element {
         }
     });
 
-    let marker_to_fluoro_map = use_memo(move || {
-        if let Some(Ok(fcs_file)) = fcs_file_resource.read().clone() {
-            let name_param: HashMap<Arc<str>, Arc<str>> = fcs_file
-                .parameters
-                .iter()
-                .map(|(key, val)| {
-                    println!("{}, {}", val.label_name.clone(), key.clone());
-                    (val.label_name.clone(), key.clone())
-                })
-                .collect();
-            name_param
-        } else {
-            HashMap::new()
-        }
-    });
 
     let sorted_params = use_memo(move || {
-        let hashmap = marker_to_fluoro_map();
-        if let Some(Ok(fcs_file)) = fcs_file_resource.peek().clone() {
+        // let hashmap = marker_to_fluoro_map();
+        if let Some(Ok(fcs_file)) = fcs_file_resource.read().clone() {
             
-            let mut sorted_params: Vec<(Arc<str>, Arc<str>)> = hashmap
-            .into_iter()
+            let mut sorted_params: Vec<Param> = fcs_file.parameters
+            .iter()
+            .map(|(_, param)| Param{marker: param.label_name.clone(), fluoro: param.channel_name.clone()})
             .collect();
         
         // Sort by parameter number
-        sorted_params.sort_by_key(|(_, param_key)| {
-            fcs_file.parameters.get(param_key.as_ref())
+        sorted_params.sort_by_key(|param| {
+            fcs_file.parameters.get(param.fluoro.as_ref())
                 .map(|p| p.parameter_number)
                 .unwrap_or(usize::MAX)
         });
@@ -160,12 +142,11 @@ fn App() -> Element {
     });
 
     use_effect(move || {
-        let file_params = &*marker_to_fluoro_map.read();
-        if let Some(Ok(fcs_file)) = (*fcs_file_resource.read()).clone() {
-            for (_, fluoro) in file_params.iter() {
-                parameter_settings.write().entry(fluoro.clone()).or_insert_with(|| {
+        if let Some(Ok(fcs_file)) = fcs_file_resource.read().clone() {
+            for param in sorted_params.iter() {
+                parameter_settings.write().entry(param.fluoro.clone()).or_insert_with(|| {
                     let is_fluoresence_channel;
-                    if let Some(param) = fcs_file.parameters.get(fluoro){
+                    if let Some(param) = fcs_file.parameters.get(&param.fluoro){
                         is_fluoresence_channel = {
                             match param.transform {
                                 TransformType::Linear => false,
@@ -179,45 +160,48 @@ fn App() -> Element {
                         let cofactor = 6000_f32;
                         let lower = asinh_transform_f32(-10000_f32, cofactor);
                         let upper = asinh_transform_f32(4194304_f32, cofactor);
-                        AxisInfo { title: fluoro.clone(), lower, upper, transform: TransformType::Arcsinh { cofactor: cofactor } }
+                        AxisInfo { title: param.fluoro.clone(), lower, upper, transform: TransformType::Arcsinh { cofactor: cofactor } }
                     } else {
-                        AxisInfo { title: fluoro.clone(), lower: 0_f32, upper: 4194304_f32, transform: TransformType::Linear }
+                        println!("{}, {} linear", param.marker, param.fluoro);
+                        AxisInfo { title: param.fluoro.clone(), lower: 0_f32, upper: 4194304_f32, transform: TransformType::Linear }
                     }
                 });
             }
         }
     });
 
+    let x_axis_marker: Signal<Param> = use_signal(|| {
+        let p: Arc<str> = Arc::from("FSC-A");
+        Param{marker: p.clone(), fluoro: p}
+});
+    let y_axis_marker = use_signal(|| {
+        let p: Arc<str> = Arc::from("SSC-A");
+        Param{marker: p.clone(), fluoro: p}
+});
+    let mut x_cofactor = use_signal(|| 6000.0f32);
+    let mut y_cofactor = use_signal(|| 6000.0f32);
+
     // fetch the axis limits from the settings dict when axis changed
     let x_axis_limits = use_memo(move || {
-        let marker = x_axis_marker();
-        if let Some(fluoro) = marker_to_fluoro_map.get(&marker){
-        if let Some(axis_info) = parameter_settings.get(&fluoro){
-            return axis_info.clone();
-        } else {
-            let x_co = 6000_f32;
-            let scaled_x_lower = asinh_transform_f32(-10000_f32, x_co);
-            let scaled_x_upper = asinh_transform_f32(4194304_f32, x_co);
-            return AxisInfo {
-                title: fluoro.clone(),
-                lower: scaled_x_lower,
-                upper: scaled_x_upper,
-                transform: TransformType::Arcsinh { cofactor: x_co },
-            };
-    }
+        let param = x_axis_marker();
+
+        match parameter_settings.read().get(&param.fluoro){
+            Some(d) => Some(d.clone()),
+            None => None,
         }
-        AxisInfo::default()
+            
+
     });
     
 
 
 
     use_effect(move || {
-        let marker = x_axis_marker.peek().clone();
+        let param = x_axis_marker.peek().clone();
         let x_co = *x_cofactor.read();
-        if let Some(fluoro) = marker_to_fluoro_map().get(&marker) {
+
         let mut settings = parameter_settings.write();
-                settings.entry(fluoro.clone())
+                settings.entry(param.fluoro.clone())
                 .and_modify(|axis| {
                     let old_axis = std::mem::take(axis);
                     let new_axis = match old_axis.transform {
@@ -232,43 +216,26 @@ fn App() -> Element {
                     *axis = new_axis;
 
                 })
-                .or_insert_with(|| {
-                    AxisInfo {
-                        title: fluoro.clone(),
-                        lower: asinh_transform_f32(-10000_f32, x_co),
-                        upper: asinh_transform_f32(4194304_f32, x_co),
-                        transform: TransformType::Arcsinh { cofactor: x_co },
-                    }
-                });
-        }
+                ;
+        
     });
 
     let y_axis_limits = use_memo(move || {
-        let marker = y_axis_marker();
-        if let Some(fluoro) = marker_to_fluoro_map.get(&marker){
-        if let Some(axis_info) = parameter_settings.get(&fluoro){
-            return axis_info.clone();
-        } else {
-            let y_co = 6000_f32;
-            let scaled_y_lower = asinh_transform_f32(-10000_f32, y_co);
-            let scaled_y_upper = asinh_transform_f32(4194304_f32, y_co);
-            return AxisInfo {
-                title: fluoro.clone(),
-                lower: scaled_y_lower,
-                upper: scaled_y_upper,
-                transform: TransformType::Arcsinh { cofactor: y_co },
-            };
-    }
+        let param = y_axis_marker();
+
+        match parameter_settings.read().get(&param.fluoro){
+            Some(d) => Some(d.clone()),
+            None => None,
         }
-        AxisInfo::default()
+
     });
 
     use_effect(move || {
-        let marker = y_axis_marker.peek().clone();
+        let param = y_axis_marker.peek().clone();
         let y_co = *y_cofactor.read();
-        if let Some(fluoro) = marker_to_fluoro_map().get(&marker) {
+
             let mut settings = parameter_settings.write();
-                settings.entry(fluoro.clone())
+                settings.entry(param.fluoro.clone())
                 .and_modify(|axis| {
                     let old_axis = std::mem::take(axis);
                     let new_axis = match old_axis.transform {
@@ -283,41 +250,14 @@ fn App() -> Element {
                     *axis = new_axis;
 
                 })
-                .or_insert_with(|| {
-                    AxisInfo {
-                        title: fluoro.clone(),
-                        lower: asinh_transform_f32(-10000_f32, y_co),
-                        upper: asinh_transform_f32(4194304_f32, y_co),
-                        transform: TransformType::Arcsinh { cofactor: y_co },
-                    }
-                });
-        }
+                ;
+        
     });
 
-    // RESOURCE 2: Process Data for Display
-    // This resource re-runs when:
-    // - fcs_file_resource's value becomes available (or changes if it were mutable)
-    // - x_axis_param, y_axis_param, x_cofactor, or y_cofactor changes
     let processed_data_resource = use_resource(move || {
-        let data = fcs_file_resource.read().clone(); // Read the current state of the FCS file resource
-        
-        
-        
-        let x_marker = x_axis_marker.read().clone();
-        let y_marker = y_axis_marker.read().clone();
-
-        let x_fluoro = marker_to_fluoro_map
-            .read()
-            .get(&x_marker)
-            .unwrap_or(&x_marker)
-            .clone();
-        let y_fluoro = marker_to_fluoro_map
-            .read()
-            .get(&y_marker)
-            .unwrap_or(&y_marker)
-            .clone();
-        
-
+        let data = fcs_file_resource.read().clone();
+        let x_fluoro = x_axis_marker.read().fluoro.clone();
+        let y_fluoro = y_axis_marker.read().fluoro.clone();
         async move {
             let d = data.and_then(|res| res.ok());
 
@@ -348,9 +288,11 @@ fn App() -> Element {
 
 
 
+
     rsx! {
         document::Stylesheet { href: CSS_STYLE }
         document::Stylesheet { href: COMPONENTS_STYLE }
+        document::Stylesheet { href: COMPONENTS_STYLE_2 }
         div {
             // h1 { "FCS Plot Viewer" }
             div { class: "controls",
@@ -374,53 +316,18 @@ fn App() -> Element {
                     }
                 }
 
-                Select::<Arc<str>> {
-                    default_value: Some(Arc::from("FSC-A")),
-                    placeholder: "Select X Parameter",
-                    on_value_change: move |val: Option<Arc<str>>| {
-                        if val.is_some() {
-                            let marker = val.unwrap();
-                            x_axis_marker.set(marker.clone());
-                            if let Some(fluoro) = marker_to_fluoro_map().get(&marker) {
-                                if let Some(options) = parameter_settings.peek().get(fluoro) {
-                                    if let TransformType::Arcsinh { cofactor } = options.transform {
-                                        x_cofactor.set(cofactor);
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    SelectTrigger { width: "12rem", SelectValue {} }
-                    SelectList { aria_label: "Select x parameter",
-                        SelectGroup {
-                            SelectGroupLabel { "channels" }
-                            for (i , (a , b)) in sorted_params().iter().enumerate() {
-                                {
-                                    let s;
-                                    if a == b {
-                                        s = format!("{}", a);
-                                    } else {
-                                        let trimmed = &b[..b.len().saturating_sub(2)];
-                                        s = format!("{}-{}", a, trimmed);
-                                    }
-
-                                    rsx! {
-                                        SelectOption::<Arc<str>> { index: i, value: a.clone(), text_value: "{s}",
-                                            {s}
-                                            SelectItemIndicator {}
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    
-                    }
+                SearchableSelect {
+                    items: sorted_params(),
+                    selected_value: x_axis_marker,
+                    placeholder: x_axis_marker.peek().to_string(),
                 }
+
                 div { class: "control-group",
                     label { "X-Axis Cofactor:" }
                     input {
                         r#type: "number",
                         value: "{x_cofactor.read()}",
+                        disabled: if x_axis_limits.read().is_none() || x_axis_limits.read().as_ref().unwrap().is_linear() { true } else { false },
                         oninput: move |evt| {
                             if let Ok(val) = evt.value().parse::<f32>() {
                                 if val > 0_f32 {
@@ -436,53 +343,18 @@ fn App() -> Element {
                     }
                 }
 
-                // Y-axis parameter selection
-                Select::<Arc<str>> {
-                    default_value: Some(Arc::from("SSC-A")),
-                    placeholder: "Select Y Parameter",
-                    on_value_change: move |val: Option<Arc<str>>| {
-                        if val.is_some() {
-                            let marker = val.unwrap();
-                            y_axis_marker.set(marker.clone());
-                            if let Some(fluoro) = marker_to_fluoro_map().get(&marker) {
-                                if let Some(options) = parameter_settings.peek().get(fluoro) {
-                                    if let TransformType::Arcsinh { cofactor } = options.transform {
-                                        y_cofactor.set(cofactor);
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    SelectTrigger { width: "12rem", SelectValue {} }
-                    SelectList { aria_label: "Select y parameter",
-                        SelectGroup {
-                            SelectGroupLabel { "channels" }
-                            for (i , (a , b)) in sorted_params().iter().enumerate() {
-                                {
-                                    let s;
-                                    if a == b {
-                                        s = format!("{}", a);
-                                    } else {
-                                        let trimmed = &b[..b.len().saturating_sub(2)];
-                                        s = format!("{}-{}", a, trimmed);
-                                    }
-                                    rsx! {
-                                        SelectOption::<Arc<str>> { index: i, value: a.clone(), text_value: "{s}",
-                                            {s}
-                                            SelectItemIndicator {}
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    
-                    }
+                SearchableSelect {
+                    items: sorted_params(),
+                    selected_value: y_axis_marker,
+                    placeholder: y_axis_marker.peek().to_string(),
                 }
+
                 div { class: "control-group",
                     label { "Y-Axis Cofactor:" }
                     input {
                         r#type: "number",
                         value: "{y_cofactor.read()}",
+                        disabled: if y_axis_limits.read().is_none() || y_axis_limits.read().as_ref().unwrap().is_linear() { true } else { false },
                         oninput: move |evt| {
                             if let Ok(val) = evt.value().parse::<f32>() {
                                 if val > 0_f32 {
@@ -522,14 +394,16 @@ fn App() -> Element {
 
             // Conditional rendering of the plot
             {
+
                 if let Some(Ok(plot_data)) = &*processed_data_resource.read() {
+
                     rsx! {
                         div {
                             PseudoColourPlot {
                                 size: (600, 600),
                                 data: plot_data.clone(),
-                                x_axis_info: x_axis_limits.read().clone(),
-                                y_axis_info: y_axis_limits.read().clone(),
+                                x_axis_info: x_axis_limits.read().as_ref().unwrap().clone(),
+                                y_axis_info: y_axis_limits.read().as_ref().unwrap().clone(),
                             }
                         }
                     }
@@ -564,4 +438,27 @@ fn main() {
             ),
         )
         .launch(App);
+}
+
+#[derive(Clone, PartialEq)]
+struct Param{
+    marker: Arc<str>,
+    fluoro: Arc<str>,
+}
+
+impl std::fmt::Display for Param {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.marker == self.fluoro {
+            write!(f, "{}", self.marker)
+        } else {
+            write!(f, "{}-{}", self.marker, self.fluoro)
+        }
+        
+    }
+}
+
+impl Into<Arc<str>> for Param {
+    fn into(self) -> Arc<str> {
+        self.marker.clone()
+    }
 }

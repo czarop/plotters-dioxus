@@ -1,1 +1,2 @@
-recalculate the lower and upper limits on cofactor change - need to un-transform them
+set plot upper and lower limits
+make cofactor invalid for linear
