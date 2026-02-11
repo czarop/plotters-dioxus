@@ -1,0 +1,47 @@
+.nav_bar-item {
+    font-size: 2rem;
+    text-align: center;
+    color: hsla(101, 79%, 44%, 0.905);
+        background-color: var(--color-background-body);
+    }
+        .nav_bar-items {
+            background-color: var(--color-background-body);
+            display: flex;
+            flex-direction: row;
+            justify-content: space-between;
+            padding-left: 2rem;
+            padding-right: 2rem;
+        }
+    
+        .route-outlet {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+
+}
+
+.nav_bar-items>div>a {
+    text-decoration: none;
+}
+.route-nav_bar {
+    /* Ensure your nav-bar has a fixed height */
+    height: 4rem;
+    /* Example height, adjust as needed */
+    flex-shrink: 0;
+    /* Prevents the nav-bar from shrinking if space is tight */
+}
+
+.main_div {
+
+    height: 100vh;
+
+
+    padding-top      : var(--safe-top);
+
+    padding-left     : var(--safe-left);
+    padding-right    : var(--safe-right);
+    display: flex;
+    justify-content: space-between;
+    flex-direction: column;
+}

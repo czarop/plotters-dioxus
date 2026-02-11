@@ -2,7 +2,7 @@ use flow_fcs::TransformType;
 use flow_gates::transforms::{
     get_plotting_area, pixel_to_raw, pixel_to_raw_y, raw_to_pixel, raw_to_pixel_y,
 };
-use std::ops::RangeInclusive;
+use std::{ops::RangeInclusive, sync::Arc};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct PlotMapper {
@@ -109,5 +109,27 @@ impl PlotMapper {
     }
     pub fn height(&self) -> f32 {
         self.view_height
+    }
+}
+
+#[derive(Clone, PartialEq)]
+pub struct Param {
+    pub marker: Arc<str>,
+    pub fluoro: Arc<str>,
+}
+
+impl std::fmt::Display for Param {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.marker == self.fluoro {
+            write!(f, "{}", self.marker)
+        } else {
+            let trimmed;
+            if self.fluoro.ends_with("-A") {
+                trimmed = &self.fluoro[..self.fluoro.len().saturating_sub(2)]
+            } else {
+                trimmed = &self.fluoro
+            }
+            write!(f, "{}-{}", self.marker, trimmed)
+        }
     }
 }

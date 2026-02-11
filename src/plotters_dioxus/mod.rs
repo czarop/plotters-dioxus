@@ -8,3 +8,5 @@ pub mod traits;
 pub use traits::PlotDrawable;
 pub mod macros;
 pub mod plot_helpers;
+pub mod plot_window;
+pub mod route;
