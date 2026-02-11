@@ -216,24 +216,30 @@ fn App() -> Element {
         let marker = x_axis_marker.peek().clone();
         let x_co = *x_cofactor.read();
         if let Some(fluoro) = marker_to_fluoro_map().get(&marker) {
-        parameter_settings.write()
-            .entry(fluoro.clone())
-            .and_modify(|axis| {
-                // Update the cofactor in the existing transform
-                axis.transform = match &axis.transform {
-                    TransformType::Arcsinh{..}=>TransformType::Arcsinh{cofactor:x_co},
-                    _ => axis.transform.clone()
-                };
-            })
-            .or_insert_with(|| {
-                // Entry doesn't exist - create new
-                AxisInfo {
-                    title: fluoro.clone(),
-                    lower: asinh_transform_f32(-10000_f32, x_co),
-                    upper: asinh_transform_f32(4194304_f32, x_co),
-                    transform: TransformType::Arcsinh { cofactor: x_co },
-                }
-            });
+        let mut settings = parameter_settings.write();
+                settings.entry(fluoro.clone())
+                .and_modify(|axis| {
+                    let old_axis = std::mem::take(axis);
+                    let new_axis = match old_axis.transform {
+                        TransformType::Linear => old_axis,
+                        TransformType::Arcsinh { .. } => match old_axis.into_archsinh(x_co){
+                            Ok(a) => a,
+                            Err(_) => old_axis,
+                        },
+                        _ => old_axis,
+                    };
+
+                    *axis = new_axis;
+
+                })
+                .or_insert_with(|| {
+                    AxisInfo {
+                        title: fluoro.clone(),
+                        lower: asinh_transform_f32(-10000_f32, x_co),
+                        upper: asinh_transform_f32(4194304_f32, x_co),
+                        transform: TransformType::Arcsinh { cofactor: x_co },
+                    }
+                });
         }
     });
 
@@ -261,17 +267,23 @@ fn App() -> Element {
         let marker = y_axis_marker.peek().clone();
         let y_co = *y_cofactor.read();
         if let Some(fluoro) = marker_to_fluoro_map().get(&marker) {
-            parameter_settings.write()
-                .entry(fluoro.clone())
+            let mut settings = parameter_settings.write();
+                settings.entry(fluoro.clone())
                 .and_modify(|axis| {
-                    // Update the cofactor in the existing transform
-                    axis.transform = match &axis.transform {
-                        TransformType::Arcsinh{..}=>TransformType::Arcsinh{cofactor:y_co},
-                        _ => axis.transform.clone()
+                    let old_axis = std::mem::take(axis);
+                    let new_axis = match old_axis.transform {
+                        TransformType::Linear => old_axis,
+                        TransformType::Arcsinh { .. } => match old_axis.into_archsinh(y_co){
+                            Ok(a) => a,
+                            Err(_) => old_axis,
+                        },
+                        _ => old_axis,
                     };
+
+                    *axis = new_axis;
+
                 })
                 .or_insert_with(|| {
-                    // Entry doesn't exist - create new
                     AxisInfo {
                         title: fluoro.clone(),
                         lower: asinh_transform_f32(-10000_f32, y_co),
@@ -314,7 +326,7 @@ fn App() -> Element {
             None => return Err(anyhow::anyhow!("No data yet")),
         };
 
-            let x_transform = {
+        let x_transform = {
             if let Some(axis) = parameter_settings.get(&x_fluoro) {
                 axis.transform.clone()
             } else {

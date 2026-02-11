@@ -113,28 +113,18 @@ impl PlotDrawable for GateFinal {
                 None
             }
         };
-        // let ghost_gate = {
-        //     if let Some(drag_data) = self.drag_self {
-        //         match &self.inner.geometry {
-        //             flow_gates::GateGeometry::Polygon {
-        //                 nodes: _,
-        //                 closed: _,
-        //             } => draw_ghost_gate(&drag_data, &main_gate),
-        //             _ => todo!(),
-        //         }
-        //     } else {
-        //         None
-        //     }
-        // };
 
         let items_to_render = crate::collate_vecs!(
             main_gate,
             selected_points,
             ghost_point,
-            // ghost_gate
         );
 
         items_to_render
+    }
+    
+    fn recalculate_gate_for_rescaled_axis(&mut self, param: std::sync::Arc<str>, old_transform: &flow_fcs::TransformType, new_transform: &flow_fcs::TransformType) {
+        todo!()
     }
 }
 
@@ -149,18 +139,6 @@ fn draw_circles_for_selected_polygon(points: &[(f32, f32)]) -> Vec<GateShape> {
             shape_type: ShapeType::Point(idx),
         })
         .collect()
-}
-
-fn draw_ghost_gate(drag_data: &GateDragData, main_gate: &[GateShape]) -> Option<Vec<GateShape>> {
-    let offset = drag_data.offset();
-    let style = &DRAGGED_GATE;
-    let shape_type = ShapeType::GhostGate(offset);
-    let ghost_gate: Vec<GateShape> = main_gate
-        .iter()
-        .map(|s| s.clone_with_type(style, shape_type.clone()))
-        .collect();
-
-    Some(ghost_gate)
 }
 
 fn draw_polygon(
@@ -204,3 +182,4 @@ fn draw_ghost_point_for_polygon(
     };
     Some(vec![line, point])
 }
+

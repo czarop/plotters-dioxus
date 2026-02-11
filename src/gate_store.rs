@@ -3,7 +3,7 @@ use flow_gates::{Gate, GateHierarchy};
 
 use std::{collections::HashMap, sync::Arc};
 
-use crate::plotters_dioxus::{PlotDrawable, gates::gate_final::GateFinal};
+use crate::plotters_dioxus::{AxisInfo, PlotDrawable, gates::gate_final::GateFinal};
 
 pub type Id = std::sync::Arc<str>;
 
@@ -196,29 +196,38 @@ impl<Lens> Store<GateState, Lens> {
         return Some(gate_list);
     }
 
-    fn get_boxed_gates_for_plot(
-        &self,
-        x_axis_title: Arc<str>,
-        y_axis_title: Arc<str>,
-    ) -> Option<Vec<Box<dyn PlotDrawable>>> {
-        let key = GatesOnPlotKey::new(x_axis_title, y_axis_title, None);
-        let key_options = self.gate_ids_by_view().get(key);
-        let mut gate_list = vec![];
-        if let Some(key_store) = key_options {
-            let ids = key_store.read().clone();
-            let registry = self.gate_registry();
-            let registry_guard = registry.read();
-            for k in ids {
-                if let Some(gate_store_entry) = registry_guard.get(&k) {
-                    let gate_clone = gate_store_entry.clone();
-                    let gate: Box<dyn PlotDrawable> = Box::new(gate_clone);
-                    gate_list.push(gate);
-                }
+    // fn get_boxed_gates_for_plot(
+    //     &self,
+    //     x_axis_title: Arc<str>,
+    //     y_axis_title: Arc<str>,
+    // ) -> Option<Vec<Box<dyn PlotDrawable>>> {
+    //     let key = GatesOnPlotKey::new(x_axis_title, y_axis_title, None);
+    //     let key_options = self.gate_ids_by_view().get(key);
+    //     let mut gate_list = vec![];
+    //     if let Some(key_store) = key_options {
+    //         let ids = key_store.read().clone();
+    //         let registry = self.gate_registry();
+    //         let registry_guard = registry.read();
+    //         for k in ids {
+    //             if let Some(gate_store_entry) = registry_guard.get(&k) {
+    //                 let gate_clone = gate_store_entry.clone();
+    //                 let gate: Box<dyn PlotDrawable> = Box::new(gate_clone);
+    //                 gate_list.push(gate);
+    //             }
+    //         }
+    //     } else {
+    //         println!("No gates for plot");
+    //         return None;
+    //     }
+    //     return Some(gate_list);
+    // }
+
+    fn rescale_gates(&self, marker: &Arc<str>, old_axis_options: &AxisInfo, new_axis_options: &AxisInfo) {
+        for (_, gate) in self().gate_registry.iter_mut(){
+            let (x_marker, y_marker) = &gate.parameters;
+            if marker == x_marker || marker == y_marker {
+                gate.recalculate_gate_for_rescaled_axis(marker.clone(), &old_axis_options.transform, &new_axis_options.transform);
             }
-        } else {
-            println!("No gates for plot");
-            return None;
         }
-        return Some(gate_list);
     }
 }

@@ -2,6 +2,7 @@
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use dioxus::prelude::*;
+use flow_fcs::TransformType;
 use plotters::coord::Shift;
 use plotters::prelude::*;
 use plotters_bitmap::BitMapBackend;
@@ -15,6 +16,31 @@ use flow_plots::{
 use crate::plotters_dioxus::{draw_gates::GateLayer, plot_helpers::PlotMapper};
 
 pub type DioxusDrawingArea<'a> = DrawingArea<BitMapBackend<'a>, Shift>;
+
+pub fn asinh_transform_f32(value: f32, cofactor: f32) -> anyhow::Result<f32> {
+    if value.is_nan() || value.is_infinite() {
+        return Err(anyhow::anyhow!("Value {value} cannot be arcsinh transform"));
+    }
+    if cofactor == 0_f32 {
+        return Err(anyhow::anyhow!("Cofactor {cofactor} cannot be used for arcsinh transform"));
+    }
+    Ok((value / cofactor).asinh())
+}
+
+pub fn asinh_reverse_f32(transformed_value: f32, cofactor: f32) -> anyhow::Result<f32> {
+    if transformed_value.is_nan() || transformed_value.is_infinite() {
+        return Err(anyhow::anyhow!("Transformed value {transformed_value} is invalid"));
+    }
+    if cofactor == 0_f32 {
+        return Err(anyhow::anyhow!("Cofactor {cofactor} cannot be zero"));
+    }
+    Ok(transformed_value.sinh() * cofactor)
+}
+
+pub fn asinh_to_asinh(value: f32, old_cofactor: f32, new_cofactor: f32) -> anyhow::Result<f32> {
+    let untransformed = asinh_reverse_f32(value, old_cofactor)?;
+    asinh_transform_f32(untransformed, new_cofactor)
+}
 
 #[derive(Debug, Clone, PartialEq, Props)]
 pub struct AxisInfo {
@@ -30,17 +56,49 @@ impl Default for AxisInfo{
     }
 }
 
-// impl AxisInfo {
-//     fn clone_with_cofactor(self, cofactor: f32) -> Self {
-//         match self.transform {
-//             flow_fcs::TransformType::Linear => self,
-//             flow_fcs::TransformType::Arcsinh { .. } => {
-//                 Self { title: (), lower: (), upper: (), transform: cofactor }
-//             },
-//             flow_fcs::TransformType::Biexponential { top_of_scale, positive_decades, negative_decades, width } => self,
-//         }
-//     }
-// }
+impl AxisInfo {
+    pub fn into_archsinh(&self, cofactor: f32) -> anyhow::Result<Self> {
+        
+        let old_lower = self.lower;
+        let old_upper = self.upper;
+        let transform = TransformType::Arcsinh{cofactor};
+        let new_self = match self.transform {
+            
+            flow_fcs::TransformType::Arcsinh { cofactor: old_cofactor } => {
+                let lower = asinh_to_asinh(old_lower, old_cofactor, cofactor)?;
+                let upper = asinh_to_asinh(old_upper, old_cofactor, cofactor)?;
+                Self { title: self.title.clone(), lower, upper, transform  }
+            },
+            _ => {
+                let lower = asinh_transform_f32(old_lower, cofactor)?;
+                let upper = asinh_transform_f32(old_upper, cofactor)?;
+                Self{ title: self.title.clone(), lower, upper, transform }
+            },
+        };
+        Ok(new_self)
+    }
+
+    pub fn into_linear(&self) -> anyhow::Result<Self> {
+        
+        let old_lower = self.lower;
+        let old_upper = self.upper;
+        let transform = TransformType::Linear;
+        let new_self = match self.transform {
+            TransformType::Linear => self.clone(),
+            
+            TransformType::Arcsinh { cofactor: old_cofactor } => {
+                let old_cofactor = old_cofactor;
+                let upper_untransformed = asinh_reverse_f32(old_upper, old_cofactor)?;
+                let lower_untransformed = asinh_reverse_f32(old_lower, old_cofactor)?;
+                Self { title: self.title.clone(), lower: lower_untransformed, upper: upper_untransformed, transform  }
+            },
+            TransformType::Biexponential { .. } => {
+                Self{ title: self.title.clone(), lower: old_lower, upper: old_upper, transform }
+            },
+        };
+        Ok(new_self)
+    }
+}
 
 #[component]
 pub fn PseudoColourPlot(
