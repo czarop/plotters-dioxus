@@ -284,13 +284,11 @@ pub fn PlotWindow() -> Element {
                         value: "{x_cofactor.read()}",
                         disabled: if x_axis_limits.read().is_none() || x_axis_limits.read().as_ref().unwrap().is_linear() { true } else { false },
                         oninput: move |evt| {
-
                             if let Ok(val) = evt.value().parse::<i32>() {
-                                if val < 1 {
+                                if val >= 1 {
                                     message.set(None);
                                     let param = x_axis_marker.peek().clone();
                                     let x_co = val;
-
                                     parameter_settings
                                         .write()
                                         .entry(param.fluoro.clone())
@@ -299,10 +297,7 @@ pub fn PlotWindow() -> Element {
                                             let new_axis = match old_axis.transform {
                                                 TransformType::Linear => old_axis,
                                                 TransformType::Arcsinh { .. } => {
-                                                    match old_axis.into_archsinh(x_co as f32) {
-                                                        Ok(a) => a,
-                                                        Err(_) => old_axis,
-                                                    }
+                                                    old_axis.into_archsinh(x_co as f32).unwrap_or(old_axis)
                                                 }
                                                 _ => old_axis,
                                             };
@@ -374,7 +369,7 @@ pub fn PlotWindow() -> Element {
                         disabled: if y_axis_limits.read().is_none() || y_axis_limits.read().as_ref().unwrap().is_linear() { true } else { false },
                         oninput: move |evt| {
                             if let Ok(val) = evt.value().parse::<i32>() {
-                                if val < 1 {
+                                if val >= 1 {
                                     message.set(None);
                                     let param = y_axis_marker.peek().clone();
                                     let y_co = val;
@@ -386,10 +381,7 @@ pub fn PlotWindow() -> Element {
                                             let new_axis = match old_axis.transform {
                                                 TransformType::Linear => old_axis,
                                                 TransformType::Arcsinh { .. } => {
-                                                    match old_axis.into_archsinh(y_co as f32) {
-                                                        Ok(a) => a,
-                                                        Err(_) => old_axis,
-                                                    }
+                                                    old_axis.into_archsinh(y_co as f32).unwrap_or(old_axis)
                                                 }
                                                 _ => old_axis,
                                             };
@@ -469,7 +461,7 @@ pub fn PlotWindow() -> Element {
             {
                 match &*processed_data_resource.read() {
                     Some(Ok(_)) => {
-                        rsx! {} // p { class: "loading-message", "Data Ready." }
+                        rsx! {}
                     }
                     Some(Err(e)) => {
                         rsx! {

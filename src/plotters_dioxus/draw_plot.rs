@@ -183,7 +183,7 @@ pub fn PseudoColourPlot(
             .title("My Density Plot")
             .build()
             .expect("shouldn't fail");
-        println!("{}, {}", x_axis_info.lower, x_axis_info.upper);
+
         let x_axis_options = flow_plots::AxisOptions::new()
             .range(x_axis_info.lower..=x_axis_info.upper)
             .transform(x_axis_info.transform.clone())
