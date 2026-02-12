@@ -17,6 +17,7 @@ flow-gates = {path = "../flow_ts_fork/gates"}
 base64 = "0.22.1"
 plotters-bitmap = "0.3.3"
 dioxus-primitives = { git = "https://github.com/DioxusLabs/components", version = "0.0.1", default-features = false }
+itertools = "0.14"
 
 [target.'cfg(windows)'.dependencies]
 polars = {version = "0.52", default-features = false, features = ["lazy", "performant", "timezones"]}

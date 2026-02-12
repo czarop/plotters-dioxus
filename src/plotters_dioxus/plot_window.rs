@@ -1,5 +1,4 @@
 use dioxus::prelude::*;
-use flow_plots::AxisOptions;
 
 use crate::{
     file_load::FcsFiles,
@@ -54,6 +53,12 @@ static CSS_STYLE: Asset = asset!("assets/plot_window.css");
 pub fn PlotWindow() -> Element {
 
     let mut filehandler: Signal<Option<FcsFiles>> = use_signal(|| None);
+    let file_list = use_memo(move || {
+        match &*filehandler.read() {
+            Some(fh) => fh.get_file_names(),
+            None => vec![],
+        }
+    });
     let mut message = use_signal(|| None::<String>);
     let gate_store = use_store(|| GateState::default());
     use_context_provider(|| gate_store);
@@ -98,7 +103,7 @@ pub fn PlotWindow() -> Element {
     // RESOURCE 1: Load FCS File
     let fcs_file_resource = use_resource(move || async move {
         if let Some(sample) = current_sample() {
-            get_flow_data(sample.full_path).await
+            get_flow_data(std::path::PathBuf::from(sample.get_filepath())).await
         } else {
             Err(Arc::new(anyhow::anyhow!("No file path selected.")))
         }
@@ -436,9 +441,29 @@ pub fn PlotWindow() -> Element {
                     },
                     "Next FCS File"
                 }
+                match &*filehandler.read() {
+                    Some(fh) => {
+                        let list = fh.get_file_names();
+                        rsx! {
+                            SearchableSelect {
+                                items: list,
+                                selected_value: x_axis_marker,
+                                placeholder: "Select a file".to_string(),
+                            }
+                        }
+                    }
+                    None => rsx! {},
+                }
+                SearchableSelect {
+                    items: sorted_params(),
+                    selected_value: x_axis_marker,
+                    placeholder: x_axis_marker.peek().to_string(),
+                }
                 p {
                     match current_sample() {
-                        Some(sample) => format!("Current File: {}", sample.name),
+                        Some(sample) => {
+                            format!("Current File: {}", sample.get_fil_keyword().unwrap_or_default())
+                        }
                         None => "No Files".to_string(),
                     }
                 }
