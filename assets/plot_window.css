@@ -1,10 +1,10 @@
-body {
+/* body {
     font-family: sans-serif;
     margin: 20px;
     display: flex;
     flex-direction: column;
     align-items: center;
-}
+} */
 
 
 button {
@@ -18,7 +18,7 @@ button:hover {
 }
 
 .status-message {
-    margin-top: 15px;
+    /* margin-top: 15px; */
     font-weight: bold;
 }
 
@@ -33,12 +33,13 @@ button:hover {
 /* Layout Container */
 .top-container {
     display: flex;
-    justify-content: space-between;
+    justify-content: start;
     align-items: flex-start;
     width: 100%;
-    max-width: 1200px;
-    margin-bottom: 2rem;
+    /* max-width: 1200px; */
+    /* margin-bottom: 2rem; */
     gap: 20px;
+    /* height: 100%; */
 }
 
 .file-info {
@@ -51,7 +52,7 @@ button:hover {
 .axis-controls-grid {
     display: grid;
     /* Col 1: Label, Col 2: Selector (wide), Col 3-5: Numbers (fixed width) */
-    grid-template-columns: auto 200px 80px 80px 80px;
+    grid-template-columns: 10% auto 12.5% 12.5% 12.5%;
     gap: 12px;
     align-items: end;
     background: #fcfcfc;

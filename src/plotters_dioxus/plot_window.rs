@@ -1,4 +1,5 @@
 use dioxus::prelude::*;
+use flow_plots::AxisOptions;
 
 use crate::{
     file_load::FcsFiles,
@@ -87,7 +88,7 @@ pub fn PlotWindow() -> Element {
 
     // Primary States
     let mut sample_index = use_signal(|| 0);
-    let mut parameter_settings: Signal<HashMap<Id, AxisInfo>> = use_signal(|| HashMap::default());
+    let mut parameter_settings: Store<HashMap<Id, AxisInfo>> = use_store(|| HashMap::default());
     use_context_provider(|| parameter_settings);
 
     let current_sample = use_memo(move || {
@@ -114,7 +115,6 @@ pub fn PlotWindow() -> Element {
     });
 
     let sorted_params = use_memo(move || {
-        // let hashmap = marker_to_fluoro_map();
         if let Some(Ok(fcs_file)) = fcs_file_resource.read().clone() {
             let mut sorted_params: Vec<Param> = fcs_file
                 .parameters
@@ -147,36 +147,21 @@ pub fn PlotWindow() -> Element {
                     .write()
                     .entry(param.fluoro.clone())
                     .or_insert_with(|| {
-                        let is_fluoresence_channel;
-                        if let Some(param) = fcs_file.parameters.get(&param.fluoro) {
-                            is_fluoresence_channel = {
-                                match param.transform {
-                                    TransformType::Linear => false,
-                                    _ => true,
-                                }
-                            };
-                        } else {
-                            is_fluoresence_channel = true;
+                        let transform = match fcs_file.parameters.get(&param.fluoro){
+                            Some(t) => match t.is_fluorescence() {
+                                false => TransformType::Linear,
+                                true => TransformType::Arcsinh { cofactor: 6000f32 },
+                            },
+                            None => TransformType::Linear,
                         };
-                        if is_fluoresence_channel {
-                            let cofactor = 6000_f32;
-                            let lower = asinh_transform_f32(-10000_f32, cofactor);
-                            let upper = asinh_transform_f32(4194304_f32, cofactor);
-                            AxisInfo {
-                                title: param.fluoro.clone(),
-                                lower,
-                                upper,
-                                transform: TransformType::Arcsinh { cofactor: cofactor },
-                            }
+                        let lower;
+                        if transform == TransformType::Linear {
+                            lower = 0f32;
                         } else {
-                            println!("{}, {} linear", param.marker, param.fluoro);
-                            AxisInfo {
-                                title: param.fluoro.clone(),
-                                lower: 0_f32,
-                                upper: 4194304_f32,
-                                transform: TransformType::Linear,
-                            }
+                            lower = -10000_f32
                         }
+                        AxisInfo::new_from_raw(param.fluoro.clone(), lower, 4194304_f32, transform)
+
                     });
             }
         }
@@ -196,70 +181,57 @@ pub fn PlotWindow() -> Element {
             fluoro: p,
         }
     });
-    let mut x_cofactor = use_signal(|| 6000.0f32);
-    let mut y_cofactor = use_signal(|| 6000.0f32);
-    let mut x_lower = use_signal(|| 0_f32);
-    let mut x_upper = use_signal(|| 4194304_f32);
-    let mut y_lower = use_signal(|| 0_f32);
-    let mut y_upper = use_signal(|| 4194304_f32);
+    let mut x_cofactor = use_signal(|| 0);
+    let mut y_cofactor = use_signal(|| 0);
+    let mut x_lower = use_signal(|| 0);
+    let mut x_upper = use_signal(|| 4194304);
+    let mut y_lower = use_signal(|| 0);
+    let mut y_upper = use_signal(|| 4194304);
 
     // fetch the axis limits from the settings dict when axis changed
     let x_axis_limits = use_memo(move || {
         let param = x_axis_marker();
 
-        match parameter_settings.read().get(&param.fluoro) {
+        match parameter_settings().get(&param.fluoro) {
             Some(d) => Some(d.clone()),
             None => None,
         }
     });
 
     use_effect(move || {
-        let param = x_axis_marker.peek().clone();
-        let x_co = *x_cofactor.read();
-
-        let mut settings = parameter_settings.write();
-        settings.entry(param.fluoro.clone()).and_modify(|axis| {
-            let old_axis = std::mem::take(axis);
-            let new_axis = match old_axis.transform {
-                TransformType::Linear => old_axis,
-                TransformType::Arcsinh { .. } => match old_axis.into_archsinh(x_co) {
-                    Ok(a) => a,
-                    Err(_) => old_axis,
-                },
-                _ => old_axis,
-            };
-
-            *axis = new_axis;
-        });
+        let param = x_axis_marker.read().clone();
+        
+        if let Some(axis_settings) = parameter_settings().get(&param.fluoro){
+            let(l, u) = axis_settings.get_untransformed_bounds();
+            x_lower.set(l.round() as i32);
+            x_upper.set(u.round() as i32);
+            match axis_settings.transform {
+                TransformType::Arcsinh { cofactor } => x_cofactor.set(cofactor.round() as i32),
+                _ => x_cofactor.set(0 as i32),
+            }
+        }
     });
 
     let y_axis_limits = use_memo(move || {
         let param = y_axis_marker();
-
-        match parameter_settings.read().get(&param.fluoro) {
+        match parameter_settings().get(&param.fluoro) {
             Some(d) => Some(d.clone()),
             None => None,
         }
     });
 
     use_effect(move || {
-        let param = y_axis_marker.peek().clone();
-        let y_co = *y_cofactor.read();
-
-        let mut settings = parameter_settings.write();
-        settings.entry(param.fluoro.clone()).and_modify(|axis| {
-            let old_axis = std::mem::take(axis);
-            let new_axis = match old_axis.transform {
-                TransformType::Linear => old_axis,
-                TransformType::Arcsinh { .. } => match old_axis.into_archsinh(y_co) {
-                    Ok(a) => a,
-                    Err(_) => old_axis,
-                },
-                _ => old_axis,
-            };
-
-            *axis = new_axis;
-        });
+        let param = y_axis_marker.read().clone();
+        let settings = &*parameter_settings.peek();
+        if let Some(axis_settings) = settings.get(&param.fluoro){
+            let(l, u) = axis_settings.get_untransformed_bounds();
+            y_lower.set(l.round() as i32);
+            y_upper.set(u.round() as i32);
+            match axis_settings.transform {
+                TransformType::Arcsinh { cofactor } => x_cofactor.set(cofactor.round() as i32),
+                _ => y_cofactor.set(0),
+            }
+        }
     });
 
     let processed_data_resource = use_resource(move || {
@@ -275,14 +247,14 @@ pub fn PlotWindow() -> Element {
             };
 
             let x_transform = {
-                if let Some(axis) = parameter_settings.get(&x_fluoro) {
+                if let Some(axis) = parameter_settings().get(&x_fluoro) {
                     axis.transform.clone()
                 } else {
                     return Err(anyhow::anyhow!("No data yet"));
                 }
             };
             let y_transform = {
-                if let Some(axis) = parameter_settings.get(&y_fluoro) {
+                if let Some(axis) = parameter_settings().get(&y_fluoro) {
                     axis.transform.clone()
                 } else {
                     return Err(anyhow::anyhow!("No data yet"));
@@ -297,6 +269,183 @@ pub fn PlotWindow() -> Element {
 
         div { class: "top-container",
             // File selection
+            div { class: "axis-controls-grid", style: "width: 600px;",
+                div { class: "grid-label", "X-Axis" }
+                SearchableSelect {
+                    items: sorted_params(),
+                    selected_value: x_axis_marker,
+                    placeholder: x_axis_marker.peek().to_string(),
+                }
+
+                div { class: "input-unit",
+                    label { "Cofactor" }
+                    input {
+                        r#type: "number",
+                        value: "{x_cofactor.read()}",
+                        disabled: if x_axis_limits.read().is_none() || x_axis_limits.read().as_ref().unwrap().is_linear() { true } else { false },
+                        oninput: move |evt| {
+
+                            if let Ok(val) = evt.value().parse::<i32>() {
+                                if val < 1 {
+                                    message.set(None);
+                                    let param = x_axis_marker.peek().clone();
+                                    let x_co = val;
+
+                                    parameter_settings
+                                        .write()
+                                        .entry(param.fluoro.clone())
+                                        .and_modify(|axis| {
+                                            let old_axis = std::mem::take(axis);
+                                            let new_axis = match old_axis.transform {
+                                                TransformType::Linear => old_axis,
+                                                TransformType::Arcsinh { .. } => {
+                                                    match old_axis.into_archsinh(x_co as f32) {
+                                                        Ok(a) => a,
+                                                        Err(_) => old_axis,
+                                                    }
+                                                }
+                                                _ => old_axis,
+                                            };
+                                            *axis = new_axis;
+                                        });
+                                } else {
+                                    message
+                                        .set(
+                                            Some("Arcsinh cofactor should be a positive integer".to_string()),
+                                        );
+                                }
+                            }
+                        },
+                        step: "any",
+                    }
+                }
+                div { class: "input-unit",
+                    label { "Lower" }
+                    input {
+                        r#type: "number",
+                        value: "{x_lower}",
+                        disabled: if x_axis_limits.read().is_none() || x_axis_limits.read().as_ref().unwrap().is_linear() { true } else { false },
+                        oninput: move |e| {
+                            if let Ok(lower) = e.value().parse::<i32>() {
+                                let param = x_axis_marker.peek().clone();
+                                parameter_settings
+                                    .write()
+                                    .entry(param.fluoro.clone())
+                                    .and_modify(|axis| {
+                                        let old_axis = std::mem::take(axis);
+                                        *axis = old_axis.into_new_lower(lower as f32);
+                                    });
+                            }
+                        },
+                    }
+                }
+                div { class: "input-unit",
+                    label { "Upper" }
+                    input {
+                        r#type: "number",
+                        value: "{x_upper}",
+                        oninput: move |e| {
+                            if let Ok(upper) = e.value().parse::<i32>() {
+                                let param = x_axis_marker.peek().clone();
+                                parameter_settings
+                                    .write()
+                                    .entry(param.fluoro.clone())
+                                    .and_modify(|axis| {
+                                        let old_axis = std::mem::take(axis);
+                                        *axis = old_axis.into_new_upper(upper as f32);
+                                    });
+                            }
+                        },
+                    }
+                }
+
+                div { class: "grid-label", "Y-Axis" }
+                SearchableSelect {
+                    items: sorted_params(),
+                    selected_value: y_axis_marker,
+                    placeholder: y_axis_marker.peek().to_string(),
+                }
+
+                div { class: "input-unit",
+                    label { "Cofactor" }
+                    input {
+                        r#type: "number",
+                        value: "{y_cofactor.read()}",
+                        disabled: if y_axis_limits.read().is_none() || y_axis_limits.read().as_ref().unwrap().is_linear() { true } else { false },
+                        oninput: move |evt| {
+                            if let Ok(val) = evt.value().parse::<i32>() {
+                                if val < 1 {
+                                    message.set(None);
+                                    let param = y_axis_marker.peek().clone();
+                                    let y_co = val;
+                                    parameter_settings
+                                        .write()
+                                        .entry(param.fluoro.clone())
+                                        .and_modify(|axis| {
+                                            let old_axis = std::mem::take(axis);
+                                            let new_axis = match old_axis.transform {
+                                                TransformType::Linear => old_axis,
+                                                TransformType::Arcsinh { .. } => {
+                                                    match old_axis.into_archsinh(y_co as f32) {
+                                                        Ok(a) => a,
+                                                        Err(_) => old_axis,
+                                                    }
+                                                }
+                                                _ => old_axis,
+                                            };
+                                            *axis = new_axis;
+                                        });
+                                } else {
+                                    message
+                                        .set(
+                                            Some("Arcsinh cofactor should be a positive integer".to_string()),
+                                        );
+                                }
+                            }
+                        },
+                        step: "any",
+                    }
+                }
+                div { class: "input-unit",
+                    label { "Lower" }
+                    input {
+                        r#type: "number",
+                        value: "{y_lower}",
+                        disabled: if y_axis_limits.read().is_none() || y_axis_limits.read().as_ref().unwrap().is_linear() { true } else { false },
+                        oninput: move |e| {
+                            if let Ok(lower) = e.value().parse::<i32>() {
+                                let param = y_axis_marker.peek().clone();
+                                parameter_settings
+                                    .write()
+                                    .entry(param.fluoro.clone())
+                                    .and_modify(|axis| {
+                                        let old_axis = std::mem::take(axis);
+                                        *axis = old_axis.into_new_lower(lower as f32);
+                                    });
+                            }
+                        },
+                    }
+                }
+                div { class: "input-unit",
+                    label { "Upper" }
+                    input {
+                        r#type: "number",
+                        value: "{y_upper}",
+                        oninput: move |e| {
+                            if let Ok(upper) = e.value().parse::<i32>() {
+                                let param = y_axis_marker.peek().clone();
+                                parameter_settings
+                                    .write()
+                                    .entry(param.fluoro.clone())
+                                    .and_modify(|axis| {
+                                        let old_axis = std::mem::take(axis);
+                                        *axis = old_axis.into_new_upper(upper as f32);
+                                    });
+                            }
+                        },
+                    }
+                }
+            }
             div { class: "file-info",
                 button {
                     onclick: move |_| {
@@ -315,104 +464,12 @@ pub fn PlotWindow() -> Element {
                     }
                 }
             }
-
-            div { class: "axis-controls-grid",
-
-                div { class: "grid-label", "X-Axis" }
-                SearchableSelect {
-                    items: sorted_params(),
-                    selected_value: x_axis_marker,
-                    placeholder: x_axis_marker.peek().to_string(),
-                }
-
-                div { class: "input-unit",
-                    label { "Cofactor" }
-                    input {
-                        r#type: "number",
-                        value: "{x_cofactor.read()}",
-                        disabled: if x_axis_limits.read().is_none() || x_axis_limits.read().as_ref().unwrap().is_linear() { true } else { false },
-                        oninput: move |evt| {
-                            if let Ok(val) = evt.value().parse::<f32>() {
-                                if val > 0_f32 {
-                                    message.set(None);
-                                    x_cofactor.set(val);
-                                } else {
-                                    message.set(Some("Arcsinh cofactor must be > 0".to_string()));
-                                }
-
-                            }
-                        },
-                        step: "any",
-                    }
-                }
-                div { class: "input-unit",
-                    label { "Lower" }
-                    input {
-                        r#type: "number",
-                        value: "{x_lower}",
-                        oninput: move |e| {},
-                    }
-                }
-                div { class: "input-unit",
-                    label { "Upper" }
-                    input {
-                        r#type: "number",
-                        value: "{x_upper}",
-                        oninput: move |e| {},
-                    }
-                }
-
-                div { class: "grid-label", "Y-Axis" }
-                SearchableSelect {
-                    items: sorted_params(),
-                    selected_value: y_axis_marker,
-                    placeholder: y_axis_marker.peek().to_string(),
-                }
-
-                div { class: "input-unit",
-                    label { "Cofactor:" }
-                    input {
-                        r#type: "number",
-                        value: "{y_cofactor.read()}",
-                        disabled: if y_axis_limits.read().is_none() || y_axis_limits.read().as_ref().unwrap().is_linear() { true } else { false },
-                        oninput: move |evt| {
-                            if let Ok(val) = evt.value().parse::<f32>() {
-                                if val > 0_f32 {
-                                    message.set(None);
-                                    y_cofactor.set(val);
-                                } else {
-                                    message.set(Some("Arcsinh cofactor must be > 0".to_string()));
-                                }
-                            }
-                        },
-                        step: "any",
-                    }
-                }
-                div { class: "input-unit",
-                    label { "Lower" }
-                    input {
-                        r#type: "number",
-                        value: "{y_lower}",
-                        oninput: move |e| {},
-                    }
-                }
-                div { class: "input-unit",
-                    label { "Upper" }
-                    input {
-                        r#type: "number",
-                        value: "{y_upper}",
-                        oninput: move |e| {},
-                    }
-                }
-            }
         }
         div { class: "status-message",
             {
                 match &*processed_data_resource.read() {
                     Some(Ok(_)) => {
-                        rsx! {
-                            p { class: "loading-message", "Data Ready." }
-                        }
+                        rsx! {} // p { class: "loading-message", "Data Ready." }
                     }
                     Some(Err(e)) => {
                         rsx! {

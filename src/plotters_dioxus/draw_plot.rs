@@ -7,7 +7,7 @@ use plotters::coord::Shift;
 use plotters::prelude::*;
 use plotters_bitmap::BitMapBackend;
 
-use std::sync::Arc;
+use std::{f32::INFINITY, sync::Arc};
 
 use flow_plots::{
     BasePlotOptions, ColorMaps, DensityPlot, DensityPlotOptions, Plot, render::RenderConfig,
@@ -57,6 +57,26 @@ impl Default for AxisInfo{
 }
 
 impl AxisInfo {
+
+    pub fn new_from_raw(title: Arc<str>, lower_raw: f32, upper_raw: f32, transform: TransformType) -> Self {
+        match transform {
+            TransformType::Linear => {
+                Self { title, lower: lower_raw, upper: upper_raw, transform }
+            },
+            TransformType::Arcsinh { cofactor } => {
+                let lower = asinh_transform_f32(lower_raw, cofactor).unwrap_or(0f32);
+                let upper = asinh_transform_f32(upper_raw, cofactor).unwrap_or(INFINITY);
+                Self {
+                    title,
+                    lower,
+                    upper,
+                    transform
+                }
+            },
+            TransformType::Biexponential { top_of_scale, positive_decades, negative_decades, width } => todo!(),
+        }
+    }
+
     pub fn into_archsinh(&self, cofactor: f32) -> anyhow::Result<Self> {
         
         let old_lower = self.lower;
@@ -105,6 +125,39 @@ impl AxisInfo {
             _ => false
         }
     }
+
+    pub fn get_untransformed_bounds(&self) -> (f32, f32) {
+        match self.transform {
+            
+            TransformType::Arcsinh { cofactor } => {
+                (asinh_reverse_f32(self.lower, cofactor).unwrap_or_default(), 
+                asinh_reverse_f32(self.upper, cofactor).unwrap_or_default())
+            },
+            _ => (self.lower, self.upper),
+        }
+    }
+
+    pub fn into_new_lower(self, lower_raw: f32) -> Self {
+        match self.transform {
+            TransformType::Linear => Self { title: self.title, lower: lower_raw, upper: self.upper, transform: self.transform },
+            TransformType::Arcsinh { cofactor } => {
+                let new_lower = asinh_transform_f32(lower_raw, cofactor).unwrap_or(self.lower);
+                Self {title: self.title, lower: new_lower, upper: self.upper, transform: self.transform}
+            },
+            TransformType::Biexponential { top_of_scale, positive_decades, negative_decades, width } => todo!(),
+        }
+    }
+
+    pub fn into_new_upper(self, upper_raw: f32) -> Self {
+        match self.transform {
+            TransformType::Linear => Self { title: self.title, lower: self.lower, upper: upper_raw, transform: self.transform },
+            TransformType::Arcsinh { cofactor } => {
+                let new_upper = asinh_transform_f32(upper_raw, cofactor).unwrap_or(self.upper);
+                Self {title: self.title, lower: self.lower, upper: new_upper, transform: self.transform}
+            },
+            TransformType::Biexponential { top_of_scale, positive_decades, negative_decades, width } => todo!(),
+        }
+    }
 }
 
 #[component]
@@ -130,7 +183,7 @@ pub fn PseudoColourPlot(
             .title("My Density Plot")
             .build()
             .expect("shouldn't fail");
-
+        println!("{}, {}", x_axis_info.lower, x_axis_info.upper);
         let x_axis_options = flow_plots::AxisOptions::new()
             .range(x_axis_info.lower..=x_axis_info.upper)
             .transform(x_axis_info.transform.clone())

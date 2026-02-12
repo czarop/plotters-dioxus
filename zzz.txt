@@ -1,1 +1,35 @@
-set plot upper and lower limits
+filepicker select
+
+rescale gates
+
+gating hierarchy
+Gating hierarchy panel
+Select gated events
+
+Elipse gates
+Rectangle gates
+Line gates
+Quadrant gates
+
+Delete gates
+Sample-specific gating
+
+Metadata
+Metadata Groups
+Metadata-specific Gating
+Set Metadata from FCS or Omiq
+
+Paired samples (FMX FS)
+
+Set gates from omiq gating
+Save gates to omiq gating
+
+Set Scaling from omiq Scaling
+Send Scaling to omiq Scaling
+
+Set Comp from omiq Comp
+
+
+
+
+
