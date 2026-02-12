@@ -48,25 +48,17 @@ async fn get_scaled_data_to_display(
     .await?
 }
 
-fn asinh_transform_f32(value: f32, cofactor: f32) -> f32 {
-    if value.is_nan() || value.is_infinite() {
-        return value;
-    }
-    (value / cofactor).asinh()
-}
-
 static CSS_STYLE: Asset = asset!("assets/plot_window.css");
 
 #[component]
 pub fn PlotWindow() -> Element {
-    // Hardcoded paths (will be selectable later)
+
     let mut filehandler: Signal<Option<FcsFiles>> = use_signal(|| None);
     let mut message = use_signal(|| None::<String>);
     let gate_store = use_store(|| GateState::default());
     use_context_provider(|| gate_store);
 
     let _ = use_resource(move || async move {
-        // Read the file from the project root
         let result = (|| -> anyhow::Result<FcsFiles> {
             let content = std::fs::read_to_string("file_paths.txt")?;
             let path = content
@@ -86,7 +78,6 @@ pub fn PlotWindow() -> Element {
         }
     });
 
-    // Primary States
     let mut sample_index = use_signal(|| 0);
     let mut parameter_settings: Store<HashMap<Id, AxisInfo>> = use_store(|| HashMap::default());
     use_context_provider(|| parameter_settings);
@@ -105,7 +96,6 @@ pub fn PlotWindow() -> Element {
     });
 
     // RESOURCE 1: Load FCS File
-    // This resource re-runs when `current_sample` changes
     let fcs_file_resource = use_resource(move || async move {
         if let Some(sample) = current_sample() {
             get_flow_data(sample.full_path).await
@@ -125,7 +115,6 @@ pub fn PlotWindow() -> Element {
                 })
                 .collect();
 
-            // Sort by parameter number
             sorted_params.sort_by_key(|param| {
                 fcs_file
                     .parameters
@@ -190,17 +179,15 @@ pub fn PlotWindow() -> Element {
 
     // fetch the axis limits from the settings dict when axis changed
     let x_axis_limits = use_memo(move || {
-        let param = x_axis_marker();
-
+        let param = x_axis_marker.read();
         match parameter_settings().get(&param.fluoro) {
             Some(d) => Some(d.clone()),
             None => None,
         }
     });
-
+    // set the axis 
     use_effect(move || {
         let param = x_axis_marker.read().clone();
-        
         if let Some(axis_settings) = parameter_settings().get(&param.fluoro){
             let(l, u) = axis_settings.get_untransformed_bounds();
             x_lower.set(l.round() as i32);
