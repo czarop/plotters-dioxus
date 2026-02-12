@@ -198,6 +198,10 @@ pub fn PlotWindow() -> Element {
     });
     let mut x_cofactor = use_signal(|| 6000.0f32);
     let mut y_cofactor = use_signal(|| 6000.0f32);
+    let mut x_lower = use_signal(|| 0_f32);
+    let mut x_upper = use_signal(|| 4194304_f32);
+    let mut y_lower = use_signal(|| 0_f32);
+    let mut y_upper = use_signal(|| 4194304_f32);
 
     // fetch the axis limits from the settings dict when axis changed
     let x_axis_limits = use_memo(move || {
@@ -291,36 +295,38 @@ pub fn PlotWindow() -> Element {
     rsx! {
         document::Stylesheet { href: CSS_STYLE }
 
-        div {
-            div { class: "controls",
-                // File selection
-                div { class: "control-group",
-                    button {
-                        onclick: move |_| {
-                            if let Some(fcsfiles) = &*filehandler.read() {
-                                let next_index = (*sample_index.read() + 1) % fcsfiles.sample_count();
-                                sample_index.set(next_index);
-                            }
-
-                        },
-                        "Next FCS File"
-                    }
-                    p {
-                        match current_sample() {
-                            Some(sample) => format!("Current File: {}", sample.name),
-                            None => "No Files".to_string(),
+        div { class: "top-container",
+            // File selection
+            div { class: "file-info",
+                button {
+                    onclick: move |_| {
+                        if let Some(fcsfiles) = &*filehandler.read() {
+                            let next_index = (*sample_index.read() + 1) % fcsfiles.sample_count();
+                            sample_index.set(next_index);
                         }
+
+                    },
+                    "Next FCS File"
+                }
+                p {
+                    match current_sample() {
+                        Some(sample) => format!("Current File: {}", sample.name),
+                        None => "No Files".to_string(),
                     }
                 }
+            }
 
+            div { class: "axis-controls-grid",
+
+                div { class: "grid-label", "X-Axis" }
                 SearchableSelect {
                     items: sorted_params(),
                     selected_value: x_axis_marker,
                     placeholder: x_axis_marker.peek().to_string(),
                 }
 
-                div { class: "control-group",
-                    label { "X-Axis Cofactor:" }
+                div { class: "input-unit",
+                    label { "Cofactor" }
                     input {
                         r#type: "number",
                         value: "{x_cofactor.read()}",
@@ -339,15 +345,32 @@ pub fn PlotWindow() -> Element {
                         step: "any",
                     }
                 }
+                div { class: "input-unit",
+                    label { "Lower" }
+                    input {
+                        r#type: "number",
+                        value: "{x_lower}",
+                        oninput: move |e| {},
+                    }
+                }
+                div { class: "input-unit",
+                    label { "Upper" }
+                    input {
+                        r#type: "number",
+                        value: "{x_upper}",
+                        oninput: move |e| {},
+                    }
+                }
 
+                div { class: "grid-label", "Y-Axis" }
                 SearchableSelect {
                     items: sorted_params(),
                     selected_value: y_axis_marker,
                     placeholder: y_axis_marker.peek().to_string(),
                 }
 
-                div { class: "control-group",
-                    label { "Y-Axis Cofactor:" }
+                div { class: "input-unit",
+                    label { "Cofactor:" }
                     input {
                         r#type: "number",
                         value: "{y_cofactor.read()}",
@@ -365,60 +388,76 @@ pub fn PlotWindow() -> Element {
                         step: "any",
                     }
                 }
-            }
-
-            div { class: "status-message",
-                {
-                    match &*processed_data_resource.read() {
-                        Some(Ok(_)) => {
-                            rsx! {
-                                p { class: "loading-message", "Data Ready." }
-                            }
-                        }
-                        Some(Err(e)) => {
-                            rsx! {
-                                p { class: "error-message", "Error: {e}" }
-                            }
-                        }
-                        None => {
-                            rsx! {
-                                p { class: "loading-message", "Loading and processing data..." }
-                            }
-                        }
+                div { class: "input-unit",
+                    label { "Lower" }
+                    input {
+                        r#type: "number",
+                        value: "{y_lower}",
+                        oninput: move |e| {},
+                    }
+                }
+                div { class: "input-unit",
+                    label { "Upper" }
+                    input {
+                        r#type: "number",
+                        value: "{y_upper}",
+                        oninput: move |e| {},
                     }
                 }
             }
-
+        }
+        div { class: "status-message",
             {
-
-                if let Some(Ok(plot_data)) = &*processed_data_resource.read() {
-
-                    rsx! {
-                        div {
-                            PseudoColourPlot {
-                                size: (600, 600),
-                                data: plot_data.clone(),
-                                x_axis_info: x_axis_limits.read().as_ref().unwrap().clone(),
-                                y_axis_info: y_axis_limits.read().as_ref().unwrap().clone(),
-                            }
+                match &*processed_data_resource.read() {
+                    Some(Ok(_)) => {
+                        rsx! {
+                            p { class: "loading-message", "Data Ready." }
                         }
                     }
-                } else {
-                    rsx! {
-                        div {
-                            border: "1px solid #ddd",
-                            width: "600px",
-                            height: "600px",
-                            display: "flex",
-                            align_items: "center",
-                            justify_content: "center",
-                            background_color: "#f9f9f9",
-                            color: "#888",
-                            "Plot area (waiting for data)"
+                    Some(Err(e)) => {
+                        rsx! {
+                            p { class: "error-message", "Error: {e}" }
+                        }
+                    }
+                    None => {
+                        rsx! {
+                            p { class: "loading-message", "Loading and processing data..." }
                         }
                     }
                 }
             }
         }
+
+        {
+
+            if let Some(Ok(plot_data)) = &*processed_data_resource.read() {
+
+                rsx! {
+                    div {
+                        PseudoColourPlot {
+                            size: (600, 600),
+                            data: plot_data.clone(),
+                            x_axis_info: x_axis_limits.read().as_ref().unwrap().clone(),
+                            y_axis_info: y_axis_limits.read().as_ref().unwrap().clone(),
+                        }
+                    }
+                }
+            } else {
+                rsx! {
+                    div {
+                        border: "1px solid #ddd",
+                        width: "600px",
+                        height: "600px",
+                        display: "flex",
+                        align_items: "center",
+                        justify_content: "center",
+                        background_color: "#f9f9f9",
+                        color: "#888",
+                        "Plot area (waiting for data)"
+                    }
+                }
+            }
+        }
+
     }
 }

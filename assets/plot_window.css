@@ -6,34 +6,6 @@ body {
     align-items: center;
 }
 
-.controls {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 15px;
-    margin-bottom: 20px;
-    align-items: flex-end;
-    justify-content: center;
-}
-
-.control-group {
-    display: flex;
-    flex-direction: column;
-}
-
-label {
-    margin-bottom: 5px;
-    font-weight: bold;
-}
-
-input[type="text"],
-input[type="number"],
-select,
-button {
-    padding: 8px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    font-size: 1rem;
-}
 
 button {
     background-color: #007bff;
@@ -56,4 +28,67 @@ button:hover {
 
 .loading-message {
     color: gray;
+}
+
+/* Layout Container */
+.top-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    width: 100%;
+    max-width: 1200px;
+    margin-bottom: 2rem;
+    gap: 20px;
+}
+
+.file-info {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* The 8-component Grid (plus row labels) */
+.axis-controls-grid {
+    display: grid;
+    /* Col 1: Label, Col 2: Selector (wide), Col 3-5: Numbers (fixed width) */
+    grid-template-columns: auto 200px 80px 80px 80px;
+    gap: 12px;
+    align-items: end;
+    background: #fcfcfc;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #eee;
+}
+
+.grid-label {
+    font-weight: bold;
+    font-size: 0.9rem;
+    padding-bottom: 10px;
+    color: #444;
+}
+
+.input-unit {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.input-unit label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: #666;
+    margin: 0;
+}
+
+.input-unit input {
+    width: 100%;
+    padding: 6px;
+    font-size: 0.85rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+/* Ensure SearchableSelect fits the grid cell */
+.combobox-container {
+    width: 100% !important;
 }

@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 
-use clingate::plotters_dioxus::{plot_window::PlotWindow, route::Route};
+use clingate::plotters_dioxus::route::Route;
 use dioxus::{
     desktop::{Config, LogicalSize, WindowBuilder}, prelude::*
 };
