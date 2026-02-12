@@ -1,9 +1,12 @@
 pub mod draw_gates;
 pub mod draw_plot;
-pub mod gate_helpers;
+pub mod gates;
 pub use draw_plot::AxisInfo;
 pub use draw_plot::DioxusDrawingArea;
 pub use draw_plot::PseudoColourPlot;
 pub mod traits;
 pub use traits::PlotDrawable;
+pub mod macros;
 pub mod plot_helpers;
+pub mod plot_window;
+pub mod route;

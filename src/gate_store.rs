@@ -3,10 +3,9 @@ use flow_gates::{Gate, GateHierarchy};
 
 use std::{collections::HashMap, sync::Arc};
 
-use crate::plotters_dioxus::gate_helpers::GateFinal;
-use crate::plotters_dioxus::PlotDrawable;
+use crate::plotters_dioxus::{AxisInfo, PlotDrawable, gates::gate_final::GateFinal};
 
-type Id = std::sync::Arc<str>;
+pub type Id = std::sync::Arc<str>;
 
 #[derive(Hash, PartialEq, Eq, Clone)]
 pub struct GatesOnPlotKey {
@@ -67,7 +66,7 @@ pub struct GateState {
     // For the Renderer: "What gates do I draw on this Plot?"
     pub gate_ids_by_view: HashMap<GatesOnPlotKey, Vec<GateKey>>,
     // For the Logic: "What is the actual data for Gate X?"
-    pub gate_registry: HashMap<GateKey, crate::plotters_dioxus::gate_helpers::GateFinal>,
+    pub gate_registry: HashMap<GateKey, GateFinal>,
     // For the Filtering: "How are these gates nested?"
     pub hierarchy: GateHierarchy,
     // are there file-specific overrides for gate positions
@@ -152,6 +151,27 @@ impl<Lens> Store<GateState, Lens> {
         Ok(())
     }
 
+    fn move_gate(&mut self, gate_id: GateKey, data_space_offset: (f32, f32)) -> Result<()> {
+        let current_gate = self
+            .gate_registry()
+            .remove(&gate_id)
+            .ok_or(anyhow::anyhow!("Gate does not exist"))?;
+        let id = current_gate.id.clone();
+        let name = current_gate.name.clone();
+        let x_param = current_gate.x_parameter_channel_name();
+        let y_param = current_gate.y_parameter_channel_name();
+        let points = current_gate
+            .get_points()
+            .into_iter()
+            .map(|(x, y)| (x - data_space_offset.0, y - data_space_offset.1))
+            .collect();
+        let new_gate = Gate::polygon(id, name, points, x_param, y_param)?;
+        let gate_final = GateFinal::new(new_gate, true);
+        self.gate_registry().insert(gate_id, gate_final);
+
+        Ok(())
+    }
+
     fn get_gates_for_plot(
         &self,
         x_axis_title: Arc<str>,
@@ -174,5 +194,40 @@ impl<Lens> Store<GateState, Lens> {
             return None;
         }
         return Some(gate_list);
+    }
+
+    // fn get_boxed_gates_for_plot(
+    //     &self,
+    //     x_axis_title: Arc<str>,
+    //     y_axis_title: Arc<str>,
+    // ) -> Option<Vec<Box<dyn PlotDrawable>>> {
+    //     let key = GatesOnPlotKey::new(x_axis_title, y_axis_title, None);
+    //     let key_options = self.gate_ids_by_view().get(key);
+    //     let mut gate_list = vec![];
+    //     if let Some(key_store) = key_options {
+    //         let ids = key_store.read().clone();
+    //         let registry = self.gate_registry();
+    //         let registry_guard = registry.read();
+    //         for k in ids {
+    //             if let Some(gate_store_entry) = registry_guard.get(&k) {
+    //                 let gate_clone = gate_store_entry.clone();
+    //                 let gate: Box<dyn PlotDrawable> = Box::new(gate_clone);
+    //                 gate_list.push(gate);
+    //             }
+    //         }
+    //     } else {
+    //         println!("No gates for plot");
+    //         return None;
+    //     }
+    //     return Some(gate_list);
+    // }
+
+    fn rescale_gates(&self, marker: &Arc<str>, old_axis_options: &AxisInfo, new_axis_options: &AxisInfo) {
+        for (_, gate) in self().gate_registry.iter_mut(){
+            let (x_marker, y_marker) = &gate.parameters;
+            if marker == x_marker || marker == y_marker {
+                gate.recalculate_gate_for_rescaled_axis(marker.clone(), &old_axis_options.transform, &new_axis_options.transform);
+            }
+        }
     }
 }

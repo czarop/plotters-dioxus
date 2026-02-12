@@ -1,10 +1,12 @@
 use std::f32::INFINITY;
 
-use crate::plotters_dioxus::plot_helpers::{GateShape, PlotMapper};
+use crate::plotters_dioxus::gates::gate_styles::GateShape;
 
 pub trait PlotDrawable {
     fn get_points(&self) -> Vec<(f32, f32)>;
     fn is_finalised(&self) -> bool;
+
+    fn draw_self(&self) -> Vec<GateShape>;
 
     fn is_near_segment(
         &self,
@@ -58,6 +60,5 @@ pub trait PlotDrawable {
         }
     }
 
-    fn draw_self(&self, mapper: &PlotMapper) -> Vec<GateShape>;
-    
+    fn recalculate_gate_for_rescaled_axis(&mut self, param: std::sync::Arc<str>, old_transform: &flow_fcs::TransformType, new_transform: &flow_fcs::TransformType);
 }

@@ -1,8 +1,8 @@
 use flow_fcs::TransformType;
-use std::ops::RangeInclusive;
 use flow_gates::transforms::{
     get_plotting_area, pixel_to_raw, pixel_to_raw_y, raw_to_pixel, raw_to_pixel_y,
 };
+use std::{ops::RangeInclusive, sync::Arc};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct PlotMapper {
@@ -42,18 +42,23 @@ impl PlotMapper {
     pub fn get_data_tolerance(&self, pixel_slop: f32) -> (f32, f32) {
         let x_span = self.x_data_range.end() - self.x_data_range.start();
         let y_span = self.y_data_range.end() - self.y_data_range.start();
-        
+
         let plot_w = (self.x_pix_range.end - self.x_pix_range.start) as f32;
         let plot_h = (self.y_pix_range.end - self.y_pix_range.start) as f32;
 
         (
             (pixel_slop / plot_w) * x_span.abs(),
-            (pixel_slop / plot_h) * y_span.abs()
+            (pixel_slop / plot_h) * y_span.abs(),
         )
     }
 
-
-    pub fn pixel_to_data(&self, px: f32, py: f32, x_t: Option<TransformType>, y_t: Option<TransformType>) -> (f32, f32) {
+    pub fn pixel_to_data(
+        &self,
+        px: f32,
+        py: f32,
+        x_t: Option<TransformType>,
+        y_t: Option<TransformType>,
+    ) -> (f32, f32) {
         let xt;
         if x_t.is_none() {
             xt = TransformType::Linear;
@@ -66,14 +71,20 @@ impl PlotMapper {
         } else {
             yt = y_t.unwrap();
         }
-        
+
         let dx = pixel_to_raw(px, &self.x_data_range, &self.x_pix_range, &xt);
         let dy = pixel_to_raw_y(py, &self.y_data_range, &self.y_pix_range, &yt);
-        
+
         (dx, dy)
     }
 
-    pub fn data_to_pixel(&self, dx: f32, dy: f32, x_t: Option<TransformType>, y_t: Option<TransformType>) -> (f32, f32) {
+    pub fn data_to_pixel(
+        &self,
+        dx: f32,
+        dy: f32,
+        x_t: Option<TransformType>,
+        y_t: Option<TransformType>,
+    ) -> (f32, f32) {
         let xt;
         if x_t.is_none() {
             xt = TransformType::Linear;
@@ -86,10 +97,10 @@ impl PlotMapper {
         } else {
             yt = y_t.unwrap();
         }
-        
+
         let px = raw_to_pixel(dx, &self.x_data_range, &self.x_pix_range, &xt);
         let py = raw_to_pixel_y(dy, &self.y_data_range, &self.y_pix_range, &yt);
-        
+
         (px, py)
     }
 
@@ -99,18 +110,26 @@ impl PlotMapper {
     pub fn height(&self) -> f32 {
         self.view_height
     }
-
 }
 
-pub enum GateShape {
-    PolyLine { points: ((f32, f32), (f32, f32)), style: DrawingStyle },
-    Circle { center: (f32, f32), radius: f32 , style: DrawingStyle},
-    Polygon { points: Vec<(f32, f32)>, style: DrawingStyle },
+#[derive(Clone, PartialEq)]
+pub struct Param {
+    pub marker: Arc<str>,
+    pub fluoro: Arc<str>,
 }
 
-pub struct DrawingStyle {
-    pub stroke: String,
-    pub fill: String,
-    pub stroke_width: f32,
-    pub dashed: bool,
+impl std::fmt::Display for Param {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.marker == self.fluoro {
+            write!(f, "{}", self.marker)
+        } else {
+            let trimmed;
+            if self.fluoro.ends_with("-A") {
+                trimmed = &self.fluoro[..self.fluoro.len().saturating_sub(2)]
+            } else {
+                trimmed = &self.fluoro
+            }
+            write!(f, "{}-{}", self.marker, trimmed)
+        }
+    }
 }

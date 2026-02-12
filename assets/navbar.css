@@ -1,0 +1,74 @@
+.nav_bar-item {
+    font-size: 2rem;
+    text-align: center;
+    color: hsla(101, 79%, 44%, 0.905);
+    background-color: var(--color-background-body);
+}
+.nav_bar-items {
+    background-color: var(--color-background-body);
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    padding-left: 2rem;
+    padding-right: 2rem;
+}
+    
+/* .route-outlet {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    min-height: 0;
+    height: 100%;
+
+} */
+
+.nav_bar-items>div>a {
+    text-decoration: none;
+}
+/* .route-nav_bar {
+    height: 4rem;
+    flex-shrink: 0;
+} */
+
+/* .main_div {
+    height: 100vh;
+    padding: 1rem;
+    display: space-between;
+    justify-content: start;
+    flex-direction: column;
+} */
+
+html, body {
+    height: 100vh;
+    margin: 0;
+    padding: 0;
+    overflow: hidden; /* Prevents the 'outer' scrollbar */
+    display: block;
+}
+
+.main_div {
+    display: flex;         /* MUST be flex for the children to align */
+    flex-direction: column; 
+    height: 100vh;         /* Lock to viewport height */
+    padding: 0;            /* Remove padding here to avoid scrollbars */
+    box-sizing: border-box;
+}
+
+.route-outlet {
+    flex-grow: 1;          /* This is the magic: it eats all free space */
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;      /* Only the content scrolls */
+    min-height: 0;         /* Critical for flex-grow + overflow to work */
+    padding: 1rem;
+    /* Remove 'height: 100%' - it can conflict with flex-grow */
+    border: 1px solid red;
+}
+
+.route-nav_bar {
+    height: 4rem;
+    flex-shrink: 0;        /* Don't let the outlet squish the nav */
+    border-top: 1px solid #eee; /* Optional visual separation */
+    border: 1px solid black;
+}

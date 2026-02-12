@@ -1,0 +1,84 @@
+use std::sync::Arc;
+
+use crate::plotters_dioxus::{
+    PlotDrawable,
+    gates::gate_styles::{DRAFT_LINE, GateShape, ShapeType},
+};
+
+#[derive(PartialEq, Clone)]
+pub enum GateDraft {
+    Polygon {
+        points: Vec<(f32, f32)>,
+        x_param: Arc<str>,
+        y_param: Arc<str>,
+    },
+}
+
+impl PlotDrawable for GateDraft {
+    fn get_points(&self) -> Vec<(f32, f32)> {
+        match self {
+            GateDraft::Polygon { points, .. } => points.clone(),
+        }
+    }
+    fn is_finalised(&self) -> bool {
+        false
+    }
+
+    fn draw_self(&self) -> Vec<GateShape> {
+        match self {
+            GateDraft::Polygon { points, .. } => draw_draft_polygon(points),
+        }
+    }
+    
+    fn recalculate_gate_for_rescaled_axis(&mut self, param: std::sync::Arc<str>, old_transform: &flow_fcs::TransformType, new_transform: &flow_fcs::TransformType) {
+        todo!()
+    }
+}
+
+impl GateDraft {
+    pub fn new_polygon(points: Vec<(f32, f32)>, x_param: Arc<str>, y_param: Arc<str>) -> Self {
+        GateDraft::Polygon {
+            points,
+            x_param: x_param,
+            y_param: y_param,
+        }
+    }
+}
+
+fn draw_draft_polygon(points: &[(f32, f32)]) -> Vec<GateShape> {
+    match points.len() {
+        0 => vec![],
+        1 => {
+            let center = points[0];
+            vec![GateShape::Circle {
+                center,
+                radius: 3.0,
+                fill: "red",
+                shape_type: ShapeType::DraftGate,
+            }]
+        }
+        2 => {
+            let start = points[0];
+            let end = points[1];
+
+            vec![GateShape::PolyLine {
+                points: vec![start, end],
+                style: &DRAFT_LINE,
+                shape_type: ShapeType::DraftGate,
+            }]
+        }
+        _ => {
+            let mut points_local: Vec<(f32, f32)> = points.to_vec();
+            // close the loop
+            if let Some(first) = points_local.first() {
+                points_local.push(first.clone());
+            }
+
+            vec![GateShape::Polygon {
+                points: points_local,
+                style: &DRAFT_LINE,
+                shape_type: ShapeType::DraftGate,
+            }]
+        }
+    }
+}
