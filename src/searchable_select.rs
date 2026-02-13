@@ -1,14 +1,11 @@
 use dioxus::prelude::*;
 
 #[component]
-pub fn SearchableSelect<
-    T: Clone + PartialEq + std::fmt::Display + 'static
->(
+pub fn SearchableSelect<T: Clone + PartialEq + std::fmt::Display + 'static>(
     items: ReadSignal<Vec<T>>,
     on_select: EventHandler<(usize, T)>,
     placeholder: Option<String>,
     selected_index: Option<ReadSignal<usize>>,
-
 ) -> Element {
     // In your component
     let mut is_open = use_signal(|| false);
@@ -48,7 +45,7 @@ pub fn SearchableSelect<
         if let Some(sig) = selected_index {
             let i = sig();
             let items = &*items.peek();
-            if i < items.len(){
+            if i < items.len() {
                 display_text.set(items[i].to_string())
             }
         }

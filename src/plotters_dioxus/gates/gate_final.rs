@@ -114,16 +114,17 @@ impl PlotDrawable for GateFinal {
             }
         };
 
-        let items_to_render = crate::collate_vecs!(
-            main_gate,
-            selected_points,
-            ghost_point,
-        );
+        let items_to_render = crate::collate_vecs!(main_gate, selected_points, ghost_point,);
 
         items_to_render
     }
-    
-    fn recalculate_gate_for_rescaled_axis(&mut self, param: std::sync::Arc<str>, old_transform: &flow_fcs::TransformType, new_transform: &flow_fcs::TransformType) {
+
+    fn recalculate_gate_for_rescaled_axis(
+        &mut self,
+        param: std::sync::Arc<str>,
+        old_transform: &flow_fcs::TransformType,
+        new_transform: &flow_fcs::TransformType,
+    ) {
         todo!()
     }
 }
@@ -182,4 +183,3 @@ fn draw_ghost_point_for_polygon(
     };
     Some(vec![line, point])
 }
-

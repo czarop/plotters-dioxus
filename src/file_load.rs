@@ -7,8 +7,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
-
-use anyhow::Result as Result;
+use anyhow::Result;
 
 #[derive(Error, Debug)]
 pub enum FileError {
@@ -49,12 +48,12 @@ impl FcsFiles {
                     .ok_or_else(|| anyhow!("Invalid UTF-8 in filename"))?;
                 if name_str.ends_with(".fcs") {
                     let full_path = buf.join(&name_str);
-                    match FcsSampleStub::open(full_path.to_str().unwrap_or_default()){
+                    match FcsSampleStub::open(full_path.to_str().unwrap_or_default()) {
                         Ok(s) => Ok(Some(s)),
                         Err(e) => {
                             println!("error in file {e}");
                             Ok(None)
-                        },
+                        }
                     }
                 } else {
                     Ok(None)
@@ -76,10 +75,14 @@ impl FcsFiles {
     }
 
     pub fn get_file_names(&self) -> Vec<String> {
-        return self.file_list.iter().map(|f| match f.get_fil_keyword() {
-            Ok(n) => n.to_string(),
-            Err(_) => f.get_filepath().to_string_lossy().to_string(),
-        }).collect()
+        return self
+            .file_list
+            .iter()
+            .map(|f| match f.get_fil_keyword() {
+                Ok(n) => n.to_string(),
+                Err(_) => f.get_filepath().to_string_lossy().to_string(),
+            })
+            .collect();
     }
 
     pub fn directory_path(&self) -> &str {
@@ -101,7 +104,6 @@ pub struct FcsSampleStub {
     pub parameters: ParameterMap,
 
     pub filepath: PathBuf,
-
 }
 
 impl PartialEq for FcsSampleStub {
@@ -111,22 +113,19 @@ impl PartialEq for FcsSampleStub {
 }
 
 impl FcsSampleStub {
-
     pub fn new() -> Result<Self> {
         Ok(Self {
             header: Header::new(),
             metadata: Metadata::new(),
             parameters: ParameterMap::default(),
-            filepath: PathBuf::new()
+            filepath: PathBuf::new(),
         })
     }
 
-    
     pub fn open(path: &str) -> Result<Self> {
-
-
         // Attempt to open the file path
-        let file_access = flow_fcs::file::AccessWrapper::new(path).expect("Should be able make new access wrapper");
+        let file_access = flow_fcs::file::AccessWrapper::new(path)
+            .expect("Should be able make new access wrapper");
 
         // Validate the file extension
         Self::validate_fcs_extension(&file_access.path)
@@ -147,7 +146,7 @@ impl FcsSampleStub {
                 .expect("Should be able to generate parameter map"),
             header,
             metadata,
-            filepath: PathBuf::from(path)
+            filepath: PathBuf::from(path),
         };
 
         Ok(fcs)
@@ -234,8 +233,6 @@ impl FcsSampleStub {
 
         Err(anyhow!("Parameter not found: {parameter_name}"))
     }
-
-
 
     /// Creates a new `HashMap` of `Parameter`s
     /// using the `Fcs` file's metadata to find the channel and label names from the `PnN` and `PnS` keywords.
@@ -341,6 +338,4 @@ impl FcsSampleStub {
     pub fn get_number_of_parameters(&self) -> Result<&usize> {
         self.metadata.get_number_of_parameters()
     }
-
-    }
-
+}

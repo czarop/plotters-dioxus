@@ -29,8 +29,13 @@ impl PlotDrawable for GateDraft {
             GateDraft::Polygon { points, .. } => draw_draft_polygon(points),
         }
     }
-    
-    fn recalculate_gate_for_rescaled_axis(&mut self, param: std::sync::Arc<str>, old_transform: &flow_fcs::TransformType, new_transform: &flow_fcs::TransformType) {
+
+    fn recalculate_gate_for_rescaled_axis(
+        &mut self,
+        param: std::sync::Arc<str>,
+        old_transform: &flow_fcs::TransformType,
+        new_transform: &flow_fcs::TransformType,
+    ) {
         todo!()
     }
 }

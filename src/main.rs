@@ -2,9 +2,9 @@
 
 use clingate::plotters_dioxus::route::Route;
 use dioxus::{
-    desktop::{Config, LogicalSize, WindowBuilder}, prelude::*
+    desktop::{Config, LogicalSize, WindowBuilder},
+    prelude::*,
 };
-
 
 static NAV_STYLE: Asset = asset!("assets/navbar.css");
 static COMPONENTS_STYLE: Asset = asset!("assets/dx-components-theme.css");
@@ -32,4 +32,3 @@ fn main() {
         )
         .launch(App);
 }
-

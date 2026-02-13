@@ -222,11 +222,20 @@ impl<Lens> Store<GateState, Lens> {
     //     return Some(gate_list);
     // }
 
-    fn rescale_gates(&self, marker: &Arc<str>, old_axis_options: &AxisInfo, new_axis_options: &AxisInfo) {
-        for (_, gate) in self().gate_registry.iter_mut(){
+    fn rescale_gates(
+        &self,
+        marker: &Arc<str>,
+        old_axis_options: &AxisInfo,
+        new_axis_options: &AxisInfo,
+    ) {
+        for (_, gate) in self().gate_registry.iter_mut() {
             let (x_marker, y_marker) = &gate.parameters;
             if marker == x_marker || marker == y_marker {
-                gate.recalculate_gate_for_rescaled_axis(marker.clone(), &old_axis_options.transform, &new_axis_options.transform);
+                gate.recalculate_gate_for_rescaled_axis(
+                    marker.clone(),
+                    &old_axis_options.transform,
+                    &new_axis_options.transform,
+                );
             }
         }
     }
