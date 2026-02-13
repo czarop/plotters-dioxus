@@ -112,7 +112,7 @@ impl PlotMapper {
     }
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct Param {
     pub marker: Arc<str>,
     pub fluoro: Arc<str>,

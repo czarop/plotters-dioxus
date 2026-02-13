@@ -2,17 +2,18 @@ use dioxus::prelude::*;
 
 #[component]
 pub fn SearchableSelect<
-    T: Clone + PartialEq + std::fmt::Display + 'static + Into<F>,
-    F: Clone + PartialEq + std::fmt::Display + 'static,
+    T: Clone + PartialEq + std::fmt::Display + 'static
 >(
     items: ReadSignal<Vec<T>>,
-    selected_value: Signal<F>,
+    on_select: EventHandler<(usize, T)>,
     placeholder: Option<String>,
+    selected_index: Option<ReadSignal<usize>>,
+
 ) -> Element {
     // In your component
     let mut is_open = use_signal(|| false);
     let mut search = use_signal(|| String::new());
-    let mut local_selected_value: Signal<Option<T>> = use_signal(|| None);
+    let mut local_selected_value: Signal<Option<(usize, T)>> = use_signal(|| None);
 
     // Filter logic
     let filtered = use_memo(move || {
@@ -25,19 +26,32 @@ pub fn SearchableSelect<
             .collect::<Vec<T>>()
     });
 
-    let display_text = use_memo(move || {
-        local_selected_value
+    let mut display_text = use_signal(|| String::new());
+
+    use_effect(move || {
+        let text = local_selected_value
             .read()
             .as_ref()
-            .map(|v| v.to_string())
+            .map(|(_, v)| v.to_string())
             .or(placeholder.clone())
-            .unwrap_or_else(|| "Select an item...".to_string())
+            .unwrap_or_else(|| "Select an item...".to_string());
+        display_text.set(text);
     });
 
     use_effect(move || {
-        if let Some(val) = local_selected_value() {
-            selected_value.set(val.into());
+        if let Some((i, val)) = local_selected_value() {
+            on_select((i, val));
         };
+    });
+
+    use_effect(move || {
+        if let Some(sig) = selected_index {
+            let i = sig();
+            let items = &*items.peek();
+            if i < items.len(){
+                display_text.set(items[i].to_string())
+            }
+        }
     });
 
     rsx! {
@@ -91,7 +105,7 @@ pub fn SearchableSelect<
                                     class: "combobox-option", // Use the Display implementation
                                     onclick: move |_| {
                                         // Set the actual item, not the index
-                                        local_selected_value.set(Some(current_item.clone()));
+                                        local_selected_value.set(Some((i, current_item.clone())));
 
                                         // Reset search so the placeholder (selected value) shows again
                                         search.set(String::new());

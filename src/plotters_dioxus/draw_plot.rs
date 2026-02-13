@@ -13,7 +13,7 @@ use flow_plots::{
     BasePlotOptions, ColorMaps, DensityPlot, DensityPlotOptions, Plot, render::RenderConfig,
 };
 
-use crate::plotters_dioxus::{draw_gates::GateLayer, plot_helpers::PlotMapper};
+use crate::plotters_dioxus::{draw_gates::GateLayer, plot_helpers::{Param, PlotMapper}};
 
 pub type DioxusDrawingArea<'a> = DrawingArea<BitMapBackend<'a>, Shift>;
 
@@ -44,7 +44,7 @@ pub fn asinh_to_asinh(value: f32, old_cofactor: f32, new_cofactor: f32) -> anyho
 
 #[derive(Debug, Clone, PartialEq, Props)]
 pub struct AxisInfo {
-    pub title: Arc<str>,
+    pub param: Param,
     pub lower: f32,
     pub upper: f32,
     pub transform: flow_fcs::TransformType,
@@ -52,22 +52,22 @@ pub struct AxisInfo {
 
 impl Default for AxisInfo{
     fn default() -> Self {
-        Self { title: Default::default(), lower: 0_f32, upper: 4194304_f32, transform: flow_fcs::TransformType::Linear }
+        Self { param: Param{marker: Arc::from(""), fluoro: Arc::from("")}, lower: 0_f32, upper: 4194304_f32, transform: flow_fcs::TransformType::Linear }
     }
 }
 
 impl AxisInfo {
 
-    pub fn new_from_raw(title: Arc<str>, lower_raw: f32, upper_raw: f32, transform: TransformType) -> Self {
+    pub fn new_from_raw(param: Param, lower_raw: f32, upper_raw: f32, transform: TransformType) -> Self {
         match transform {
             TransformType::Linear => {
-                Self { title, lower: lower_raw, upper: upper_raw, transform }
+                Self { param, lower: lower_raw, upper: upper_raw, transform }
             },
             TransformType::Arcsinh { cofactor } => {
                 let lower = asinh_transform_f32(lower_raw, cofactor).unwrap_or(0f32);
                 let upper = asinh_transform_f32(upper_raw, cofactor).unwrap_or(INFINITY);
                 Self {
-                    title,
+                    param,
                     lower,
                     upper,
                     transform
@@ -87,12 +87,12 @@ impl AxisInfo {
             flow_fcs::TransformType::Arcsinh { cofactor: old_cofactor } => {
                 let lower = asinh_to_asinh(old_lower, old_cofactor, cofactor)?;
                 let upper = asinh_to_asinh(old_upper, old_cofactor, cofactor)?;
-                Self { title: self.title.clone(), lower, upper, transform  }
+                Self { param: self.param.clone(), lower, upper, transform  }
             },
             _ => {
                 let lower = asinh_transform_f32(old_lower, cofactor)?;
                 let upper = asinh_transform_f32(old_upper, cofactor)?;
-                Self{ title: self.title.clone(), lower, upper, transform }
+                Self{ param: self.param.clone(), lower, upper, transform }
             },
         };
         Ok(new_self)
@@ -110,10 +110,10 @@ impl AxisInfo {
                 let old_cofactor = old_cofactor;
                 let upper_untransformed = asinh_reverse_f32(old_upper, old_cofactor)?;
                 let lower_untransformed = asinh_reverse_f32(old_lower, old_cofactor)?;
-                Self { title: self.title.clone(), lower: lower_untransformed, upper: upper_untransformed, transform  }
+                Self { param: self.param.clone(), lower: lower_untransformed, upper: upper_untransformed, transform  }
             },
             TransformType::Biexponential { .. } => {
-                Self{ title: self.title.clone(), lower: old_lower, upper: old_upper, transform }
+                Self{ param: self.param.clone(), lower: old_lower, upper: old_upper, transform }
             },
         };
         Ok(new_self)
@@ -139,10 +139,10 @@ impl AxisInfo {
 
     pub fn into_new_lower(self, lower_raw: f32) -> Self {
         match self.transform {
-            TransformType::Linear => Self { title: self.title, lower: lower_raw, upper: self.upper, transform: self.transform },
+            TransformType::Linear => Self { param: self.param, lower: lower_raw, upper: self.upper, transform: self.transform },
             TransformType::Arcsinh { cofactor } => {
                 let new_lower = asinh_transform_f32(lower_raw, cofactor).unwrap_or(self.lower);
-                Self {title: self.title, lower: new_lower, upper: self.upper, transform: self.transform}
+                Self {param: self.param, lower: new_lower, upper: self.upper, transform: self.transform}
             },
             TransformType::Biexponential { top_of_scale, positive_decades, negative_decades, width } => todo!(),
         }
@@ -150,10 +150,10 @@ impl AxisInfo {
 
     pub fn into_new_upper(self, upper_raw: f32) -> Self {
         match self.transform {
-            TransformType::Linear => Self { title: self.title, lower: self.lower, upper: upper_raw, transform: self.transform },
+            TransformType::Linear => Self { param: self.param, lower: self.lower, upper: upper_raw, transform: self.transform },
             TransformType::Arcsinh { cofactor } => {
                 let new_upper = asinh_transform_f32(upper_raw, cofactor).unwrap_or(self.upper);
-                Self {title: self.title, lower: self.lower, upper: new_upper, transform: self.transform}
+                Self {param: self.param, lower: self.lower, upper: new_upper, transform: self.transform}
             },
             TransformType::Biexponential { top_of_scale, positive_decades, negative_decades, width } => todo!(),
         }
@@ -187,13 +187,13 @@ pub fn PseudoColourPlot(
         let x_axis_options = flow_plots::AxisOptions::new()
             .range(x_axis_info.lower..=x_axis_info.upper)
             .transform(x_axis_info.transform.clone())
-            .label(&x_axis_info.title.to_string())
+            .label(&x_axis_info.param.to_string())
             .build()
             .expect("axis options failed");
         let y_axis_options = flow_plots::AxisOptions::new()
             .range(y_axis_info.lower..=y_axis_info.upper)
             .transform(y_axis_info.transform.clone())
-            .label(y_axis_info.title.to_string())
+            .label(y_axis_info.param.to_string())
             .build()
             .expect("axis options failed");
         let mapper = PlotMapper::new(
@@ -234,8 +234,8 @@ pub fn PseudoColourPlot(
             }
             GateLayer {
                 plot_map,
-                x_channel: x_axis_info().title.clone(),
-                y_channel: y_axis_info().title.clone(),
+                x_channel: x_axis_info().param.fluoro.clone(),
+                y_channel: y_axis_info().param.fluoro.clone(),
             
             }
         }

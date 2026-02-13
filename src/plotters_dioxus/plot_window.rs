@@ -53,12 +53,6 @@ static CSS_STYLE: Asset = asset!("assets/plot_window.css");
 pub fn PlotWindow() -> Element {
 
     let mut filehandler: Signal<Option<FcsFiles>> = use_signal(|| None);
-    let file_list = use_memo(move || {
-        match &*filehandler.read() {
-            Some(fh) => fh.get_file_names(),
-            None => vec![],
-        }
-    });
     let mut message = use_signal(|| None::<String>);
     let gate_store = use_store(|| GateState::default());
     use_context_provider(|| gate_store);
@@ -154,21 +148,21 @@ pub fn PlotWindow() -> Element {
                         } else {
                             lower = -10000_f32
                         }
-                        AxisInfo::new_from_raw(param.fluoro.clone(), lower, 4194304_f32, transform)
+                        AxisInfo::new_from_raw(param.clone(), lower, 4194304_f32, transform)
 
                     });
             }
         }
     });
 
-    let x_axis_marker: Signal<Param> = use_signal(|| {
+    let mut x_axis_marker: Signal<Param> = use_signal(|| {
         let p: Arc<str> = Arc::from("FSC-A");
         Param {
             marker: p.clone(),
             fluoro: p,
         }
     });
-    let y_axis_marker = use_signal(|| {
+    let mut y_axis_marker = use_signal(|| {
         let p: Arc<str> = Arc::from("SSC-A");
         Param {
             marker: p.clone(),
@@ -194,6 +188,7 @@ pub fn PlotWindow() -> Element {
     use_effect(move || {
         let param = x_axis_marker.read().clone();
         if let Some(axis_settings) = parameter_settings().get(&param.fluoro){
+            println!("x");
             let(l, u) = axis_settings.get_untransformed_bounds();
             x_lower.set(l.round() as i32);
             x_upper.set(u.round() as i32);
@@ -214,13 +209,13 @@ pub fn PlotWindow() -> Element {
 
     use_effect(move || {
         let param = y_axis_marker.read().clone();
-        let settings = &*parameter_settings.peek();
-        if let Some(axis_settings) = settings.get(&param.fluoro){
+        if let Some(axis_settings) = parameter_settings().get(&param.fluoro){
+            println!("y");
             let(l, u) = axis_settings.get_untransformed_bounds();
             y_lower.set(l.round() as i32);
             y_upper.set(u.round() as i32);
             match axis_settings.transform {
-                TransformType::Arcsinh { cofactor } => x_cofactor.set(cofactor.round() as i32),
+                TransformType::Arcsinh { cofactor } => y_cofactor.set(cofactor.round() as i32),
                 _ => y_cofactor.set(0),
             }
         }
@@ -265,7 +260,8 @@ pub fn PlotWindow() -> Element {
                 div { class: "grid-label", "X-Axis" }
                 SearchableSelect {
                     items: sorted_params(),
-                    selected_value: x_axis_marker,
+                    // selected_value: x_axis_marker,
+                    on_select: move |(_, v)| { x_axis_marker.set(v) },
                     placeholder: x_axis_marker.peek().to_string(),
                 }
 
@@ -349,7 +345,7 @@ pub fn PlotWindow() -> Element {
                 div { class: "grid-label", "Y-Axis" }
                 SearchableSelect {
                     items: sorted_params(),
-                    selected_value: y_axis_marker,
+                    on_select: move |(_, v)| { y_axis_marker.set(v) },
                     placeholder: y_axis_marker.peek().to_string(),
                 }
 
@@ -431,15 +427,27 @@ pub fn PlotWindow() -> Element {
                 }
             }
             div { class: "file-info",
-                button {
-                    onclick: move |_| {
-                        if let Some(fcsfiles) = &*filehandler.read() {
-                            let next_index = (*sample_index.read() + 1) % fcsfiles.sample_count();
-                            sample_index.set(next_index);
-                        }
+                div { class: "file-info_button-panel",
+                    button {
+                        onclick: move |_| {
+                            if let Some(fcsfiles) = &*filehandler.read() {
+                                let next_index = (*sample_index.read() - 1) % fcsfiles.sample_count();
+                                sample_index.set(next_index);
+                            }
 
-                    },
-                    "Next FCS File"
+                        },
+                        "Prev"
+                    }
+                    button {
+                        onclick: move |_| {
+                            if let Some(fcsfiles) = &*filehandler.read() {
+                                let next_index = (*sample_index.read() + 1) % fcsfiles.sample_count();
+                                sample_index.set(next_index);
+                            }
+
+                        },
+                        "Next"
+                    }
                 }
                 match &*filehandler.read() {
                     Some(fh) => {
@@ -447,26 +455,15 @@ pub fn PlotWindow() -> Element {
                         rsx! {
                             SearchableSelect {
                                 items: list,
-                                selected_value: x_axis_marker,
+                                on_select: move |(i, _)| { sample_index.set(i) },
                                 placeholder: "Select a file".to_string(),
+                                selected_index: Some(sample_index.into()),
                             }
                         }
                     }
                     None => rsx! {},
                 }
-                SearchableSelect {
-                    items: sorted_params(),
-                    selected_value: x_axis_marker,
-                    placeholder: x_axis_marker.peek().to_string(),
-                }
-                p {
-                    match current_sample() {
-                        Some(sample) => {
-                            format!("Current File: {}", sample.get_fil_keyword().unwrap_or_default())
-                        }
-                        None => "No Files".to_string(),
-                    }
-                }
+            
             }
         }
         div { class: "status-message",
