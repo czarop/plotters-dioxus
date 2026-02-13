@@ -13,7 +13,7 @@ use std::sync::Arc;
 use tokio::task;
 
 async fn get_flow_data(path: std::path::PathBuf) -> Result<Arc<Fcs>, Arc<anyhow::Error>> {
-    println!("Loading FCS file: {:?}", path);
+    // println!("Loading FCS file: {:?}", path);
     task::spawn_blocking(move || {
         let fcs_file = Fcs::open(path.to_str().unwrap_or_default())?;
         Ok(Arc::new(fcs_file))
@@ -128,33 +128,6 @@ pub fn PlotWindow() -> Element {
             Vec::new()
         }
     });
-
-    // use_effect(move || {
-    //     let sorted_params = &*sorted_params.read();
-    //     if let Some(Ok(fcs_file)) = &*fcs_file_resource.peek() {
-    //         for param in sorted_params.iter() {
-    //             parameter_settings
-    //                 .write()
-    //                 .entry(param.fluoro.clone())
-    //                 .or_insert_with(|| {
-    //                     let transform = match fcs_file.parameters.get(&param.fluoro) {
-    //                         Some(t) => match t.is_fluorescence() {
-    //                             false => TransformType::Linear,
-    //                             true => TransformType::Arcsinh { cofactor: 6000f32 },
-    //                         },
-    //                         None => TransformType::Linear,
-    //                     };
-    //                     let lower;
-    //                     if transform == TransformType::Linear {
-    //                         lower = 0f32;
-    //                     } else {
-    //                         lower = -10000_f32
-    //                     }
-    //                     AxisInfo::new_from_raw(param.clone(), lower, 4194304_f32, transform)
-    //                 });
-    //         }
-    //     }
-    // });
 
     let mut x_axis_marker: Signal<Param> = use_signal(|| {
         let p: Arc<str> = Arc::from("FSC-A");
