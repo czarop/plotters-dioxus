@@ -65,5 +65,5 @@ pub trait PlotDrawable {
         param: std::sync::Arc<str>,
         old_transform: &flow_fcs::TransformType,
         new_transform: &flow_fcs::TransformType,
-    );
+    ) -> anyhow::Result<()>;
 }

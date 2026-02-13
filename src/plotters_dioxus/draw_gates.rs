@@ -399,7 +399,7 @@ fn RenderShape(
             GateShape::PolyLine {
                 points,
                 style,
-                shape_type,
+                shape_type:_,
             } => {
                 let mapped = points
                     .iter()
@@ -467,7 +467,7 @@ fn RenderShape(
             GateShape::Polygon {
                 points,
                 style,
-                shape_type,
+                shape_type:_,
             } => {
                 let mapped_points = points
                     .iter()
