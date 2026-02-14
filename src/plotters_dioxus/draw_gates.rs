@@ -1,8 +1,8 @@
 use crate::{
-    gate_store::{GateState, GateStateImplExt, GateStateStoreExt as _},
     plotters_dioxus::{
         PlotDrawable,
         gates::{
+            GateState, gate_store::GateStateImplExt, gate_store::GateStateStoreExt as _,
             gate_draft::GateDraft,
             gate_drag::{GateDragData, GateDragType, PointDragData},
             gate_final::GateFinal,

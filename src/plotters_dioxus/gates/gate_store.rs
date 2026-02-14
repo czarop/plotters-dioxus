@@ -227,16 +227,27 @@ impl<Lens> Store<GateState, Lens> {
         marker: &Arc<str>,
         old_axis_options: &AxisInfo,
         new_axis_options: &AxisInfo,
-    ) {
+    ) -> Result<(), Vec<String>> {
+        let mut errors = vec![];
         for (_, gate) in self().gate_registry.iter_mut() {
             let (x_marker, y_marker) = &gate.parameters;
             if marker == x_marker || marker == y_marker {
-                gate.recalculate_gate_for_rescaled_axis(
+                println!("rescaling gate");
+                let res = gate.recalculate_gate_for_rescaled_axis(
                     marker.clone(),
                     &old_axis_options.transform,
                     &new_axis_options.transform,
                 );
+
+                let _ = res.inspect_err(|e| {
+                    errors.push(e.to_string());
+                });
             }
+        }
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
         }
     }
 }

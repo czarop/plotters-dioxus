@@ -3,9 +3,9 @@ use flow_fcs::TransformType;
 use flow_gates::transforms::{
     get_plotting_area, pixel_to_raw, pixel_to_raw_y, raw_to_pixel, raw_to_pixel_y,
 };
-use std::{collections::HashMap, ops::RangeInclusive, sync::Arc};
+use std::{collections::{HashMap, hash_map::Entry}, ops::RangeInclusive, sync::Arc};
 
-use crate::{gate_store::Id, plotters_dioxus::AxisInfo};
+use crate::{plotters_dioxus::{AxisInfo, gates::Id}};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct PlotMapper {
@@ -175,14 +175,25 @@ impl<Lens> Store<ParameterStore, Lens> {
     });
 }
 
-    fn update_cofactor(&mut self, id: &Id, cofactor: f32) {
-        self.settings().write().entry(id.clone()).and_modify(|axis| {
+    fn update_cofactor(&mut self, id: &Id, cofactor: f32) -> Option<(AxisInfo, AxisInfo)> {
+        let mut old = None;
+        let mut new = None;
+        self.settings().write().entry(id.clone()).and_modify( |axis| {
             if let TransformType::Arcsinh { .. } = axis.transform {
                 let old_axis = std::mem::take(axis);
-                let new_axis = old_axis.into_archsinh(cofactor).unwrap_or(old_axis);
+                let new_axis = (&old_axis).into_archsinh(cofactor).unwrap_or(old_axis.clone());
+                new = Some(new_axis.clone());
+                old = Some(old_axis);
                 *axis = new_axis;
             }
         });
+        
+
+        if new.is_some() && old.is_some() {
+            return Some((old.unwrap(), new.unwrap()))
+        }
+
+        None
     }
 
     fn update_lower(&mut self, id: &Id, lower: f32) {

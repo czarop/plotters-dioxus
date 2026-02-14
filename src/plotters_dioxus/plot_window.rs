@@ -2,8 +2,8 @@ use dioxus::prelude::*;
 
 use crate::{
     file_load::FcsFiles,
-    gate_store::{GateState},
-    plotters_dioxus::{AxisInfo, PseudoColourPlot, plot_helpers::{Param, ParameterStore, ParameterStoreImplExt, ParameterStoreStoreExt as _}},
+    
+    plotters_dioxus::{AxisInfo, PseudoColourPlot, gates::{GateState, gate_store::GateStateImplExt}, plot_helpers::{Param, ParameterStore, ParameterStoreImplExt, ParameterStoreStoreExt as _}},
     searchable_select::SearchableSelect,
 };
 use flow_fcs::{Fcs, TransformType, Transformable};
@@ -217,7 +217,14 @@ pub fn PlotWindow() -> Element {
                                 if val >= 1 {
                                     message.set(None);
                                     let param = x_axis_marker.peek();
-                                    parameter_settings.update_cofactor(&param.fluoro, val as f32);
+                                    let res = parameter_settings.update_cofactor(&param.fluoro, val as f32);
+                                    match res {
+                                        Some((old, new)) => {
+                                            gate_store.rescale_gates(&param.fluoro, &old, &new);
+                                        }
+                                        None => {}
+                                    }
+
                                 } else {
                                     message
                                         .set(

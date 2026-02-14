@@ -1,4 +1,4 @@
-use crate::gate_store::Id;
+use crate::plotters_dioxus::gates::gate_store::Id;
 
 #[derive(PartialEq, Clone)]
 pub enum ShapeType {

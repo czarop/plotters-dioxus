@@ -16,7 +16,7 @@ use crate::plotters_dioxus::{
 
 #[derive(PartialEq, Clone)]
 pub struct GateFinal {
-    inner: Arc<flow_gates::Gate>,
+    inner: flow_gates::Gate,
     selected: bool,
     drag_self: Option<GateDragData>,
     drag_point: Option<PointDragData>,
@@ -25,7 +25,7 @@ pub struct GateFinal {
 impl GateFinal {
     pub fn new(gate: flow_gates::Gate, selected: bool) -> Self {
         GateFinal {
-            inner: Arc::new(gate),
+            inner: gate,
             selected,
             drag_point: None,
             drag_self: None,
@@ -171,7 +171,7 @@ impl PlotDrawable for GateFinal {
 
         for p in points.iter_mut() {
             let val = if is_x { &mut p.0 } else { &mut p.1 };
-
+            println!("changing point {val}");
             let raw = match old_transform {
                 TransformType::Arcsinh { cofactor } => asinh_reverse_f32(*val, *cofactor).unwrap_or(*val),
                 TransformType::Linear => *val,
@@ -183,16 +183,17 @@ impl PlotDrawable for GateFinal {
                 TransformType::Linear => raw,
                 _ => raw,
             };
+            println!("changing point {val}");
         }
 
-        let mut gate = (*self.inner).clone();
+        let mut gate = (self.inner).clone();
         gate.geometry = match &gate.geometry {
             GateGeometry::Polygon { .. } => geometry::create_polygon_geometry(points, gate.x_parameter_channel_name(), gate.y_parameter_channel_name())?,
             GateGeometry::Rectangle { .. } => geometry::create_rectangle_geometry(points, gate.x_parameter_channel_name(), gate.y_parameter_channel_name())?,
             GateGeometry::Ellipse { .. } => geometry::create_ellipse_geometry(points, gate.x_parameter_channel_name(), gate.y_parameter_channel_name())?,
             GateGeometry::Boolean { .. } => todo!(),
         };
-        self.inner = Arc::new(gate);
+        self.inner = gate;
         
         
 
