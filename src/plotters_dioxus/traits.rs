@@ -59,11 +59,4 @@ pub trait PlotDrawable {
             return Some(closest);
         }
     }
-
-    fn recalculate_gate_for_rescaled_axis(
-        &mut self,
-        param: std::sync::Arc<str>,
-        old_transform: &flow_fcs::TransformType,
-        new_transform: &flow_fcs::TransformType,
-    ) -> anyhow::Result<()>;
 }

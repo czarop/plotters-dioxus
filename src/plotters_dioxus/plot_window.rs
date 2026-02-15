@@ -49,7 +49,7 @@ static CSS_STYLE: Asset = asset!("assets/plot_window.css");
 pub fn PlotWindow() -> Element {
     let mut filehandler: Signal<Option<FcsFiles>> = use_signal(|| None);
     let mut message = use_signal(|| None::<String>);
-    let gate_store = use_store(|| GateState::default());
+    let mut gate_store = use_store(|| GateState::default());
     use_context_provider(|| gate_store);
 
     let _ = use_resource(move || async move {
@@ -215,12 +215,16 @@ pub fn PlotWindow() -> Element {
                         oninput: move |evt| {
                             if let Ok(val) = evt.value().parse::<i32>() {
                                 if val >= 1 {
-                                    message.set(None);
                                     let param = x_axis_marker.peek();
                                     let res = parameter_settings.update_cofactor(&param.fluoro, val as f32);
                                     match res {
                                         Some((old, new)) => {
-                                            gate_store.rescale_gates(&param.fluoro, &old, &new);
+                                            match gate_store.rescale_gates(&param.fluoro, &old, &new) {
+                                                Ok(_) => message.set(None),
+                                                Err(e) => {
+                                                    message.set(Some(e.join("\n")));
+                                                }
+                                            };
                                         }
                                         None => {}
                                     }
@@ -282,7 +286,18 @@ pub fn PlotWindow() -> Element {
                                 if val >= 1 {
                                     message.set(None);
                                     let param = y_axis_marker.peek();
-                                    parameter_settings.update_cofactor(&param.fluoro, val as f32);
+                                    let res = parameter_settings.update_cofactor(&param.fluoro, val as f32);
+                                    match res {
+                                        Some((old, new)) => {
+                                            match gate_store.rescale_gates(&param.fluoro, &old, &new) {
+                                                Ok(_) => message.set(None),
+                                                Err(e) => {
+                                                    message.set(Some(e.join("\n")));
+                                                }
+                                            };
+                                        }
+                                        None => {}
+                                    }
                                 } else {
                                     message
                                         .set(

@@ -55,6 +55,49 @@ impl GateFinal {
     pub fn set_drag_point(&mut self, drag_data: Option<PointDragData>) {
         self.drag_point = drag_data;
     }
+
+    pub fn recalculate_gate_for_rescaled_axis(
+        &mut self,
+        param: std::sync::Arc<str>,
+        old_transform: &TransformType,
+        new_transform: &TransformType,
+    ) -> anyhow::Result<()> {
+        
+        let is_x = self.x_parameter_channel_name() == &*param;
+        let is_y = self.y_parameter_channel_name() == &*param;
+        
+        if !is_x && !is_y {
+            return Err(anyhow!("Param does not match gate {}!", &self.name));
+        }
+
+        let mut points = self.get_points();
+
+        for p in points.iter_mut() {
+            let val = if is_x { &mut p.0 } else { &mut p.1 };
+            let raw = match old_transform {
+                TransformType::Arcsinh { cofactor } => asinh_reverse_f32(*val, *cofactor).unwrap_or(*val),
+                TransformType::Linear => *val,
+                _ => *val,
+            };
+
+            *val = match new_transform {
+                TransformType::Arcsinh { cofactor } => asinh_transform_f32(raw, *cofactor).unwrap_or(raw),
+                TransformType::Linear => raw,
+                _ => raw,
+            };
+        }
+
+        let mut gate = (self.inner).clone();
+        gate.geometry = match &gate.geometry {
+            GateGeometry::Polygon { .. } => geometry::create_polygon_geometry(points, gate.x_parameter_channel_name(), gate.y_parameter_channel_name())?,
+            GateGeometry::Rectangle { .. } => geometry::create_rectangle_geometry(points, gate.x_parameter_channel_name(), gate.y_parameter_channel_name())?,
+            GateGeometry::Ellipse { .. } => geometry::create_ellipse_geometry(points, gate.x_parameter_channel_name(), gate.y_parameter_channel_name())?,
+            GateGeometry::Boolean { .. } => todo!(),
+        };
+        self.inner = gate;
+        
+        Ok(())
+    }
 }
 
 impl Deref for GateFinal {
@@ -122,83 +165,7 @@ impl PlotDrawable for GateFinal {
         items_to_render
     }
 
-    fn recalculate_gate_for_rescaled_axis(
-        &mut self,
-        param: std::sync::Arc<str>,
-        old_transform: &TransformType,
-        new_transform: &TransformType,
-    ) -> anyhow::Result<()> {
-        // let coord: usize = if self.x_parameter_channel_name() == &*param {
-        //     0
-        // } else if self.y_parameter_channel_name() == &*param {
-        //         1
-        // } else {
-        //     return Err(anyhow!(
-        //         "Param does not match gate!".to_string()
-        //     ))
-        // };
-        // let mut points = self.get_points();
-        
-        // let (is_new_asinh, new_cofactor) = if let TransformType::Arcsinh { cofactor } = new_transform {
-        //     (true, *cofactor)
-        // } else {
-        //     (false, 0_f32)
-        // };
-
-        // if let TransformType::Arcsinh { cofactor } = old_transform {
-        //     for p in points.iter_mut() {
-        //         let point_to_change = if coord == 0 { &mut p.0 } else { &mut p.1 };
-        //         *point_to_change = asinh_reverse_f32(*point_to_change, *cofactor).expect("");
-        //         if is_new_asinh {
-        //             *point_to_change = asinh_transform_f32(*point_to_change, new_cofactor).expect("");
-        //         }
-        //     }
-        // } else if let TransformType::Linear = old_transform {
-        //     for p in points.iter_mut() {
-        //         let point_to_change = if coord == 0 { &mut p.0 } else { &mut p.1 };
-        //         *point_to_change = asinh_transform_f32(*point_to_change, new_cofactor).expect("");
-        //     }
-        // }
-
-        let is_x = self.x_parameter_channel_name() == &*param;
-        let is_y = self.y_parameter_channel_name() == &*param;
-        
-        if !is_x && !is_y {
-            return Err(anyhow!("Param does not match gate!"));
-        }
-
-        let mut points = self.get_points();
-
-        for p in points.iter_mut() {
-            let val = if is_x { &mut p.0 } else { &mut p.1 };
-            println!("changing point {val}");
-            let raw = match old_transform {
-                TransformType::Arcsinh { cofactor } => asinh_reverse_f32(*val, *cofactor).unwrap_or(*val),
-                TransformType::Linear => *val,
-                _ => *val,
-            };
-
-            *val = match new_transform {
-                TransformType::Arcsinh { cofactor } => asinh_transform_f32(raw, *cofactor).unwrap_or(raw),
-                TransformType::Linear => raw,
-                _ => raw,
-            };
-            println!("changing point {val}");
-        }
-
-        let mut gate = (self.inner).clone();
-        gate.geometry = match &gate.geometry {
-            GateGeometry::Polygon { .. } => geometry::create_polygon_geometry(points, gate.x_parameter_channel_name(), gate.y_parameter_channel_name())?,
-            GateGeometry::Rectangle { .. } => geometry::create_rectangle_geometry(points, gate.x_parameter_channel_name(), gate.y_parameter_channel_name())?,
-            GateGeometry::Ellipse { .. } => geometry::create_ellipse_geometry(points, gate.x_parameter_channel_name(), gate.y_parameter_channel_name())?,
-            GateGeometry::Boolean { .. } => todo!(),
-        };
-        self.inner = gate;
-        
-        
-
-        Ok(())
-    }
+    
 }
 
 fn draw_circles_for_selected_polygon(points: &[(f32, f32)]) -> Vec<GateShape> {

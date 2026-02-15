@@ -1,4 +1,4 @@
-rescale gates
+gates do no accept click on last segmaent - as allowing polygon to draw this
 
 gating hierarchy
 Gating hierarchy panel
