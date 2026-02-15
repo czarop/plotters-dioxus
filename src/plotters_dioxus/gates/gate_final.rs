@@ -128,11 +128,17 @@ impl PlotDrawable for GateFinal {
         };
         let main_points = self.get_points();
         let main_gate = match &self.inner.geometry {
-            flow_gates::GateGeometry::Polygon {
-                nodes: _,
-                closed: _,
+            GateGeometry::Polygon {
+                ..
             } => draw_polygon(
                 &main_points,
+                gate_line_style,
+                ShapeType::Gate(self.id.clone()),
+            ),
+            GateGeometry::Ellipse { .. } => draw_elipse(
+                &main_points[0],
+                &main_points[1].0,
+                &main_points[1].1,
                 gate_line_style,
                 ShapeType::Gate(self.id.clone()),
             ),
@@ -166,6 +172,11 @@ impl PlotDrawable for GateFinal {
 
     
 }
+
+fn draw_elipse(center: (f32, f32), rx: f32, ry: f32, style: &'static DrawingStyle,
+    shape_type: ShapeType,) -> Vec<GateShape> {
+        vec![GateShape::Ellipse { center, radius_x: rx, radius_y: ry, style, shape_type }]
+    }
 
 fn draw_circles_for_selected_polygon(points: &[(f32, f32)]) -> Vec<GateShape> {
     points

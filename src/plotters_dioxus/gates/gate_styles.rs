@@ -27,6 +27,13 @@ pub enum GateShape {
         style: &'static DrawingStyle,
         shape_type: ShapeType,
     },
+    Ellipse {
+        center: (f32, f32),
+        radius_x: f32,
+        radius_y: f32,
+        style: &'static DrawingStyle,
+        shape_type: ShapeType,
+    }
 }
 
 impl GateShape {
@@ -61,6 +68,8 @@ impl GateShape {
                 style: style,
                 shape_type: shape_type.clone(),
             },
+            GateShape::Ellipse { center, radius_x, radius_y, style:_, shape_type:_ } => GateShape::Ellipse 
+            { center: *center, radius_x: *radius_x, radius_y: *radius_y, style: style, shape_type: shape_type.clone() }
         }
     }
 
@@ -103,6 +112,19 @@ impl GateShape {
                     .collect();
                 Self::Polygon {
                     points: p,
+                    style: style,
+                    shape_type: shape_type.clone(),
+                }
+            },
+            GateShape::Ellipse {
+                center, radius_x, radius_y, style, shape_type,
+            } => {
+                let c = (center.0 - offset.0, center.1 - offset.1);
+
+                Self::Ellipse {
+                    center: c,
+                    radius_x: *radius_x,
+                    radius_y: *radius_y,
                     style: style,
                     shape_type: shape_type.clone(),
                 }

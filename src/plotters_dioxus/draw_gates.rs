@@ -491,6 +491,32 @@ fn RenderShape(
 
                 }
             }
+            GateShape::Ellipse {
+                center,
+                radius_x,
+                radius_y,
+                style,
+                shape_type:_,
+            } => {
+                let mapped_points = mapper.data_to_pixel(center.0, center.1, None, None);
+
+                rsx! {
+                    g { transform,
+                        ellipse {
+                            key: "{gate_id}-{gate_index}-{shape_index}",
+                            cx: mapped_points.0,
+                            cy: mapped_points.1,
+                            rx: radius_x,
+                            ry: radius_y,
+                            stroke: style.stroke,
+                            stroke_width: style.stroke_width,
+                            stroke_dasharray: if style.dashed { "4" } else { "none" },
+                            fill: style.fill,
+                        }
+                    }
+
+                }
+            }
         }
     } else {
         rsx! {}
