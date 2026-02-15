@@ -1,14 +1,14 @@
-use std::{ops::Deref, sync::Arc};
+use std::{ops::Deref};
 
 use anyhow::anyhow;
 use flow_fcs::TransformType;
-use flow_gates::{Gate, GateGeometry, geometry};
+use flow_gates::{GateGeometry, geometry};
 
 use crate::plotters_dioxus::{
     PlotDrawable, axis_info::{asinh_reverse_f32, asinh_transform_f32}, gates::{
         gate_drag::{GateDragData, PointDragData},
         gate_styles::{
-            DEFAULT_LINE, DRAGGED_GATE, DRAGGED_LINE, DrawingStyle, GateShape, SELECTED_LINE,
+            DEFAULT_LINE, DRAGGED_LINE, DrawingStyle, GateShape, SELECTED_LINE,
             ShapeType,
         },
     }
@@ -121,7 +121,6 @@ impl PlotDrawable for GateFinal {
     }
 
     fn draw_self(&self) -> Vec<GateShape> {
-        println!("{} redraw requested", self.id);
         let gate_line_style = if self.is_selected() {
             &SELECTED_LINE
         } else {

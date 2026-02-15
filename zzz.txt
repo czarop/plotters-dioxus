@@ -1,5 +1,3 @@
-gates do no accept click on last segmaent - as allowing polygon to draw this
-
 gating hierarchy
 Gating hierarchy panel
 Select gated events
@@ -8,6 +6,7 @@ Elipse gates
 Rectangle gates
 Line gates
 Quadrant gates
+Not gates
 
 Histogram
 
