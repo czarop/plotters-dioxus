@@ -13,7 +13,7 @@ use crate::{
 };
 use dioxus::prelude::*;
 use flow_gates::Gate;
-use std::sync::Arc;
+use std::{f32::consts::PI, sync::Arc};
 
 #[component]
 pub fn GateLayer(
@@ -499,7 +499,6 @@ fn RenderShape(
                 shape_type:_,
             } => {
                 let mapped_points = mapper.data_to_pixel(center.0, center.1, None, None);
-
                 rsx! {
                     g { transform,
                         ellipse {

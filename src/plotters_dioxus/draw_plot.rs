@@ -21,7 +21,7 @@ pub type DioxusDrawingArea<'a> = DrawingArea<BitMapBackend<'a>, Shift>;
 
 #[component]
 pub fn PseudoColourPlot(
-    data: ReadSignal<Arc<Vec<(f32, f32)>>>,
+    data: ReadSignal<Vec<(f32, f32)>>,
     size: ReadSignal<(u32, u32)>,
     x_axis_info: ReadSignal<AxisInfo>,
     y_axis_info: ReadSignal<AxisInfo>,

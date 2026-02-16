@@ -20,6 +20,7 @@ pub struct GateFinal {
     selected: bool,
     drag_self: Option<GateDragData>,
     drag_point: Option<PointDragData>,
+    rotation: f32
 }
 
 impl GateFinal {
@@ -29,6 +30,7 @@ impl GateFinal {
             selected,
             drag_point: None,
             drag_self: None,
+            rotation: 0f32,
         }
     }
 
@@ -98,6 +100,60 @@ impl GateFinal {
         
         Ok(())
     }
+
+    fn to_render_points(&self, x_param: &str, y_param: &str) -> Vec<(f32, f32)> {
+        match &self.inner.geometry {
+            GateGeometry::Polygon { nodes, .. } => nodes
+                .iter()
+                .filter_map(|n| Some((n.get_coordinate(x_param)?, n.get_coordinate(y_param)?)))
+                .collect(),
+            GateGeometry::Rectangle { min, max } => {
+                if let (Some(x1), Some(y1), Some(x2), Some(y2)) = (
+                    min.get_coordinate(x_param),
+                    min.get_coordinate(y_param),
+                    max.get_coordinate(x_param),
+                    max.get_coordinate(y_param),
+                ) {
+                    // Create the 4 corners of the rectangle in sequence
+                    vec![(x1, y1), (x2, y1), (x2, y2), (x1, y2)]
+                } else {
+                    vec![]
+                }
+            }
+            GateGeometry::Ellipse {
+                center,
+                radius_x,
+                radius_y,
+                angle,
+            } => {
+                if let (Some(cx), Some(cy)) = (
+                    center.get_coordinate(x_param),
+                    center.get_coordinate(y_param),
+                ) {
+                    let points_count = 64; // Smoothness of the ellipse
+                    (0..points_count)
+                        .map(|i| {
+                            let theta =
+                                2.0 * std::f32::consts::PI * (i as f32 / points_count as f32);
+
+                            // 1. Calculate point on an unrotated ellipse
+                            let dx = radius_x * theta.cos();
+                            let dy = radius_y * theta.sin();
+
+                            // 2. Apply rotation (2D rotation matrix)
+                            let rx = dx * angle.cos() - dy * angle.sin();
+                            let ry = dx * angle.sin() + dy * angle.cos();
+
+                            (cx + rx, cy + ry)
+                        })
+                        .collect()
+                } else {
+                    vec![]
+                }
+            }
+            GateGeometry::Boolean { .. } => vec![], // Boolean gates usually don't have a single outline
+        }
+    }
 }
 
 impl Deref for GateFinal {
@@ -110,7 +166,7 @@ impl Deref for GateFinal {
 
 impl PlotDrawable for GateFinal {
     fn get_points(&self) -> Vec<(f32, f32)> {
-        self.inner.geometry.to_render_points(
+        self.to_render_points(
             self.x_parameter_channel_name(),
             self.y_parameter_channel_name(),
         )
@@ -135,13 +191,17 @@ impl PlotDrawable for GateFinal {
                 gate_line_style,
                 ShapeType::Gate(self.id.clone()),
             ),
-            GateGeometry::Ellipse { .. } => draw_elipse(
-                &main_points[0],
-                &main_points[1].0,
-                &main_points[1].1,
+            GateGeometry::Ellipse { center, radius_x, radius_y, angle:_} => 
+            {
+                let x = center.get_coordinate(self.x_parameter_channel_name()).unwrap_or_default();
+                let y = center.get_coordinate(self.y_parameter_channel_name()).unwrap_or_default();
+            draw_elipse(
+                (x, y),
+                *radius_x,
+                *radius_y,
                 gate_line_style,
                 ShapeType::Gate(self.id.clone()),
-            ),
+            )},
             _ => todo!(),
         };
         let selected_points = {

@@ -28,17 +28,17 @@ async fn get_scaled_data_to_display(
     col2_name: &str,
     transform_1: TransformType,
     transform_2: TransformType,
-) -> Result<Arc<Vec<(f32, f32)>>, anyhow::Error> {
+) -> Result<Vec<(f32, f32)>, anyhow::Error> {
     let fs_clone = fs.clone();
     let col1_name = col1_name.to_string();
     let col2_name = col2_name.to_string();
-    task::spawn_blocking(move || -> Result<Arc<Vec<(f32, f32)>>, anyhow::Error> {
+    task::spawn_blocking(move || -> Result<Vec<(f32, f32)>, anyhow::Error> {
         let cols = fs_clone.get_xy_pairs(&col1_name, &col2_name)?;
         let zipped_cols = cols
             .into_iter()
             .map(|(x, y)| (transform_1.transform(&x), transform_2.transform(&y)))
             .collect();
-        Ok(Arc::new(zipped_cols))
+        Ok(zipped_cols)
     })
     .await?
 }
@@ -161,6 +161,7 @@ pub fn PlotWindow() -> Element {
         }
     });
 
+    let mut plot_data_signal = use_signal(|| vec![]);
     let processed_data_resource = use_resource(move || {
         let x_fluoro = x_axis_marker.read().fluoro.clone();
         let y_fluoro = y_axis_marker.read().fluoro.clone();
@@ -180,19 +181,31 @@ pub fn PlotWindow() -> Element {
                 .clone();
 
             if let Some(Ok(fcs_file)) = &*fcs_file_resource.read() {
-                get_scaled_data_to_display(
+                match get_scaled_data_to_display(
                     fcs_file.clone(),
                     &x_fluoro,
                     &y_fluoro,
                     x_transform,
                     y_transform,
                 )
-                .await
+                .await{
+                    Ok(d) => {
+                        plot_data_signal.set(d);
+                        Ok(())
+                    },
+                    Err(e) => {
+                        plot_data_signal.set(vec![]);
+                        Err(anyhow::anyhow!(e.to_string()))
+                    },
+                }
             } else {
+                plot_data_signal.set(vec![]);
                 Err(anyhow::anyhow!("No data yet"))
             }
         }
     });
+
+    
 
     rsx! {
         document::Stylesheet { href: CSS_STYLE }
@@ -400,13 +413,13 @@ pub fn PlotWindow() -> Element {
 
         {
 
-            if let Some(Ok(plot_data)) = &*processed_data_resource.read() {
+            if !plot_data_signal.read().is_empty() {
 
                 rsx! {
                     div {
                         PseudoColourPlot {
                             size: (600, 600),
-                            data: plot_data.clone(),
+                            data: plot_data_signal,
                             x_axis_info: x_axis_limits.read().clone(),
                             y_axis_info: y_axis_limits.read().clone(),
                         }

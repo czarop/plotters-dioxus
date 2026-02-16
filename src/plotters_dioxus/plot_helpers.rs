@@ -3,7 +3,7 @@ use flow_fcs::TransformType;
 use flow_gates::transforms::{
     get_plotting_area, pixel_to_raw, pixel_to_raw_y, raw_to_pixel, raw_to_pixel_y,
 };
-use std::{collections::{HashMap, hash_map::Entry}, ops::RangeInclusive, sync::Arc};
+use std::{collections::{HashMap}, ops::RangeInclusive, sync::Arc};
 
 use crate::{plotters_dioxus::{AxisInfo, gates::Id}};
 

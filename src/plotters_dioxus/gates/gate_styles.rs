@@ -125,7 +125,7 @@ impl GateShape {
                     center: c,
                     radius_x: *radius_x,
                     radius_y: *radius_y,
-                    style: style,
+                                        style: style,
                     shape_type: shape_type.clone(),
                 }
             }

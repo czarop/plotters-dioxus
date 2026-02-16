@@ -8,7 +8,7 @@ resolver = "2"
 dioxus = { version = "0.7.3", features = ["desktop", "router"] }
 plotters = "0.3.5"
 thiserror = "2.0.12"
-polars = {version = "0.52", default-features = false}
+polars = {version = "0.53", default-features = false}
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 anyhow = "1"
 flow-fcs = {path = "../flow_ts_fork/fcs"}
@@ -20,6 +20,6 @@ dioxus-primitives = { git = "https://github.com/DioxusLabs/components", version 
 itertools = "0.14"
 
 [target.'cfg(windows)'.dependencies]
-polars = {version = "0.52", default-features = false, features = ["lazy", "performant", "timezones"]}
+polars = {version = "0.53", default-features = false, features = ["lazy", "performant", "timezones"]}
 [target.'cfg(not(windows))'.dependencies]
-polars = {version = "0.52", default-features = false, features = ["lazy", "performant", "dtype-full"]}
+polars = {version = "0.53", default-features = false, features = ["lazy", "performant", "dtype-full"]}
