@@ -3,12 +3,12 @@ use dioxus::prelude::*;
 use crate::{
     file_load::FcsFiles,
     
-    plotters_dioxus::{AxisInfo, PseudoColourPlot, gates::{GateState, gate_store::GateStateImplExt}, plot_helpers::{Param, ParameterStore, ParameterStoreImplExt, ParameterStoreStoreExt as _}},
+    plotters_dioxus::{AxisInfo, PseudoColourPlot, gates::{GateState, gate_buttons::GateShapeStub, gate_store::GateStateImplExt}, plot_helpers::{Param, ParameterStore, ParameterStoreImplExt, ParameterStoreStoreExt as _}},
     searchable_select::SearchableSelect,
 };
 use flow_fcs::{Fcs, TransformType, Transformable};
 
-
+use crate::plotters_dioxus::gates::gate_buttons::NewGateButtons;
 use std::sync::Arc;
 use tokio::task;
 
@@ -51,6 +51,9 @@ pub fn PlotWindow() -> Element {
     let mut message = use_signal(|| None::<String>);
     let mut gate_store = use_store(|| GateState::default());
     use_context_provider(|| gate_store);
+
+    let mut current_gate_type = use_signal(|| GateShapeStub::Polygon);
+    use_context_provider(|| current_gate_type);
 
     let _ = use_resource(move || async move {
         let result = (|| -> anyhow::Result<FcsFiles> {
@@ -417,6 +420,7 @@ pub fn PlotWindow() -> Element {
 
                 rsx! {
                     div {
+                        NewGateButtons { callback: move |gate_type| current_gate_type.set(gate_type) }
                         PseudoColourPlot {
                             size: (600, 600),
                             data: plot_data_signal,

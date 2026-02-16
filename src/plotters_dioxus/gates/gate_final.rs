@@ -1,8 +1,8 @@
-use std::{ops::Deref};
+use std::{ops::Deref, sync::Arc};
 
 use anyhow::anyhow;
 use flow_fcs::TransformType;
-use flow_gates::{GateGeometry, geometry};
+use flow_gates::{GateGeometry, create_ellipse_geometry, geometry};
 
 use crate::plotters_dioxus::{
     PlotDrawable, axis_info::{asinh_reverse_f32, asinh_transform_f32}, gates::{
@@ -20,7 +20,6 @@ pub struct GateFinal {
     selected: bool,
     drag_self: Option<GateDragData>,
     drag_point: Option<PointDragData>,
-    rotation: f32
 }
 
 impl GateFinal {
@@ -30,7 +29,6 @@ impl GateFinal {
             selected,
             drag_point: None,
             drag_self: None,
-            rotation: 0f32,
         }
     }
 
@@ -126,34 +124,34 @@ impl GateFinal {
                 radius_y,
                 angle,
             } => {
+                //format: [center, right/end, top, left/start, bottom]
                 if let (Some(cx), Some(cy)) = (
                     center.get_coordinate(x_param),
                     center.get_coordinate(y_param),
                 ) {
-                    let points_count = 64; // Smoothness of the ellipse
-                    (0..points_count)
-                        .map(|i| {
-                            let theta =
-                                2.0 * std::f32::consts::PI * (i as f32 / points_count as f32);
-
-                            // 1. Calculate point on an unrotated ellipse
-                            let dx = radius_x * theta.cos();
-                            let dy = radius_y * theta.sin();
-
-                            // 2. Apply rotation (2D rotation matrix)
-                            let rx = dx * angle.cos() - dy * angle.sin();
-                            let ry = dx * angle.sin() + dy * angle.cos();
-
-                            (cx + rx, cy + ry)
-                        })
-                        .collect()
+                    calculate_ellipse_nodes(cx, cy, *radius_x, *radius_y, *angle)
                 } else {
-                    vec![]
+                    panic!("failed to make ellipse geometry")
                 }
             }
-            GateGeometry::Boolean { .. } => vec![], // Boolean gates usually don't have a single outline
+            GateGeometry::Boolean { .. } => vec![],
         }
     }
+
+    fn get_points_for_nodes(&self) -> Vec<(f32, f32)> {
+        let p = self.to_render_points(
+                self.x_parameter_channel_name(),
+                self.y_parameter_channel_name(),
+            );
+        
+        match self.inner.geometry {
+            GateGeometry::Ellipse { .. } => {
+                p[1..].to_vec()
+            },
+            _ => p,
+        }
+    }
+
 }
 
 impl Deref for GateFinal {
@@ -182,16 +180,19 @@ impl PlotDrawable for GateFinal {
         } else {
             &DEFAULT_LINE
         };
+
         let main_points = self.get_points();
+        let points_for_nodes = self.get_points_for_nodes();
         let main_gate = match &self.inner.geometry {
             GateGeometry::Polygon {
                 ..
-            } => draw_polygon(
+            } => {
+                draw_polygon(
                 &main_points,
                 gate_line_style,
                 ShapeType::Gate(self.id.clone()),
-            ),
-            GateGeometry::Ellipse { center, radius_x, radius_y, angle:_} => 
+            )},
+            GateGeometry::Ellipse { center, radius_x, radius_y, angle} => 
             {
                 let x = center.get_coordinate(self.x_parameter_channel_name()).unwrap_or_default();
                 let y = center.get_coordinate(self.y_parameter_channel_name()).unwrap_or_default();
@@ -199,6 +200,7 @@ impl PlotDrawable for GateFinal {
                 (x, y),
                 *radius_x,
                 *radius_y,
+                *angle,
                 gate_line_style,
                 ShapeType::Gate(self.id.clone()),
             )},
@@ -206,7 +208,7 @@ impl PlotDrawable for GateFinal {
         };
         let selected_points = {
             if self.is_selected() {
-                Some(draw_circles_for_selected_polygon(&main_points))
+                Some(draw_circles_for_selected_gate(&*points_for_nodes))
             } else {
                 None
             }
@@ -215,9 +217,11 @@ impl PlotDrawable for GateFinal {
             if let Some(drag_data) = self.drag_point {
                 match &self.inner.geometry {
                     flow_gates::GateGeometry::Polygon {
-                        nodes: _,
-                        closed: _,
+                        ..
                     } => draw_ghost_point_for_polygon(&drag_data, &main_points),
+                    GateGeometry::Ellipse { .. } => {
+                        draw_ghost_point_for_ellipse(&self.inner.geometry, &drag_data, self.x_parameter_channel_name(), self.y_parameter_channel_name())
+                    }
                     _ => todo!(),
                 }
             } else {
@@ -233,12 +237,73 @@ impl PlotDrawable for GateFinal {
     
 }
 
-fn draw_elipse(center: (f32, f32), rx: f32, ry: f32, style: &'static DrawingStyle,
+fn is_point_on_ellipse_perimeter(
+    &self, 
+    click_pt: (f32, f32), 
+    center: (f32, f32), 
+    rx: f32, 
+    ry: f32, 
+    angle_rad: f32,
+    tolerance: f32
+) -> Option<f32> {
+    // 1. Translate point relative to center
+    let dx = click_pt.0 - center.0;
+    let dy = click_pt.1 - center.1;
+
+    // 2. Rotate point back (Inverse Rotation)
+    // If ellipse is rotated by θ, rotate point by -θ
+    let cos_a = (-angle_rad).cos();
+    let sin_a = (-angle_rad).sin();
+    let local_x = dx * cos_a - dy * sin_a;
+    let local_y = dx * sin_a + dy * cos_a;
+
+    // 3. The "Ellipse Equation" check
+    // A point (x,y) is ON the perimeter if (x/rx)^2 + (y/ry)^2 == 1
+    // We calculate the "distance" from 1.0
+    
+    // Calculate the angle of the click point relative to the local center
+    let click_angle = local_y.atan2(local_x);
+    
+    // Find the closest point actually ON the ellipse at that same angle
+    let on_ellipse_x = rx * click_angle.cos();
+    let on_ellipse_y = ry * click_angle.sin();
+
+    // 4. Distance check
+    let dist_sq = (local_x - on_ellipse_x).powi(2) + (local_y - on_ellipse_y).powi(2);
+    let dist = dist_sq.sqrt();
+
+    if dist <= tolerance {
+        Some(dist)
+    } else {
+        None
+    }
+}
+
+fn draw_elipse(center: (f32, f32), rx: f32, ry: f32, angle_rotation: f32, style: &'static DrawingStyle,
     shape_type: ShapeType,) -> Vec<GateShape> {
-        vec![GateShape::Ellipse { center, radius_x: rx, radius_y: ry, style, shape_type }]
+        let degrees_rotation = angle_rotation.to_degrees();
+        vec![GateShape::Ellipse { center, radius_x: rx, radius_y: ry, degrees_rotation, style, shape_type }]
     }
 
-fn draw_circles_for_selected_polygon(points: &[(f32, f32)]) -> Vec<GateShape> {
+pub fn calculate_ellipse_nodes(cx: f32, cy: f32, rx: f32, ry: f32, angle_rad: f32) -> Vec<(f32, f32)> {
+    let cos_a = angle_rad.cos();
+    let sin_a = angle_rad.sin();
+
+    vec![
+        (cx, cy),
+        // Right node (Local: rx, 0)
+        (cx + rx * cos_a, cy + rx * sin_a),
+        // Top node (Local: 0, -ry) -> assuming standard screen coords where Y is down
+        (cx + ry * sin_a, cy - ry * cos_a),
+        // Left node (Local: -rx, 0)
+        (cx - rx * cos_a, cy - rx * sin_a),
+        // Bottom node (Local: 0, ry)
+        (cx - ry * sin_a, cy + ry * cos_a),
+    ]
+}
+
+
+fn draw_circles_for_selected_gate(points: &[(f32, f32)]) -> Vec<GateShape> {
     points
         .iter()
         .enumerate()
@@ -291,4 +356,74 @@ fn draw_ghost_point_for_polygon(
         shape_type: ShapeType::GhostPoint,
     };
     Some(vec![line, point])
+}
+
+fn draw_ghost_point_for_ellipse(
+    curr_geo: &GateGeometry,
+    drag_data: &PointDragData,
+    x_param: &str,
+    y_param: &str
+) -> Option<Vec<GateShape>>{
+    let (cursor_x, cursor_y) = drag_data.loc();
+    if let GateGeometry::Ellipse { center: current_center, radius_x: current_rx, radius_y: current_ry, angle: current_angle } = curr_geo {
+        let current_cx =  current_center.get_coordinate(x_param).unwrap_or_default();
+        let current_cy =  current_center.get_coordinate(y_param).unwrap_or_default();
+        
+        // 1. Pre-calculate trig for the constant angle
+        let cos_a = current_angle.cos();
+        let sin_a = current_angle.sin();
+
+        // 2. Identify new dimensions
+        // We calculate new_rx/ry based on distance from the CURRENT center 
+        // to the NEW cursor position.
+        let (new_rx, new_ry) = match drag_data.point_index() {
+            1 | 3 => {
+                // Dragging Right or Left changes horizontal radius
+                let dist = f32::hypot(cursor_x - current_cx, cursor_y - current_cy);
+                (dist, *current_ry)
+            }
+            2 | 4 => {
+                // Dragging Top or Bottom changes vertical radius
+                let dist = f32::hypot(cursor_x - current_cx, cursor_y - current_cy);
+                (*current_rx, dist)
+            }
+            _ => (*current_rx, *current_ry),
+        };
+
+        // 3. Generate the 5-point Vec for your 'create_ellipse_geometry' function
+        // Even though you don't use the center as a handle, the function requires it.
+        let ghost_points: Vec<(f32, f32)> = vec![
+            (current_cx, current_cy),                              // 0: Center (Stable)
+            (current_cx + new_rx * cos_a, current_cy + new_rx * sin_a), // 1: Right
+            (current_cx + new_ry * sin_a, current_cy - new_ry * cos_a), // 2: Top
+            (current_cx - new_rx * cos_a, current_cy - new_rx * sin_a), // 3: Left
+            (current_cx - new_ry * sin_a, current_cy + new_ry * cos_a), // 4: Bottom
+        ];
+
+        if let Ok(GateGeometry::Ellipse { center, radius_x, radius_y, angle }) = create_ellipse_geometry(ghost_points, &x_param, &y_param) {
+            
+            let x = center.get_coordinate(x_param).unwrap_or_default();
+            let y = center.get_coordinate(y_param).unwrap_or_default();
+            
+            return Some(vec![
+                GateShape::Circle {
+            center: (cursor_x, cursor_y),
+            radius: 5.0,
+            fill: "yellow",
+            shape_type: ShapeType::GhostPoint,
+        },
+        GateShape::Ellipse { 
+            center: (x, y), 
+            radius_x, 
+            radius_y, 
+            degrees_rotation: angle.to_degrees(), 
+            style: &DRAGGED_LINE, 
+            shape_type: ShapeType::GhostPoint }
+            ]);
+        } else {
+            return None;
+        }
+    }
+    None
+
 }

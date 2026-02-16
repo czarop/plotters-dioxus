@@ -1,19 +1,13 @@
-use crate::{
-    plotters_dioxus::{
+use crate::plotters_dioxus::{
         PlotDrawable,
         gates::{
-            GateState, gate_store::GateStateImplExt, gate_store::GateStateStoreExt as _,
-            gate_draft::GateDraft,
-            gate_drag::{GateDragData, GateDragType, PointDragData},
-            gate_final::GateFinal,
-            gate_styles::{GateShape, ShapeType},
+            GateState, gate_buttons::GateShapeStub, gate_draft::GateDraft, gate_drag::{GateDragData, GateDragType, PointDragData}, gate_final::GateFinal, gate_store::{GateStateImplExt, GateStateStoreExt as _}, gate_styles::{GateShape, ShapeType}
         },
         plot_helpers::PlotMapper,
-    },
-};
+    };
 use dioxus::prelude::*;
 use flow_gates::Gate;
-use std::{f32::consts::PI, sync::Arc};
+use std::{sync::Arc};
 
 #[component]
 pub fn GateLayer(
@@ -25,13 +19,18 @@ pub fn GateLayer(
     let mut draft_gate_coords = use_signal(|| Vec::<(f32, f32)>::new());
     let mut next_gate_id = use_signal(|| 0);
     let mut selected_gate_id = use_signal(|| None::<Arc<str>>);
+    let current_gate_type = use_context::<Signal<GateShapeStub>>();
 
     // convert clicked coords into a draft gate
     let draft_gate = use_memo(move || {
-        let cur_coords = draft_gate_coords();
-        if cur_coords.len() > 0 {
-            let gate_draft = GateDraft::new_polygon(cur_coords, x_channel(), y_channel());
-            Some(gate_draft)
+        if let GateShapeStub::Polygon = &*current_gate_type.read(){
+            let cur_coords = draft_gate_coords();
+            if cur_coords.len() > 0 {
+                let gate_draft = GateDraft::new_polygon(cur_coords, x_channel(), y_channel());
+                Some(gate_draft)
+            } else {
+                None
+            }
         } else {
             None
         }
@@ -132,37 +131,72 @@ pub fn GateLayer(
 
                         }
                     },
-                    ondoubleclick: move |_| {
-                        if let Some(curr_gate) = &*draft_gate.peek() {
-                            let mut points = curr_gate.get_points();
-                            points.pop();
-                            let finalised_gate = match flow_gates::geometry::create_polygon_geometry(
-                                points,
-                                &*x_channel(),
-                                &*y_channel(),
-                            ) {
-                                Ok(gate) => {
-                                    let id = *next_gate_id.peek();
-                                    Some(
-                                        Gate::new(
+                    ondoubleclick: move |evt| {
+                        match current_gate_type() {
+                            GateShapeStub::Polygon => {
+                                if let Some(curr_gate) = &*draft_gate.peek() {
+                                    let mut points = curr_gate.get_points();
+                                    points.pop();
+                                    match flow_gates::geometry::create_polygon_geometry(
+                                        points,
+                                        &*x_channel(),
+                                        &*y_channel(),
+                                    ) {
+                                        Ok(gate) => {
+                                            let id = *next_gate_id.peek();
+                                            let g = Gate::new(
+                                                id.to_string(),
+                                                id.to_string(),
+                                                gate,
+                                                x_channel(),
+                                                y_channel(),
+                                            );
+                                            gate_store
+                                                .add_gate(g, None)
+                                                .expect("Failed to add gate to gate store");
+                                            draft_gate_coords.write().clear();
+                                            *next_gate_id.write() += 1;
+                                        }
+                                        Err(_) => {
+                                            draft_gate_coords.write().clear();
+                                        }
+                                    }
+
+                                }
+                            }
+                            GateShapeStub::Ellipse => {
+                                println!("ellipse");
+                                let local_coords = evt.data.coordinates().element();
+                                let px = local_coords.x as f32;
+                                let py = local_coords.y as f32;
+                                let data_coords = plot_map
+                                    .as_ref()
+                                    .unwrap()
+                                    .pixel_to_data(px, py, None, None);
+                                let points = vec![data_coords];
+                                match flow_gates::geometry::create_ellipse_geometry(
+                                    points,
+                                    &*x_channel(),
+                                    &*y_channel(),
+                                ) {
+                                    Ok(gate) => {
+                                        let id = *next_gate_id.peek();
+                                        let g = Gate::new(
                                             id.to_string(),
                                             id.to_string(),
                                             gate,
                                             x_channel(),
                                             y_channel(),
-                                        ),
-                                    )
+                                        );
+                                        gate_store
+                                            .add_gate(g, None)
+                                            .expect("Failed to add gate to gate store");
+                                        *next_gate_id.write() += 1;
+
+                                    }
+                                    Err(_) => {}
                                 }
-                                Err(_) => {
-                                    draft_gate_coords.write().clear();
-                                    return;
-                                }
-                            };
-                            gate_store
-                                .add_gate(finalised_gate.unwrap(), None)
-                                .expect("Failed to add gate to gate store");
-                            draft_gate_coords.write().clear();
-                            *next_gate_id.write() += 1;
+                            }
                         }
                     },
                     onmousemove: move |evt| {
@@ -495,10 +529,12 @@ fn RenderShape(
                 center,
                 radius_x,
                 radius_y,
+                degrees_rotation,
                 style,
                 shape_type:_,
             } => {
                 let mapped_points = mapper.data_to_pixel(center.0, center.1, None, None);
+                
                 rsx! {
                     g { transform,
                         ellipse {
@@ -511,6 +547,7 @@ fn RenderShape(
                             stroke_width: style.stroke_width,
                             stroke_dasharray: if style.dashed { "4" } else { "none" },
                             fill: style.fill,
+                            transform: "rotation({degrees_rotation} {mapped_points.0} {mapped_points.1})",
                         }
                     }
 

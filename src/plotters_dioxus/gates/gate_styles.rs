@@ -31,6 +31,7 @@ pub enum GateShape {
         center: (f32, f32),
         radius_x: f32,
         radius_y: f32,
+        degrees_rotation: f32,
         style: &'static DrawingStyle,
         shape_type: ShapeType,
     }
@@ -68,8 +69,8 @@ impl GateShape {
                 style: style,
                 shape_type: shape_type.clone(),
             },
-            GateShape::Ellipse { center, radius_x, radius_y, style:_, shape_type:_ } => GateShape::Ellipse 
-            { center: *center, radius_x: *radius_x, radius_y: *radius_y, style: style, shape_type: shape_type.clone() }
+            GateShape::Ellipse { center, radius_x, radius_y, degrees_rotation, style:_, shape_type:_ } => GateShape::Ellipse 
+            { center: *center, radius_x: *radius_x, radius_y: *radius_y, degrees_rotation: *degrees_rotation, style: style, shape_type: shape_type.clone() }
         }
     }
 
@@ -117,7 +118,7 @@ impl GateShape {
                 }
             },
             GateShape::Ellipse {
-                center, radius_x, radius_y, style, shape_type,
+                center, radius_x, radius_y, degrees_rotation, style, shape_type,
             } => {
                 let c = (center.0 - offset.0, center.1 - offset.1);
 
@@ -125,6 +126,7 @@ impl GateShape {
                     center: c,
                     radius_x: *radius_x,
                     radius_y: *radius_y,
+                    degrees_rotation: *degrees_rotation,
                                         style: style,
                     shape_type: shape_type.clone(),
                 }
