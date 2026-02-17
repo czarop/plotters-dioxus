@@ -1,5 +1,5 @@
 use dioxus::prelude::*;
-use flow_fcs::TransformType;
+use flow_fcs::{TransformType, Transformable};
 use flow_gates::transforms::{
     get_plotting_area, pixel_to_raw, pixel_to_raw_y, raw_to_pixel, raw_to_pixel_y,
 };
@@ -112,6 +112,26 @@ impl PlotMapper {
     }
     pub fn height(&self) -> f32 {
         self.view_height
+    }
+
+
+    pub fn x_axis_min_max(&self) -> (f32, f32) {
+        (*self.x_data_range.start(), *self.x_data_range.end())
+    }
+
+    pub fn y_axis_min_max(&self) -> (f32, f32) {
+        (*self.y_data_range.start(), *self.y_data_range.end())
+    }
+
+    pub fn x_axis_range(&self) -> f32 {
+        let raw_x = self.x_data_range.end() - self.x_data_range.start();
+        self.x_transform.transform(&raw_x)
+        
+    }
+
+    pub fn y_axis_range(&self) -> f32 {
+        let raw_y = self.y_data_range.end() - self.y_data_range.start();
+        self.y_transform.transform(&raw_y)
     }
 }
 

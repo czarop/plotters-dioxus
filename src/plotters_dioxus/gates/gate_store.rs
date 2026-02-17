@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use dioxus::prelude::*;
 use flow_gates::{Gate, GateHierarchy};
 
@@ -131,44 +132,56 @@ impl<Lens> Store<GateState, Lens> {
         gate_id: GateKey,
         point_idx: usize,
         new_point: (f32, f32),
-    ) -> Result<()> {
-        let current_gate = self
+    ) -> anyhow::Result<()> {
+        // we remove first to stop a flicker
+        let mut gate = self.gate_registry()
+        .write()
+        .remove(&gate_id)
+        .ok_or(anyhow!("No Gate Found"))?;
+
+        match gate.replace_point(new_point, point_idx){
+            Ok(_) => {},
+            Err(e) => {
+                self
+                    .gate_registry()
+                    .write()
+                    .insert(gate_id, gate);
+                return Err(e);
+            },
+        };
+
+        gate.set_drag_point(None);
+
+        self
             .gate_registry()
-            .remove(&gate_id)
-            .ok_or(anyhow::anyhow!("Gate does not exist"))?;
-        let id = current_gate.id.clone();
-        let name = current_gate.name.clone();
-        let x_param = current_gate.x_parameter_channel_name();
-        let y_param = current_gate.y_parameter_channel_name();
-        let mut points = current_gate.get_points();
-        if point_idx < points.len() {
-            points[point_idx] = new_point
-        }
-        let new_gate = Gate::polygon(id, name, points, x_param, y_param)?;
-        let gate_final = GateFinal::new(new_gate, true);
-        self.gate_registry().insert(gate_id, gate_final);
+            .write()
+            .insert(gate_id, gate);
 
         Ok(())
     }
 
     fn move_gate(&mut self, gate_id: GateKey, data_space_offset: (f32, f32)) -> Result<()> {
-        let current_gate = self
-            .gate_registry()
-            .remove(&gate_id)
-            .ok_or(anyhow::anyhow!("Gate does not exist"))?;
-        let id = current_gate.id.clone();
-        let name = current_gate.name.clone();
-        let x_param = current_gate.x_parameter_channel_name();
-        let y_param = current_gate.y_parameter_channel_name();
-        let points = current_gate
+        // we remove first to stop a flicker
+        let mut gate = self.gate_registry()
+        .write()
+        .remove(&gate_id)
+        .ok_or(anyhow!("No Gate Found"))?;
+
+        let points = gate
             .get_points()
             .into_iter()
             .map(|(x, y)| (x - data_space_offset.0, y - data_space_offset.1))
             .collect();
-        let new_gate = Gate::polygon(id, name, points, x_param, y_param)?;
-        let gate_final = GateFinal::new(new_gate, true);
-        self.gate_registry().insert(gate_id, gate_final);
 
+        let _ = gate.replace_points(points)?;
+
+        gate.set_drag_self(None);
+
+        self
+            .gate_registry()
+            .write()
+            .insert(gate_id, gate);
+        
         Ok(())
     }
 

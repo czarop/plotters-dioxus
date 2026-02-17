@@ -65,9 +65,68 @@ impl PointDragData {
 }
 
 #[derive(Clone, PartialEq)]
+pub struct RotationData {
+    gate_id: Arc<str>,
+    gate_center_loc: (f32, f32),
+    start_loc: (f32, f32),
+    current_loc: (f32, f32),
+}
+
+impl RotationData {
+    pub fn new(gate_id: Arc<str>, gate_center_loc: (f32, f32), start_loc: (f32, f32), current_loc: (f32, f32)) -> Self {
+        Self {
+            gate_id,
+            gate_center_loc,
+            start_loc,
+            current_loc,
+        }
+    }
+
+    pub fn clone_from_data(new_loc: (f32, f32), old_data: Self) -> Self {
+        Self {
+            gate_id: old_data.gate_id.clone(),
+            gate_center_loc: old_data.gate_center_loc.clone(),
+            start_loc: old_data.start_loc,
+            current_loc: new_loc,
+        }
+    }
+
+    pub fn start_loc(&self) -> (f32, f32) {
+        self.start_loc
+    }
+    pub fn current_loc(&self) -> (f32, f32) {
+        self.current_loc
+    }
+
+    pub fn rotation_rad(&self) -> f32 {
+        let (cx, cy) = self.gate_center_loc;
+        let (sx, sy) = self.start_loc;
+        let (tx, ty) = self.current_loc;
+
+        // Calculate the angle of the vector from center to the initial click
+        let angle_start = (sy - cy).atan2(sx - cx);
+
+        // Calculate the angle of the vector from center to the current mouse position
+        let angle_now = (ty - cy).atan2(tx - cx);
+
+        // The change in rotation in radians
+        angle_now - angle_start
+    }
+
+    pub fn rotation_deg(&self) -> f32 {
+        let delta_rad = self.rotation_rad();
+
+        // Convert to degrees for your Ellipse geometry
+        delta_rad.to_degrees()
+    
+    }
+}
+
+#[derive(Clone, PartialEq)]
 pub enum GateDragType {
     Point(PointDragData),
     Gate(GateDragData),
+    Rotation(RotationData)
 }
 
 impl GateDragType {
@@ -79,6 +138,9 @@ impl GateDragType {
             GateDragType::Gate(gate_drag_data) => {
                 GateDragType::Gate(GateDragData::clone_from_data(point, gate_drag_data))
             }
+            GateDragType::Rotation(rotation_data) => {
+                GateDragType::Rotation(RotationData::clone_from_data(point, rotation_data))
+            },
         }
     }
 }

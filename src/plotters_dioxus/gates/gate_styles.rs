@@ -7,6 +7,7 @@ pub enum ShapeType {
     GhostGate((f32, f32)),
     GhostPoint,
     DraftGate,
+    Rotation,
 }
 
 #[derive(PartialEq, Clone)]
@@ -33,6 +34,11 @@ pub enum GateShape {
         radius_y: f32,
         degrees_rotation: f32,
         style: &'static DrawingStyle,
+        shape_type: ShapeType,
+    },
+    Svg {
+        center: (f32, f32),
+        size: f32,
         shape_type: ShapeType,
     }
 }
@@ -70,7 +76,10 @@ impl GateShape {
                 shape_type: shape_type.clone(),
             },
             GateShape::Ellipse { center, radius_x, radius_y, degrees_rotation, style:_, shape_type:_ } => GateShape::Ellipse 
-            { center: *center, radius_x: *radius_x, radius_y: *radius_y, degrees_rotation: *degrees_rotation, style: style, shape_type: shape_type.clone() }
+            { center: *center, radius_x: *radius_x, radius_y: *radius_y, degrees_rotation: *degrees_rotation, style: style, shape_type: shape_type.clone() },
+            GateShape::Svg { center, size, shape_type:_ } => Self::Svg {
+                center: *center, size: *size, shape_type: shape_type.clone()
+            },
         }
     }
 
@@ -131,6 +140,11 @@ impl GateShape {
                     shape_type: shape_type.clone(),
                 }
             }
+            GateShape::Svg { center, size, shape_type } => {
+                
+                Self::Svg {
+                center: (center.0 + offset.0, center.1 + offset.1), size: *size, shape_type: shape_type.clone()
+            }},
         }
     }
 }

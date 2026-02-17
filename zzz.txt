@@ -1,3 +1,6 @@
+multiple gates moving if one selected but drag another one
+
+
 gating hierarchy
 Gating hierarchy panel
 Select gated events

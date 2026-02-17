@@ -42,30 +42,5 @@ pub trait PlotDrawable {
             None
         }
     }
-    fn is_point_on_perimeter(&self, point: (f32, f32), tolerance: (f32, f32)) -> Option<f32> {
-        let points = self.get_points();
-        if points.len() < 2 {
-            return None;
-        }
-        let mut closest = INFINITY;
-        for segment in points.windows(2) {
-            if let Some(dis) = self.is_near_segment(point, segment[0], segment[1], tolerance) {
-                closest = closest.min(dis);
-            }
-        }
-        // close the loop if required:
-        let first = points[0];
-        let last = points[points.len() - 1];
-
-        if first != last {
-            if let Some(dis) = self.is_near_segment(point, last, first, tolerance) {
-                closest = closest.min(dis);
-            }
-        }
-        if closest == INFINITY {
-            return None;
-        } else {
-            return Some(closest);
-        }
-    }
+    
 }
