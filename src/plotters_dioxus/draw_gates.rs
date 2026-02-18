@@ -61,7 +61,6 @@ pub fn GateLayer(
                     },
                     None => {
                         gate.set_drag_point(None);
-                        gate.set_drag_self(None);
                     }
                 }
             }
@@ -233,7 +232,6 @@ pub fn GateLayer(
                         }
                     },
                     onmouseup: move |evt| {
-                        println!("up");
                         if let Some(data) = drag_data() {
                             let local_coords = &evt.data.coordinates().element();
                             let px = local_coords.x as f32;
@@ -244,9 +242,10 @@ pub fn GateLayer(
                                 .pixel_to_data(px, py, None, None);
 
                             let new_data = data.clone_with_point(data_coords);
-                            match new_data {
-                                GateDragType::Point(point_drag_data) => {
-                                    if let Some(selected_gate_id) = &*selected_gate_id.peek() {
+                            if let Some(selected_gate_id) = &*selected_gate_id.peek() {
+                                match new_data {
+                                    GateDragType::Point(point_drag_data) => {
+
                                         gate_store
                                             .move_gate_point(
                                                 selected_gate_id.clone().into(),
@@ -254,20 +253,26 @@ pub fn GateLayer(
                                                 data_coords,
                                             )
                                             .expect("Gate Move Failed");
+
                                     }
-                                }
-                                GateDragType::Gate(gate_drag_data) => {
-                                    if let Some(selected_gate_id) = &*selected_gate_id.peek() {
+                                    GateDragType::Gate(gate_drag_data) => {
                                         let offset = gate_drag_data.offset();
                                         gate_store
                                             .move_gate(selected_gate_id.clone().into(), offset)
                                             .expect("Gate Move Failed");
+
+                                    }
+                                    GateDragType::Rotation(rotation_data) => {
+                                        gate_store
+                                            .rotate_gate(
+                                                selected_gate_id.clone().into(),
+                                                rotation_data.current_loc(),
+                                            )
+                                            .expect("Gate Move Failed");
                                     }
                                 }
-                                GateDragType::Rotation(_) => todo!(),
                             }
                         }
-
                     },
                     onmousedown: move |evt| {
                         evt.stop_propagation();
@@ -313,7 +318,6 @@ pub fn GateLayer(
                                     {
                                         gate.set_selected(false);
                                         gate.set_drag_point(None);
-                                        gate.set_drag_self(None);
                                         draft_gate_coords.write().clear();
                                     }
                                 } else {
@@ -388,7 +392,7 @@ fn RenderDraftGate(
         for (shape_index , shape) in gate.draw_self().into_iter().enumerate() {
             RenderShape {
                 shape,
-                gate_id: "draft",
+                gate_id: Arc::from("draft"),
                 gate_index: 0,
                 shape_index,
                 drag_data,
@@ -422,7 +426,7 @@ fn RenderGate(
 #[component]
 fn RenderShape(
     shape: GateShape,
-    gate_id: String,
+    gate_id: Arc<str>,
     gate_index: usize,
     shape_index: usize,
     drag_data: Signal<Option<GateDragType>>,
@@ -432,7 +436,7 @@ fn RenderShape(
         let transform = {
             match &*drag_data.read() {
                 Some(GateDragType::Gate(data)) => {
-                    if &gate_id == data.gate_id() {
+                    if *gate_id == *data.gate_id() {
                         let offset = data.offset();
                         let p_start = mapper.data_to_pixel(0.0, 0.0, None, None);
                         let p_current = mapper.data_to_pixel(offset.0, offset.1, None, None);
@@ -443,6 +447,16 @@ fn RenderShape(
                         format!("none")
                     }
                 }
+                Some(GateDragType::Rotation(data)) => {
+                    if *gate_id == *data.gate_id() {
+                        let rotation_degs = data.rotation_deg();
+                        let c = data.pivot_point();
+                        let (cx, cy) = mapper.data_to_pixel(c.0, c.1, None, None);
+                        format!("rotate({rotation_degs} {cx} {cy})")
+                    } else {
+                        format!("none")
+                    }
+                },
                 _ => format!("none"),
             }
         };
@@ -574,7 +588,7 @@ fn RenderShape(
 
                 }
             },
-            GateShape::Svg {center, size, shape_type} => {
+            GateShape::Handle {center, size, shape_center, shape_type} => {
                 let c = mapper.data_to_pixel(center.0, center.1, None, None);
                 let pixel_offset = 15.0;
                 let handle_x = c.0;
@@ -596,11 +610,24 @@ fn RenderShape(
                             cy: "{handle_y}",
                             stroke: "orange",
                             r: size,
-                            onmousedown: move |e| {
+                            onmousedown: move |evt| {
+                                let local_coords = &evt.data.coordinates().element();
+                                let px = local_coords.x as f32;
+                                let py = local_coords.y as f32;
+                                let data_coords = plot_map()
+                                    .unwrap()
+                                    .pixel_to_data(px, py, None, None);
                                 drag_data
                                     .set(
-                                        GateDragType::Rotation(
-                                            RotationData::new(gate_id, start_loc, current_loc),
+                                        Some(
+                                            GateDragType::Rotation(
+                                                RotationData::new(
+                                                    gate_id.clone(),
+                                                    shape_center,
+                                                    data_coords,
+                                                    data_coords,
+                                                ),
+                                            ),
                                         ),
                                     )
                             },

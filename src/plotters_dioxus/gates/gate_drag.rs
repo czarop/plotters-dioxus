@@ -90,13 +90,19 @@ impl RotationData {
             current_loc: new_loc,
         }
     }
-
+    pub fn gate_id(&self) -> &str{
+        &self.gate_id
+    }
     pub fn start_loc(&self) -> (f32, f32) {
         self.start_loc
     }
     pub fn current_loc(&self) -> (f32, f32) {
         self.current_loc
     }
+    pub fn pivot_point(&self) -> (f32, f32) {
+        self.gate_center_loc
+    }
+
 
     pub fn rotation_rad(&self) -> f32 {
         let (cx, cy) = self.gate_center_loc;
@@ -110,7 +116,7 @@ impl RotationData {
         let angle_now = (ty - cy).atan2(tx - cx);
 
         // The change in rotation in radians
-        angle_now - angle_start
+        -(angle_now - angle_start)
     }
 
     pub fn rotation_deg(&self) -> f32 {

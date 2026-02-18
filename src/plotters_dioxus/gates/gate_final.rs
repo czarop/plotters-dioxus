@@ -6,7 +6,7 @@ use flow_gates::{GateGeometry, create_ellipse_geometry, create_polygon_geometry,
 
 use crate::plotters_dioxus::{
     PlotDrawable, axis_info::{asinh_reverse_f32, asinh_transform_f32}, gates::{
-        gate_drag::{GateDragData, PointDragData}, gate_draw_helpers::{ellipse::{calculate_ellipse_nodes, draw_elipse, draw_ghost_point_for_ellipse, is_point_on_ellipse_perimeter, update_ellipse_geometry}, polygon::{draw_ghost_point_for_polygon, draw_polygon, is_point_on_polygon_perimeter}}, gate_styles::{
+        gate_drag::{GateDragData, PointDragData, RotationData}, gate_draw_helpers::{ellipse::{calculate_ellipse_nodes, draw_elipse, draw_ghost_point_for_ellipse, is_point_on_ellipse_perimeter, update_ellipse_geometry}, polygon::{draw_ghost_point_for_polygon, draw_polygon, is_point_on_polygon_perimeter}}, gate_styles::{
             DEFAULT_LINE, GateShape, SELECTED_LINE,
             ShapeType,
         }
@@ -17,8 +17,8 @@ use crate::plotters_dioxus::{
 pub struct GateFinal {
     inner: flow_gates::Gate,
     selected: bool,
-    drag_self: Option<GateDragData>,
     drag_point: Option<PointDragData>,
+
 }
 
 impl GateFinal {
@@ -27,7 +27,6 @@ impl GateFinal {
             inner: gate,
             selected,
             drag_point: None,
-            drag_self: None,
         }
     }
 
@@ -39,13 +38,6 @@ impl GateFinal {
         self.selected = state;
     }
 
-    pub fn is_drag(&self) -> bool {
-        self.drag_self.is_some()
-    }
-
-    pub fn set_drag_self(&mut self, drag_data: Option<GateDragData>) {
-        self.drag_self = drag_data
-    }
 
     pub fn is_drag_point(&self) -> bool {
         self.drag_point.is_some()
@@ -167,6 +159,21 @@ impl GateFinal {
         
     }
 
+    pub fn rotate_gate(&mut self, mouse_position: (f32, f32)) -> anyhow::Result<()> {
+        let x_param = self.x_parameter_channel_name();
+        let y_param = self.y_parameter_channel_name();
+        match &self.inner.geometry {
+            GateGeometry::Polygon { .. } => todo!(),
+            GateGeometry::Rectangle { .. } => todo!(),
+            GateGeometry::Ellipse { center, radius_x, radius_y, angle } => {
+                self.inner.geometry = update_ellipse_geometry(center, *radius_x, *radius_y, *angle, mouse_position, 5, x_param, y_param)?;
+            },
+            GateGeometry::Boolean { .. } => todo!(),
+        };
+
+        Ok(())
+    }
+
     pub fn replace_point(&mut self, new_point: (f32, f32), point_index: usize) -> anyhow::Result<()> {
         let x_param = self.x_parameter_channel_name();
         let y_param = self.y_parameter_channel_name();
@@ -274,7 +281,7 @@ impl PlotDrawable for GateFinal {
                 let mut circles = draw_circles_for_selected_gate(&*points_for_nodes, index_offset);
                 if has_rotation {
                     
-                    let rotation = GateShape::Svg { center: points_for_nodes[3], size: 5_f32, shape_type: ShapeType::Rotation };
+                    let rotation = GateShape::Handle { center: points_for_nodes[3], size: 5_f32, shape_center: main_points[0], shape_type: ShapeType::Rotation };
                     circles.push(rotation);
                 }
                 Some(circles)

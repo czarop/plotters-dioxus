@@ -175,13 +175,43 @@ impl<Lens> Store<GateState, Lens> {
 
         let _ = gate.replace_points(points)?;
 
-        gate.set_drag_self(None);
+        // gate.set_drag_self(None);
 
         self
             .gate_registry()
             .write()
             .insert(gate_id, gate);
         
+        Ok(())
+    }
+
+    fn rotate_gate(
+        &mut self,
+        gate_id: GateKey,
+        current_position: (f32, f32),
+    ) -> anyhow::Result<()> {
+        // we remove first to stop a flicker
+        let mut gate = self.gate_registry()
+        .write()
+        .remove(&gate_id)
+        .ok_or(anyhow!("No Gate Found"))?;
+
+        match gate.rotate_gate(current_position){
+            Ok(_) => {},
+            Err(e) => {
+                self
+                    .gate_registry()
+                    .write()
+                    .insert(gate_id, gate);
+                return Err(e);
+            },
+        };
+
+        self
+            .gate_registry()
+            .write()
+            .insert(gate_id, gate);
+
         Ok(())
     }
 

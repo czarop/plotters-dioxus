@@ -36,9 +36,10 @@ pub enum GateShape {
         style: &'static DrawingStyle,
         shape_type: ShapeType,
     },
-    Svg {
+    Handle {
         center: (f32, f32),
         size: f32,
+        shape_center: (f32, f32),
         shape_type: ShapeType,
     }
 }
@@ -77,8 +78,8 @@ impl GateShape {
             },
             GateShape::Ellipse { center, radius_x, radius_y, degrees_rotation, style:_, shape_type:_ } => GateShape::Ellipse 
             { center: *center, radius_x: *radius_x, radius_y: *radius_y, degrees_rotation: *degrees_rotation, style: style, shape_type: shape_type.clone() },
-            GateShape::Svg { center, size, shape_type:_ } => Self::Svg {
-                center: *center, size: *size, shape_type: shape_type.clone()
+            GateShape::Handle { center, size, shape_center, shape_type:_ } => Self::Handle {
+                center: *center, size: *size, shape_center: *shape_center, shape_type: shape_type.clone()
             },
         }
     }
@@ -140,10 +141,10 @@ impl GateShape {
                     shape_type: shape_type.clone(),
                 }
             }
-            GateShape::Svg { center, size, shape_type } => {
+            GateShape::Handle { center, size, shape_center, shape_type } => {
                 
-                Self::Svg {
-                center: (center.0 + offset.0, center.1 + offset.1), size: *size, shape_type: shape_type.clone()
+                Self::Handle {
+                center: (center.0 + offset.0, center.1 + offset.1), shape_center: *shape_center, size: *size, shape_type: shape_type.clone()
             }},
         }
     }

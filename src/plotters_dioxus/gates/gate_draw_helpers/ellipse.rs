@@ -207,7 +207,7 @@ pub fn calculate_projected_radii(
             // Calculate the angle from center to cursor.
             // Since our 'Top' handle (index 2) is at -90 degrees (or -PI/2)
             // relative to the local X axis, we adjust the atan2 result.
-            let mouse_angle = dy.atan2(dx);
+            let mouse_angle = (-dy).atan2(dx);
             let new_angle = mouse_angle + std::f32::consts::FRAC_PI_2;
 
             (current_rx, current_ry, new_angle)
