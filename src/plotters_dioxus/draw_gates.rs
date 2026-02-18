@@ -260,7 +260,6 @@ pub fn GateLayer(
                                         gate_store
                                             .move_gate(selected_gate_id.clone().into(), offset)
                                             .expect("Gate Move Failed");
-
                                     }
                                     GateDragType::Rotation(rotation_data) => {
                                         gate_store
@@ -460,7 +459,6 @@ fn RenderShape(
                 _ => format!("none"),
             }
         };
-        println!("{transform}");
         match shape {
             GateShape::PolyLine {
                 points,
@@ -570,7 +568,7 @@ fn RenderShape(
                 let rx_px = (x_edge.0 - cp.0).abs();
                 let y_edge = mapper.data_to_pixel(center.0, center.1 + radius_y, None, None);
                 let ry_px = (y_edge.1 - cp.1).abs();
-                println!("{degrees_rotation}");
+
                 rsx! {
                     g { transform,
                         ellipse {
@@ -591,9 +589,53 @@ fn RenderShape(
             },
             GateShape::Handle {center, size, shape_center, shape_type} => {
                 let c = mapper.data_to_pixel(center.0, center.1, None, None);
+                let cp = mapper.data_to_pixel(shape_center.0, shape_center.1, None, None);
+                
                 let pixel_offset = 15.0;
                 let handle_x = c.0;
-                let handle_y = c.1 - (size + pixel_offset);
+                // Move 'up' in pixel space (closer to 0)
+                let handle_y = c.1 - (size + pixel_offset); 
+
+                let translate = {
+                    if let Some(GateDragType::Gate(data)) = &&*drag_data.read() {
+                        if *gate_id == *data.gate_id() {
+                            let offset = data.offset();
+                            let p_start = mapper.data_to_pixel(0.0, 0.0, None, None);
+                            let p_current = mapper.data_to_pixel(offset.0, offset.1, None, None);
+                            let dx = p_current.0 - p_start.0;
+                            let dy = p_current.1 - p_start.1;
+                            Some(format!("translate({} {})", -dx, -dy))
+                        } else {
+                            None
+                        }
+                } else {
+                    None
+                }};
+                let rotate = { 
+                    if let Some(GateDragType::Rotation(data)) = &*drag_data.read() {
+                        // During drag, use the live drag degrees, added to the current saved angle
+                        if let ShapeType::Rotation(handle_angle_rad) = shape_type {
+                            let angle = -(handle_angle_rad.to_degrees()) + data.rotation_deg();
+                            Some(format!("rotate({} {} {})", angle, cp.0, cp.1))
+                        } else {
+                            None
+                        }
+                    
+                    } else if let ShapeType::Rotation(handle_angle_rad) = shape_type {
+                        // After drag, use the saved angle (negated for SVG/Mapper inversion)
+                        let r = -(handle_angle_rad.to_degrees());
+                        Some(format!("rotate({} {} {})", r, cp.0, cp.1))
+                    } else {
+                        None
+                    }
+                };
+
+                let transform = [translate, rotate]
+                    .into_iter()
+                    .flatten()
+                    .collect::<Vec<_>>()
+                    .join(" ");
+
                 rsx!{
                     g { transform,
                         line {
@@ -604,6 +646,7 @@ fn RenderShape(
                             stroke: "orange",
                             stroke_width: "1.5",
                             stroke_dasharray: "4",
+                            pointer_events: "none",
                         }
                         circle {
                             key: "{gate_id}-{gate_index}-{shape_index}",
@@ -634,7 +677,8 @@ fn RenderShape(
                             },
                         }
                     }
-                }}
+                }
+            }
         }
     } else {
         rsx! {}

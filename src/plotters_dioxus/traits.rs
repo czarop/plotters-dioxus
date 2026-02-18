@@ -1,4 +1,4 @@
-use std::f32::INFINITY;
+use std::{sync::Arc};
 
 use crate::plotters_dioxus::gates::gate_styles::GateShape;
 

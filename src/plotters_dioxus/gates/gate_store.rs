@@ -167,15 +167,15 @@ impl<Lens> Store<GateState, Lens> {
         .remove(&gate_id)
         .ok_or(anyhow!("No Gate Found"))?;
 
+
         let points = gate
-            .get_points()
-            .into_iter()
-            .map(|(x, y)| (x - data_space_offset.0, y - data_space_offset.1))
-            .collect();
+                .get_points()
+                .into_iter()
+                .map(|(x, y)| (x - data_space_offset.0, y - data_space_offset.1))
+                .collect();
+        
 
         let _ = gate.replace_points(points)?;
-
-        // gate.set_drag_self(None);
 
         self
             .gate_registry()
@@ -233,7 +233,6 @@ impl<Lens> Store<GateState, Lens> {
                 }
             }
         } else {
-            println!("No gates for plot");
             return None;
         }
         return Some(gate_list);

@@ -7,7 +7,7 @@ pub enum ShapeType {
     GhostGate((f32, f32)),
     GhostPoint,
     DraftGate,
-    Rotation,
+    Rotation(f32),
 }
 
 #[derive(PartialEq, Clone)]

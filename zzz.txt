@@ -1,4 +1,4 @@
-multiple gates moving if one selected but drag another one
+swap axis on gates when showing same gates with swap axis.
 
 
 gating hierarchy

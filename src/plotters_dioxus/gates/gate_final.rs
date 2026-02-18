@@ -1,4 +1,4 @@
-use std::{ops::Deref};
+use std::{ops::Deref, sync::Arc};
 
 use anyhow::anyhow;
 use flow_fcs::TransformType;
@@ -6,7 +6,7 @@ use flow_gates::{GateGeometry, create_ellipse_geometry, create_polygon_geometry,
 
 use crate::plotters_dioxus::{
     PlotDrawable, axis_info::{asinh_reverse_f32, asinh_transform_f32}, gates::{
-        gate_drag::{GateDragData, PointDragData, RotationData}, gate_draw_helpers::{ellipse::{calculate_ellipse_nodes, draw_elipse, draw_ghost_point_for_ellipse, is_point_on_ellipse_perimeter, update_ellipse_geometry}, polygon::{draw_ghost_point_for_polygon, draw_polygon, is_point_on_polygon_perimeter}}, gate_styles::{
+        gate_drag::{PointDragData}, gate_draw_helpers::{ellipse::{calculate_ellipse_nodes, draw_elipse, draw_ghost_point_for_ellipse, is_point_on_ellipse_perimeter, update_ellipse_geometry}, polygon::{draw_ghost_point_for_polygon, draw_polygon, is_point_on_polygon_perimeter}}, gate_styles::{
             DEFAULT_LINE, GateShape, SELECTED_LINE,
             ShapeType,
         }
@@ -104,6 +104,7 @@ impl GateFinal {
     }
 
     fn to_render_points(&self, x_param: &str, y_param: &str) -> Vec<(f32, f32)> {
+        println!("called {} {}", x_param, y_param);
         match &self.inner.geometry {
             GateGeometry::Polygon { nodes, .. } => nodes
                 .iter()
@@ -248,7 +249,6 @@ impl PlotDrawable for GateFinal {
         let main_points = self.get_points();
         let points_for_nodes = self.get_points_for_nodes();
         let mut index_offset = 0;
-        let mut has_rotation = false;
         let main_gate = match &self.inner.geometry {
             GateGeometry::Polygon {
                 ..
@@ -261,9 +261,6 @@ impl PlotDrawable for GateFinal {
             GateGeometry::Ellipse { center, radius_x, radius_y, angle} => 
             {
                 index_offset = 1;
-                if self.is_selected() {
-                    has_rotation = true;
-                }
                 let x = center.get_coordinate(self.x_parameter_channel_name()).unwrap_or_default();
                 let y = center.get_coordinate(self.y_parameter_channel_name()).unwrap_or_default();
             draw_elipse(
@@ -279,9 +276,17 @@ impl PlotDrawable for GateFinal {
         let selected_points = {
             if self.is_selected() {
                 let mut circles = draw_circles_for_selected_gate(&*points_for_nodes, index_offset);
-                if has_rotation {
-                    
-                    let rotation = GateShape::Handle { center: points_for_nodes[3], size: 5_f32, shape_center: main_points[0], shape_type: ShapeType::Rotation };
+                if let GateGeometry::Ellipse { center, radius_x: _, radius_y: ry, angle } = &self.geometry {
+                    let cx = center.get_coordinate(self.x_parameter_channel_name()).unwrap_or_default();
+                    let cy = center.get_coordinate(self.y_parameter_channel_name()).unwrap_or_default();
+                    let unrotated_top = (cx, cy + *ry);
+
+                    let rotation = GateShape::Handle { 
+                        // center: points_for_nodes[3], 
+                        center: unrotated_top,
+                        size: 5_f32, 
+                        shape_center: main_points[0], 
+                        shape_type: ShapeType::Rotation(*angle) };
                     circles.push(rotation);
                 }
                 Some(circles)

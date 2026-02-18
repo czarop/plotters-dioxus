@@ -105,8 +105,16 @@ pub fn draw_ghost_point_for_ellipse(
                 (cx + proj * sin_n, cy - proj * cos_n)
             }
             5 => {
-                let dist = new_ry + 20.0;
-                (cx - dist * sin_n, cy + dist * cos_n) 
+                // let dist = new_ry + 20.0;
+                // (cx - dist * sin_n, cy + dist * cos_n)
+                let handle_distance = new_ry + 20.0; // Distance from center to the handle
+    
+                // Position the ghost dot relative to the rotated top of the ellipse
+                // (cx - dist * sin, cy + dist * cos)
+                let gx = cx - handle_distance * sin_n;
+                let gy = cy + handle_distance * cos_n;
+                
+                (gx, gy)
             }
             _ => (cursor_x, cursor_y),
         };
