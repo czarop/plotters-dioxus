@@ -460,6 +460,7 @@ fn RenderShape(
                 _ => format!("none"),
             }
         };
+        println!("{transform}");
         match shape {
             GateShape::PolyLine {
                 points,
@@ -569,7 +570,7 @@ fn RenderShape(
                 let rx_px = (x_edge.0 - cp.0).abs();
                 let y_edge = mapper.data_to_pixel(center.0, center.1 + radius_y, None, None);
                 let ry_px = (y_edge.1 - cp.1).abs();
-
+                println!("{degrees_rotation}");
                 rsx! {
                     g { transform,
                         ellipse {

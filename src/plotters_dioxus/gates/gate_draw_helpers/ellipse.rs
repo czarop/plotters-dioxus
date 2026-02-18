@@ -53,7 +53,7 @@ pub fn draw_elipse(
     style: &'static DrawingStyle,
     shape_type: ShapeType,
 ) -> Vec<GateShape> {
-    let degrees_rotation = angle_rotation.to_degrees();
+    let degrees_rotation = -angle_rotation.to_degrees();
     vec![GateShape::Ellipse {
         center,
         radius_x: rx,
@@ -63,27 +63,15 @@ pub fn draw_elipse(
         shape_type,
     }]
 }
-
-pub fn calculate_ellipse_nodes(
-    cx: f32,
-    cy: f32,
-    rx: f32,
-    ry: f32,
-    angle_rad: f32,
-) -> Vec<(f32, f32)> {
+pub fn calculate_ellipse_nodes(cx: f32, cy: f32, rx: f32, ry: f32, angle_rad: f32) -> Vec<(f32, f32)> {
     let (sin_a, cos_a) = angle_rad.sin_cos();
 
     vec![
-        // 0. Center
-        (cx, cy),
-        // 1. Right (rx, 0)
-        (cx + rx * cos_a, cy + rx * sin_a),
-        // 2. Top (0, -ry)
-        (cx + ry * sin_a, cy - ry * cos_a),
-        // 3. Left (-rx, 0)
-        (cx - rx * cos_a, cy - rx * sin_a),
-        // 4. Bottom (0, ry)
-        (cx - ry * sin_a, cy + ry * cos_a),
+        (cx, cy),                                   // 0. Center
+        (cx + rx * cos_a, cy + rx * sin_a),         // 1. Right (Local X+)
+        (cx + ry * sin_a, cy - ry * cos_a),         // 2. Top (Local Y-)
+        (cx - rx * cos_a, cy - rx * sin_a),         // 3. Left (Local X-)
+        (cx - ry * sin_a, cy + ry * cos_a),         // 4. Bottom (Local Y+)
     ]
 }
 
@@ -95,66 +83,30 @@ pub fn draw_ghost_point_for_ellipse(
 ) -> Option<Vec<GateShape>> {
     let (cursor_x, cursor_y) = drag_data.loc();
 
-    if let GateGeometry::Ellipse {
-        center: current_center,
-        radius_x,
-        radius_y,
-        angle,
-    } = curr_geo
-    {
-        let current_cx = current_center.get_coordinate(x_param).unwrap_or_default();
-        let current_cy = current_center.get_coordinate(y_param).unwrap_or_default();
+    if let GateGeometry::Ellipse { center, radius_x, radius_y, angle } = curr_geo {
+        let cx = center.get_coordinate(x_param).unwrap_or_default();
+        let cy = center.get_coordinate(y_param).unwrap_or_default();
         let index = drag_data.point_index();
 
-        // 1. Use the shared helper for radii
         let (new_rx, new_ry, new_angle) = calculate_projected_radii(
-            (cursor_x, cursor_y),
-            (current_cx, current_cy),
-            *radius_x,
-            *radius_y,
-            *angle,
-            index,
+            (cursor_x, cursor_y), (cx, cy), *radius_x, *radius_y, *angle, index,
         );
 
-        // 2. Calculate the snapped ghost point position
         let (sin_n, cos_n) = new_angle.sin_cos();
-        // let dx = cursor_x - current_cx;
-        // let dy = cursor_y - current_cy;
-
-        // let ghost_circle_pos = match index {
-        //     0 => (cursor_x, cursor_y), // Center moves freely
-        //     1 | 3 => {
-        //         let proj_x = dx * cos_a + dy * sin_a;
-        //         (current_cx + proj_x * cos_a, current_cy + proj_x * sin_a)
-        //     }
-        //     2 | 4 => {
-        //         let proj_y = dx * -sin_a + dy * cos_a;
-        //         (current_cx + proj_y * -sin_a, current_cy + proj_y * cos_a)
-        //     }
-        //     _ => (cursor_x, cursor_y),
-        // };
 
         let ghost_circle_pos = match index {
             0 => (cursor_x, cursor_y),
             1 | 3 => {
-                // Snap to Major Axis
-                let dx = cursor_x - current_cx;
-                let dy = cursor_y - current_cy;
-                let proj = dx * cos_n + dy * sin_n;
-                (current_cx + proj * cos_n, current_cy + proj * sin_n)
+                let proj = (cursor_x - cx) * cos_n + (cursor_y - cy) * sin_n;
+                (cx + proj * cos_n, cy + proj * sin_n)
             }
             2 | 4 => {
-                // Snap to Minor Axis
-                let dx = cursor_x - current_cx;
-                let dy = cursor_y - current_cy;
-                let proj = dx * -sin_n + dy * cos_n;
-                (current_cx + proj * -sin_n, current_cy + proj * cos_n)
+                let proj = (cursor_x - cx) * sin_n - (cursor_y - cy) * cos_n;
+                (cx + proj * sin_n, cy - proj * cos_n)
             }
             5 => {
-                // Snap to Rotation Orbit
-                // The dot stays at a fixed distance (e.g., ry + 20) but follows the angle
                 let dist = new_ry + 20.0;
-                (current_cx + dist * sin_n, current_cy - dist * cos_n)
+                (cx - dist * sin_n, cy + dist * cos_n) 
             }
             _ => (cursor_x, cursor_y),
         };
@@ -167,10 +119,10 @@ pub fn draw_ghost_point_for_ellipse(
                 shape_type: ShapeType::GhostPoint,
             },
             GateShape::Ellipse {
-                center: (current_cx, current_cy),
+                center: (cx, cy),
                 radius_x: new_rx,
                 radius_y: new_ry,
-                degrees_rotation: angle.to_degrees(),
+                degrees_rotation: (-new_angle).to_degrees(), // Standard SVG degrees
                 style: &DRAGGED_LINE,
                 shape_type: ShapeType::GhostPoint,
             },
@@ -192,65 +144,30 @@ pub fn calculate_projected_radii(
     let (sin_a, cos_a) = current_angle_rad.sin_cos();
 
     match point_index {
-        // Handle Horizontal Axis (Right/Left)
-        1 | 3 => {
+        1 | 3 => { // Horizontal Axis (Right/Left)
             let rx = (dx * cos_a + dy * sin_a).abs();
             (rx, current_ry, current_angle_rad)
         }
-        // Handle Vertical Axis (Top/Bottom)
-        2 | 4 => {
-            let ry = (dx * -sin_a + dy * cos_a).abs();
+        2 | 4 => { // Vertical Axis (Top/Bottom)
+            // Projects cursor onto the Minor Axis vector (sin, -cos)
+            let ry = (dx * sin_a - dy * cos_a).abs();
             (current_rx, ry, current_angle_rad)
         }
-        // Handle Rotation Handle
-        5 => {
-            // Calculate the angle from center to cursor.
-            // Since our 'Top' handle (index 2) is at -90 degrees (or -PI/2)
-            // relative to the local X axis, we adjust the atan2 result.
-            let mouse_angle = (-dy).atan2(dx);
-            let new_angle = mouse_angle + std::f32::consts::FRAC_PI_2;
-
+        // 5 => { // Rotation Handle
+        //     let mouse_angle = dy.atan2(dx); 
+        //     let new_angle = mouse_angle + std::f32::consts::FRAC_PI_2; 
+        //     (current_rx, current_ry, new_angle)
+        // }
+        5 => { // Rotation Handle
+            let mouse_angle = dy.atan2(dx); 
+            // In Y-up Data Space, Top is +PI/2. 
+            // We subtract PI/2 to align the Ellipse's 0-degree axis.
+            let new_angle = mouse_angle - std::f32::consts::FRAC_PI_2; 
             (current_rx, current_ry, new_angle)
         }
-        // Default (Center or no-op)
         _ => (current_rx, current_ry, current_angle_rad),
     }
 }
-
-// pub fn update_ellipse_geometry(
-//     center: &GateNode,
-//     old_rx: f32,
-//     old_ry: f32,
-//     old_angle: f32,
-//     new_point: (f32, f32),
-//     point_index: usize,
-//     x_param: &str,
-//     y_param: &str,
-// ) -> anyhow::Result<GateGeometry> {
-//     println!("called");
-//     let cx = center.get_coordinate(x_param).unwrap_or(0.0);
-//     let cy = center.get_coordinate(y_param).unwrap_or(0.0);
-
-//     // 1. Calculate new radii (and eventually angle)
-//     let (rx, ry, new_angle) =
-//         calculate_projected_radii(new_point, (cx, cy), old_rx, old_ry, old_angle, point_index);
-
-//     // 2. Reconstruct the 5 points the library expects
-//     let (sin_a, cos_a) = new_angle.sin_cos();
-//     let sanitized_points = vec![
-//         (cx, cy),
-//         (cx + rx * cos_a, cy + rx * sin_a), // Right
-//         (cx + ry * sin_a, cy - ry * cos_a), // Top
-//         (cx - rx * cos_a, cy - rx * sin_a), // Left
-//         (cx - ry * sin_a, cy + ry * cos_a), // Bottom
-//     ];
-
-//     Ok(flow_gates::create_ellipse_geometry(
-//         sanitized_points,
-//         x_param,
-//         y_param,
-//     )?)
-// }
 
 pub fn update_ellipse_geometry(
     center: &GateNode,
@@ -265,40 +182,28 @@ pub fn update_ellipse_geometry(
     let cx = center.get_coordinate(x_param).unwrap_or(0.0);
     let cy = center.get_coordinate(y_param).unwrap_or(0.0);
 
-    // If point_index is 0, we are moving the center (Translation)
-    if point_index == 0 {
-        // Re-construct with new center, same radii/angle
-        let (sin_a, cos_a) = old_angle.sin_cos();
-        let sanitized_points = vec![
-            new_point, // The new center
-            (new_point.0 + old_rx * cos_a, new_point.1 + old_rx * sin_a),
-            (new_point.0 + old_ry * sin_a, new_point.1 - old_ry * cos_a),
-            (new_point.0 - old_rx * cos_a, new_point.1 - old_rx * sin_a),
-            (new_point.0 - old_ry * sin_a, new_point.1 + old_ry * cos_a),
-        ];
-        return Ok(flow_gates::create_ellipse_geometry(
-            sanitized_points,
-            x_param,
-            y_param,
-        )?);
-    }
+    let (final_cx, final_cy, final_rx, final_ry, final_angle) = if point_index == 0 {
+        (new_point.0, new_point.1, old_rx, old_ry, old_angle)
+    } else {
+        let (rx, ry, angle) = calculate_projected_radii(new_point, (cx, cy), old_rx, old_ry, old_angle, point_index);
+        (cx, cy, rx, ry, angle)
+    };
 
-    // Otherwise, we are resizing (1-4) or rotating (5)
-    let (rx, ry, new_angle) =
-        calculate_projected_radii(new_point, (cx, cy), old_rx, old_ry, old_angle, point_index);
+    // CALL THE HELPER HERE
+    let sanitized_points = calculate_ellipse_nodes_y_up(final_cx, final_cy, final_rx, final_ry, final_angle);
 
-    let (sin_a, cos_a) = new_angle.sin_cos();
-    let sanitized_points = vec![
-        (cx, cy),
-        (cx + rx * cos_a, cy + rx * sin_a),
-        (cx + ry * sin_a, cy - ry * cos_a),
-        (cx - rx * cos_a, cy - rx * sin_a),
-        (cx - ry * sin_a, cy + ry * cos_a),
-    ];
-
-    Ok(flow_gates::create_ellipse_geometry(
-        sanitized_points,
-        x_param,
-        y_param,
-    )?)
+    Ok(flow_gates::create_ellipse_geometry(sanitized_points, x_param, y_param)?)
 }
+
+pub fn calculate_ellipse_nodes_y_up(cx: f32, cy: f32, rx: f32, ry: f32, angle_rad: f32) -> Vec<(f32, f32)> {
+    let (sin_a, cos_a) = angle_rad.sin_cos();
+
+    vec![
+        (cx, cy),                                   // 0. Center
+        (cx + rx * cos_a, cy + rx * sin_a),         // 1. Right (Local X+)
+        (cx - ry * sin_a, cy + ry * cos_a),         // 2. Top (Local Y+)
+        (cx - rx * cos_a, cy - rx * sin_a),         // 3. Left (Local X-)
+        (cx + ry * sin_a, cy - ry * cos_a),         // 4. Bottom (Local Y-)
+    ]
+}
+
