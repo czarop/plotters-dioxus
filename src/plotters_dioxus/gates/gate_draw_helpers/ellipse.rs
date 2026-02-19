@@ -1,9 +1,9 @@
 use flow_gates::{GateGeometry, GateNode};
 
-use crate::plotters_dioxus::gates::{
+use crate::plotters_dioxus::{gates::{
     gate_drag::PointDragData,
     gate_styles::{DRAGGED_LINE, DrawingStyle, GateShape, ShapeType},
-};
+}, plot_helpers::PlotMapper};
 
 pub fn is_point_on_ellipse_perimeter(
     point: (f32, f32),
@@ -215,3 +215,28 @@ pub fn calculate_ellipse_nodes_y_up(cx: f32, cy: f32, rx: f32, ry: f32, angle_ra
     ]
 }
 
+pub fn create_default_ellipse(plot_map: &PlotMapper, cx_raw: f32, cy_raw: f32, rx_raw: f32, ry_raw: f32, x_channel: &str, y_channel: &str) -> anyhow::Result<GateGeometry> {
+    let data_coords = plot_map
+        .pixel_to_data(cx_raw, cy_raw, None, None);
+    let (click_x, click_y) = data_coords;
+
+    let edge_x_data = plot_map
+        .pixel_to_data(cx_raw + rx_raw, cy_raw, None, None);
+    let edge_y_data = plot_map
+        .pixel_to_data(cx_raw, cy_raw + ry_raw, None, None);
+    let rx = (edge_x_data.0 - click_x).abs();
+    let ry = (edge_y_data.1 - click_y).abs();
+    let coords = vec![
+        (click_x, click_y),
+        (click_x + rx, click_y),
+        (click_x, click_y + ry),
+        (click_x - rx, click_y),
+        (click_x, click_y - ry),
+    ];
+    flow_gates::geometry::create_ellipse_geometry(
+            coords,
+            x_channel,
+            y_channel,
+        )
+        .map_err(|_| anyhow::anyhow!("failed to create ellipse geometry"))
+}

@@ -41,6 +41,14 @@ pub enum GateShape {
         size: f32,
         shape_center: (f32, f32),
         shape_type: ShapeType,
+    },
+    Rectangle {
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+        style: &'static DrawingStyle,
+        shape_type: ShapeType,
     }
 }
 
@@ -81,6 +89,7 @@ impl GateShape {
             GateShape::Handle { center, size, shape_center, shape_type:_ } => Self::Handle {
                 center: *center, size: *size, shape_center: *shape_center, shape_type: shape_type.clone()
             },
+            GateShape::Rectangle { x, y, width, height, style, shape_type:_ } => Self::Rectangle { x: *x, y: *y, width: *width, height: *height, style: *style, shape_type: shape_type.clone() }
         }
     }
 
@@ -146,6 +155,11 @@ impl GateShape {
                 Self::Handle {
                 center: (center.0 + offset.0, center.1 + offset.1), shape_center: *shape_center, size: *size, shape_type: shape_type.clone()
             }},
+            GateShape::Rectangle { x, y, width, height, style, shape_type } => {
+                let new_x = x + offset.0;
+                let new_y = y + offset.1;
+                Self::Rectangle { x: new_x, y: new_y, width: *width, height: *height, style: *style, shape_type: shape_type.clone() }
+            }
         }
     }
 }

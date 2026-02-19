@@ -133,55 +133,36 @@ impl<Lens> Store<GateState, Lens> {
         point_idx: usize,
         new_point: (f32, f32),
     ) -> anyhow::Result<()> {
-        // we remove first to stop a flicker
-        let mut gate = self.gate_registry()
-        .write()
-        .remove(&gate_id)
-        .ok_or(anyhow!("No Gate Found"))?;
-
-        match gate.replace_point(new_point, point_idx){
-            Ok(_) => {},
-            Err(e) => {
-                self
-                    .gate_registry()
-                    .write()
-                    .insert(gate_id, gate);
-                return Err(e);
-            },
-        };
-
-        gate.set_drag_point(None);
-
-        self
-            .gate_registry()
+        self.gate_registry()
             .write()
-            .insert(gate_id, gate);
+            .get_mut(&gate_id)
+            .and_then(|g| {
+                g.set_drag_point(None);
+                Some(g.replace_point(new_point, point_idx))
+            })
+            .ok_or(anyhow!("No Gate Found"))??;
 
         Ok(())
     }
 
     fn move_gate(&mut self, gate_id: GateKey, data_space_offset: (f32, f32)) -> Result<()> {
-        // we remove first to stop a flicker
-        let mut gate = self.gate_registry()
+
+        self.gate_registry()
         .write()
-        .remove(&gate_id)
-        .ok_or(anyhow!("No Gate Found"))?;
-
-
-        let points = gate
+        .get_mut(&gate_id)
+        .and_then(|g| {
+            let points = g
                 .get_points()
                 .into_iter()
                 .map(|(x, y)| (x - data_space_offset.0, y - data_space_offset.1))
                 .collect();
         
 
-        let _ = gate.replace_points(points)?;
+        Some(g.replace_points(points))
 
-        self
-            .gate_registry()
-            .write()
-            .insert(gate_id, gate);
-        
+        })
+        .ok_or(anyhow!("No Gate Found"))??;
+
         Ok(())
     }
 
@@ -190,29 +171,42 @@ impl<Lens> Store<GateState, Lens> {
         gate_id: GateKey,
         current_position: (f32, f32),
     ) -> anyhow::Result<()> {
-        // we remove first to stop a flicker
-        let mut gate = self.gate_registry()
-        .write()
-        .remove(&gate_id)
-        .ok_or(anyhow!("No Gate Found"))?;
-
-        match gate.rotate_gate(current_position){
-            Ok(_) => {},
-            Err(e) => {
-                self
-                    .gate_registry()
-                    .write()
-                    .insert(gate_id, gate);
-                return Err(e);
-            },
-        };
-
-        self
-            .gate_registry()
+        self.gate_registry()
             .write()
-            .insert(gate_id, gate);
+            .get_mut(&gate_id)
+            .and_then(|g| {
+           
 
-        Ok(())
+            Some(g.rotate_gate(current_position))
+
+            })
+            .ok_or(anyhow!("No Gate Found"))??;
+
+            Ok(())
+        
+        // // we remove first to stop a flicker
+        // let mut gate = self.gate_registry()
+        // .write()
+        // .remove(&gate_id)
+        // .ok_or(anyhow!("No Gate Found"))?;
+
+        // match gate.rotate_gate(current_position){
+        //     Ok(_) => {},
+        //     Err(e) => {
+        //         self
+        //             .gate_registry()
+        //             .write()
+        //             .insert(gate_id, gate);
+        //         return Err(e);
+        //     },
+        // };
+
+        // self
+        //     .gate_registry()
+        //     .write()
+        //     .insert(gate_id, gate);
+
+        // Ok(())
     }
 
     fn get_gates_for_plot(
@@ -236,6 +230,29 @@ impl<Lens> Store<GateState, Lens> {
             return None;
         }
         return Some(gate_list);
+    }
+
+    fn match_gates_to_plot(
+        &mut self,
+        x_axis_title: Arc<str>,
+        y_axis_title: Arc<str>,
+    ) -> anyhow::Result<()> {
+        let x: &str = &x_axis_title;
+        let y: &str = &y_axis_title;
+        let key = GatesOnPlotKey::new(x_axis_title.clone(), y_axis_title.clone(), None);
+        let key_options = self.gate_ids_by_view().get(key);
+        
+        if let Some(key_store) = key_options {
+            let ids = key_store.read().clone();
+            
+            // let registry_guard = registry.write();
+            for k in ids {
+                if let Some(gate) = self.gate_registry().write().get_mut(&k) {
+                    gate.match_to_plot_axis(x, y)?;
+                }
+            }
+        } 
+        return Ok(());
     }
 
     // fn get_boxed_gates_for_plot(

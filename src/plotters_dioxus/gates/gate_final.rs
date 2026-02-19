@@ -2,11 +2,11 @@ use std::{ops::Deref, sync::Arc};
 
 use anyhow::anyhow;
 use flow_fcs::TransformType;
-use flow_gates::{GateGeometry, create_ellipse_geometry, create_polygon_geometry, create_rectangle_geometry, geometry};
+use flow_gates::{GateGeometry, create_ellipse_geometry, create_polygon_geometry, create_rectangle_geometry, geometry, types::LabelPosition};
 
 use crate::plotters_dioxus::{
     PlotDrawable, axis_info::{asinh_reverse_f32, asinh_transform_f32}, gates::{
-        gate_drag::{PointDragData}, gate_draw_helpers::{ellipse::{calculate_ellipse_nodes, draw_elipse, draw_ghost_point_for_ellipse, is_point_on_ellipse_perimeter, update_ellipse_geometry}, polygon::{draw_ghost_point_for_polygon, draw_polygon, is_point_on_polygon_perimeter}}, gate_styles::{
+        gate_drag::PointDragData, gate_draw_helpers::{ellipse::{calculate_ellipse_nodes, draw_elipse, draw_ghost_point_for_ellipse, is_point_on_ellipse_perimeter, update_ellipse_geometry}, polygon::{draw_ghost_point_for_polygon, draw_polygon, is_point_on_polygon_perimeter}, rectangle::{draw_rectangle, is_point_on_rectangle_perimeter}}, gate_styles::{
             DEFAULT_LINE, GateShape, SELECTED_LINE,
             ShapeType,
         }
@@ -50,7 +50,7 @@ impl GateFinal {
     pub fn is_point_on_perimeter(&self, point: (f32, f32), tolerance: (f32, f32)) -> Option<f32> {
         match &self.inner.geometry{
             GateGeometry::Polygon { .. } => is_point_on_polygon_perimeter(self, point, tolerance),
-            GateGeometry::Rectangle { .. } => todo!(),
+            GateGeometry::Rectangle { .. } => is_point_on_rectangle_perimeter(self, point, tolerance),
             GateGeometry::Ellipse { center, radius_x: rx, radius_y: ry, angle  } => {
                 let x = center.get_coordinate(self.x_parameter_channel_name()).unwrap_or_default();
                 let y = center.get_coordinate(self.y_parameter_channel_name()).unwrap_or_default();
@@ -58,6 +58,73 @@ impl GateFinal {
             },
             GateGeometry::Boolean { .. } => todo!(),
         }
+    }
+
+    pub fn match_to_plot_axis(&mut self, plot_x_param: &str, plot_y_param: &str) -> anyhow::Result<()> {
+        if plot_x_param == self.x_parameter_channel_name() && plot_y_param == self.y_parameter_channel_name() {
+            return Ok(());
+        } else if plot_x_param == self.y_parameter_channel_name() && plot_y_param == self.x_parameter_channel_name() {
+            self.swap_axis()
+        } else {
+            Err(anyhow!("Gate {} not applicable for plot axis {} and {}", self.id, plot_x_param, plot_y_param))
+        }
+    }
+
+    fn swap_axis(&mut self) -> anyhow::Result<()> {
+        let (curr_x, curr_y) = &self.inner.parameters;
+        let new_params = (curr_y.clone(), curr_x.clone());
+        
+        let (x_param, y_param) = &new_params;
+
+        let swapped_points = self.to_render_points(curr_y, curr_x);
+        let new_geo = match &self.geometry {
+            GateGeometry::Polygon { .. } => None,
+            GateGeometry::Rectangle { .. } => Some(create_rectangle_geometry(swapped_points, x_param, y_param)?),
+            GateGeometry::Ellipse { center, radius_x, radius_y, angle } => {
+                //format: [center, right/end, top, left/start, bottom]
+                if let (Some(cx), Some(cy)) = (
+                    center.get_coordinate(curr_x),
+                    center.get_coordinate(curr_y),
+                ) {
+                    let pts = calculate_ellipse_nodes(cx, cy, *radius_x, *radius_y, *angle);
+    
+        
+                    let reflect = |(x, y): (f32, f32)| (y, x);
+
+                    let mirrored_pts = vec![
+                        reflect(pts[0]),
+                        reflect(pts[3]),
+                        reflect(pts[4]),
+                        reflect(pts[1]),
+                        reflect(pts[2]),
+                    ];
+                    Some(create_ellipse_geometry(mirrored_pts, x_param, y_param)?)
+                } else {
+                    panic!("failed to make ellipse geometry")
+                }
+                
+            },
+            GateGeometry::Boolean { .. } => todo!(),
+        };
+
+        let new_label_poition = match &self.inner.label_position{
+            Some(pos) => {
+                Some(LabelPosition{ offset_x: pos.offset_y, offset_y: pos.offset_x })
+            },
+            None => None,
+        };
+
+        self.inner.parameters = new_params;
+        if new_geo.is_some() {
+            self.inner.geometry = new_geo.unwrap();
+        }
+        
+        self.inner.label_position = new_label_poition;
+
+        self.set_drag_point(None);
+        self.set_selected(false);
+
+        Ok(())
     }
 
     pub fn recalculate_gate_for_rescaled_axis(
@@ -271,6 +338,13 @@ impl PlotDrawable for GateFinal {
                 gate_line_style,
                 ShapeType::Gate(self.id.clone()),
             )},
+            GateGeometry::Rectangle { min, max } => {
+                draw_rectangle(main_points[0],
+                    main_points[2],
+                gate_line_style,
+                ShapeType::Gate(self.id.clone()),
+                )
+            }
             _ => todo!(),
         };
         let selected_points = {
