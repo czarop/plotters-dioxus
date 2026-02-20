@@ -1,19 +1,14 @@
+
 use dioxus::prelude::*;
 
-#[derive(Clone, PartialEq)]
-pub enum GateShapeStub {
-    Polygon,
-    Ellipse,
-    Rectangle,
-    Line,
-    Quadrant
-}
+use crate::plotters_dioxus::gates::gate_types::GateType;
+
 
 #[component]
-pub fn NewGateButtons(callback: EventHandler<GateShapeStub>) -> Element {
+pub fn NewGateButtons(callback: EventHandler<GateType>) -> Element {
     rsx! {
-        button { onclick: move |_| callback.call(GateShapeStub::Polygon), "P" }
-        button { onclick: move |_| callback.call(GateShapeStub::Ellipse), "E" }
-        button { onclick: move |_| callback.call(GateShapeStub::Rectangle), "R" }
+        button { onclick: move |_| callback.call(GateType::Polygon), "P" }
+        button { onclick: move |_| callback.call(GateType::Ellipse), "E" }
+        button { onclick: move |_| callback.call(GateType::Rectangle), "R" }
     }
 }

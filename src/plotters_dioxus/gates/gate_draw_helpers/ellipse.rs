@@ -2,7 +2,7 @@ use flow_gates::{GateGeometry, GateNode};
 
 use crate::plotters_dioxus::{gates::{
     gate_drag::PointDragData,
-    gate_styles::{DRAGGED_LINE, DrawingStyle, GateShape, ShapeType},
+    gate_types::{DRAGGED_LINE, DrawingStyle, GateShape, ShapeType},
 }, plot_helpers::PlotMapper};
 
 pub fn is_point_on_ellipse_perimeter(

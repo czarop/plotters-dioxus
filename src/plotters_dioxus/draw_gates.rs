@@ -1,9 +1,9 @@
 use crate::plotters_dioxus::{
         PlotDrawable, gates::{
-            GateState, gate_buttons::GateShapeStub, gate_draft::GateDraft, gate_drag::{GateDragData, GateDragType, PointDragData, RotationData}, gate_draw_helpers::rectangle::map_rect_to_pixels, gate_final::GateFinal, gate_store::{GateStateImplExt, GateStateStoreExt as _}, gate_styles::{GateShape, ShapeType}
+            GateState, gate_draft::GateDraft, gate_drag::{GateDragData, GateDragType, PointDragData, RotationData}, gate_draw_helpers::rectangle::map_rect_to_pixels, gate_final::GateFinal, gate_store::{GateStateImplExt, GateStateStoreExt as _}, gate_types::{GateShape, GateType, ShapeType}
         }, plot_helpers::PlotMapper
     };
-use anyhow::anyhow;
+
 use dioxus::prelude::*;
 use flow_gates::Gate;
 use std::{sync::Arc};
@@ -18,12 +18,12 @@ pub fn GateLayer(
     let mut draft_gate_coords = use_signal(|| Vec::<(f32, f32)>::new());
     let mut next_gate_id = use_signal(|| 0);
     let mut selected_gate_id = use_signal(|| None::<Arc<str>>);
-    let current_gate_type = use_context::<Signal<GateShapeStub>>();
+    let current_gate_type = use_context::<Signal<GateType>>();
 
     // convert clicked coords into a draft gate
     let draft_gate = use_memo(move || {
         
-        if let GateShapeStub::Polygon = &*current_gate_type.read(){
+        if let GateType::Polygon = &*current_gate_type.read(){
             let cur_coords = draft_gate_coords();
             if cur_coords.len() > 0 {
                 let gate_draft = GateDraft::new_polygon(cur_coords, x_channel(), y_channel());
@@ -95,7 +95,7 @@ pub fn GateLayer(
                             }
                             if clicked_gate.is_none() {
                                 if selected_gate_id.peek().is_none() {
-                                    if &GateShapeStub::Polygon == &*current_gate_type.peek() {
+                                    if &GateType::Polygon == &*current_gate_type.peek() {
                                         draft_gate_coords.write().push((data_x, data_y));
                                     }
                                 } else if drag_data.peek().is_none() {
@@ -131,48 +131,24 @@ pub fn GateLayer(
                         let local_coords = evt.data.coordinates().element();
                         let px = local_coords.x as f32;
                         let py = local_coords.y as f32;
+                        let x_param = &*x_channel.peek();
+                        let y_param = &*y_channel.peek();
 
-                        let geometry_res = match current_gate_type() {
-                            GateShapeStub::Polygon => {
-                                if let Some(curr_gate) = &*draft_gate.peek() {
-                                    let mut points = curr_gate.get_points();
-                                    draft_gate_coords.write().clear();
-                                    points.pop();
-                                    flow_gates::geometry::create_polygon_geometry(
-                                            points,
-                                            &*x_channel(),
-                                            &*y_channel(),
-                                        )
-                                        .map_err(|_| anyhow!("failed to create polygon geometry"))
-                                } else {
-                                    Err(anyhow!("No draft gate"))
-                                }
-                            }
-                            GateShapeStub::Ellipse => {
-                                crate::plotters_dioxus::gates::gate_draw_helpers::ellipse::create_default_ellipse(
-                                    &mapper,
-                                    px,
-                                    py,
-                                    50f32,
-                                    30f32,
-                                    &x_channel(),
-                                    &y_channel(),
-                                )
-                            }
-                            GateShapeStub::Line => todo!(),
-                            GateShapeStub::Quadrant => todo!(),
-                            GateShapeStub::Rectangle => {
-                                crate::plotters_dioxus::gates::gate_draw_helpers::rectangle::create_default_rectangle(
-                                    &mapper,
-                                    px,
-                                    py,
-                                    50f32,
-                                    50f32,
-                                    &x_channel(),
-                                    &y_channel(),
-                                )
+                        let points = {
+                            if let Some(curr_gate) = &*draft_gate.peek() {
+                                let mut points = curr_gate.get_points();
+                                draft_gate_coords.write().clear();
+                                points.pop();
+                                Some(points)
+                            } else {
+                                None
                             }
                         };
+
+                        let geometry_res = current_gate_type
+                            .peek()
+                            .to_gate_geometry(&mapper, px, py, x_param, y_param, points);
+
                         match geometry_res {
                             Ok(gate) => {
                                 let id = *next_gate_id.peek();
@@ -183,7 +159,9 @@ pub fn GateLayer(
                                     x_channel(),
                                     y_channel(),
                                 );
-                                gate_store.add_gate(g, None).expect("Failed to add gate to gate store");
+                                gate_store
+                                    .add_gate(g, None, *current_gate_type.peek())
+                                    .expect("Failed to add gate to gate store");
                                 *next_gate_id.write() += 1;
                             }
                             Err(_) => {}
@@ -199,6 +177,7 @@ pub fn GateLayer(
                                 .as_ref()
                                 .unwrap()
                                 .pixel_to_data(px, py, None, None);
+
                             let new_data = data.clone_with_point(data_coords);
                             drag_data.set(Some(new_data));
 
@@ -373,28 +352,6 @@ fn RenderDraftGate(
     }
 }
 
-// #[component]
-// fn RenderGate(
-//     gate: GateFinal,
-//     gate_index: usize,
-//     drag_data: Signal<Option<GateDragType>>,
-//     plot_map: ReadSignal<Option<PlotMapper>>,
-// ) -> Element {
-
-//     rsx! {
-//         for (shape_index , shape) in gate.draw_self().into_iter().enumerate() {
-//             RenderShape {
-//                 shape,
-//                 gate_id: gate.id.clone(),
-//                 gate_index,
-//                 shape_index,
-//                 drag_data,
-//                 plot_map,
-//             }
-//         }
-//     }
-// }
-
 #[component]
 fn RenderShape(
     shape: GateShape,
@@ -566,7 +523,6 @@ fn RenderShape(
                 
                 let pixel_offset = 15.0;
                 let handle_x = c.0;
-                // Move 'up' in pixel space (closer to 0)
                 let handle_y = c.1 - (size + pixel_offset); 
 
                 let translate = {
@@ -586,7 +542,6 @@ fn RenderShape(
                 }};
                 let rotate = { 
                     if let Some(GateDragType::Rotation(data)) = &*drag_data.read() {
-                        // During drag, use the live drag degrees, added to the current saved angle
                         if let ShapeType::Rotation(handle_angle_rad) = shape_type {
                             let angle = -(handle_angle_rad.to_degrees()) + data.rotation_deg();
                             Some(format!("rotate({} {} {})", angle, cp.0, cp.1))
@@ -595,7 +550,6 @@ fn RenderShape(
                         }
                     
                     } else if let ShapeType::Rotation(handle_angle_rad) = shape_type {
-                        // After drag, use the saved angle (negated for SVG/Mapper inversion)
                         let r = -(handle_angle_rad.to_degrees());
                         Some(format!("rotate({} {} {})", r, cp.0, cp.1))
                     } else {

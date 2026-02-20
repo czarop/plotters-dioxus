@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::plotters_dioxus::{
     PlotDrawable,
-    gates::gate_styles::{DRAFT_LINE, GateShape, ShapeType},
+    gates::gate_types::{DRAFT_LINE, GateShape, ShapeType},
 };
 
 #[derive(PartialEq, Clone)]

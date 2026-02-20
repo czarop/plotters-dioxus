@@ -1,6 +1,4 @@
-use std::{sync::Arc};
-
-use crate::plotters_dioxus::gates::gate_styles::GateShape;
+use crate::plotters_dioxus::gates::gate_types::GateShape;
 
 pub trait PlotDrawable {
     fn get_points(&self) -> Vec<(f32, f32)>;

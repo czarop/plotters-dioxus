@@ -4,7 +4,7 @@ use flow_gates::{Gate, GateHierarchy};
 
 use std::{collections::HashMap, sync::Arc};
 
-use crate::plotters_dioxus::{AxisInfo, PlotDrawable, gates::gate_final::GateFinal};
+use crate::plotters_dioxus::{AxisInfo, PlotDrawable, gates::{gate_final::GateFinal, gate_types::GateType}};
 
 pub type Id = std::sync::Arc<str>;
 
@@ -76,7 +76,7 @@ pub struct GateState {
 
 #[store(pub name = GateStateImplExt)]
 impl<Lens> Store<GateState, Lens> {
-    fn add_gate(&mut self, gate: Gate, parental_gate_id: Option<Id>) -> Result<()> {
+    fn add_gate(&mut self, gate: Gate, parental_gate_id: Option<Id>, gate_type: GateType) -> Result<()> {
         println!(
             "{}, {}",
             gate.x_parameter_channel_name(),
@@ -101,7 +101,7 @@ impl<Lens> Store<GateState, Lens> {
 
         self.gate_registry()
             .write()
-            .insert(gate_key, GateFinal::new(gate, false));
+            .insert(gate_key, GateFinal::new(gate, false, gate_type));
 
         Ok(())
     }

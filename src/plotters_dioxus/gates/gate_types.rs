@@ -1,5 +1,68 @@
 use crate::plotters_dioxus::gates::gate_store::Id;
 
+use anyhow::anyhow;
+use flow_gates::GateGeometry;
+
+use crate::plotters_dioxus::plot_helpers::PlotMapper;
+
+#[derive(Clone, PartialEq, Copy)]
+pub enum GateType {
+    Polygon,
+    Ellipse,
+    Rectangle,
+    Line,
+    Quadrant,
+    Bisector,
+    FlexibleQuadrant,
+}
+
+impl GateType {
+    pub fn to_gate_geometry(
+        &self,
+        mapper: &PlotMapper,
+        click_x: f32,
+        click_y: f32,
+        x_param: &str,
+        y_param: &str,
+        points: Option<Vec<(f32, f32)>>,
+    ) -> anyhow::Result<GateGeometry> {
+        match self {
+            GateType::Polygon => flow_gates::geometry::create_polygon_geometry(
+                                            points.ok_or(anyhow!("points not provided for polygon gate"))?,
+                                            x_param,
+                                            y_param,
+                                        )
+                                        .map_err(|_| anyhow!("failed to create polygon geometry")),
+            GateType::Ellipse => {
+                crate::plotters_dioxus::gates::gate_draw_helpers::ellipse::create_default_ellipse(
+                                    &mapper,
+                                    click_x,
+                                    click_y,
+                                    50f32,
+                                    30f32,
+                                    x_param,
+                                    y_param,
+                                )
+            },
+            GateType::Rectangle => {
+                crate::plotters_dioxus::gates::gate_draw_helpers::rectangle::create_default_rectangle(
+                                    &mapper,
+                                    click_x,
+                                    click_y,
+                                    50f32,
+                                    50f32,
+                                    x_param,
+                                    y_param,
+                                )
+            },
+            GateType::Line => todo!(),
+            GateType::Quadrant => todo!(),
+            GateType::Bisector => todo!(),
+            GateType::FlexibleQuadrant => todo!(),
+        }
+    }
+}
+
 #[derive(PartialEq, Clone)]
 pub enum ShapeType {
     Gate(Id),
@@ -49,7 +112,7 @@ pub enum GateShape {
         height: f32,
         style: &'static DrawingStyle,
         shape_type: ShapeType,
-    }
+    },
 }
 
 impl GateShape {
@@ -84,12 +147,47 @@ impl GateShape {
                 style: style,
                 shape_type: shape_type.clone(),
             },
-            GateShape::Ellipse { center, radius_x, radius_y, degrees_rotation, style:_, shape_type:_ } => GateShape::Ellipse 
-            { center: *center, radius_x: *radius_x, radius_y: *radius_y, degrees_rotation: *degrees_rotation, style: style, shape_type: shape_type.clone() },
-            GateShape::Handle { center, size, shape_center, shape_type:_ } => Self::Handle {
-                center: *center, size: *size, shape_center: *shape_center, shape_type: shape_type.clone()
+            GateShape::Ellipse {
+                center,
+                radius_x,
+                radius_y,
+                degrees_rotation,
+                style: _,
+                shape_type: _,
+            } => GateShape::Ellipse {
+                center: *center,
+                radius_x: *radius_x,
+                radius_y: *radius_y,
+                degrees_rotation: *degrees_rotation,
+                style: style,
+                shape_type: shape_type.clone(),
             },
-            GateShape::Rectangle { x, y, width, height, style, shape_type:_ } => Self::Rectangle { x: *x, y: *y, width: *width, height: *height, style: *style, shape_type: shape_type.clone() }
+            GateShape::Handle {
+                center,
+                size,
+                shape_center,
+                shape_type: _,
+            } => Self::Handle {
+                center: *center,
+                size: *size,
+                shape_center: *shape_center,
+                shape_type: shape_type.clone(),
+            },
+            GateShape::Rectangle {
+                x,
+                y,
+                width,
+                height,
+                style,
+                shape_type: _,
+            } => Self::Rectangle {
+                x: *x,
+                y: *y,
+                width: *width,
+                height: *height,
+                style: *style,
+                shape_type: shape_type.clone(),
+            },
         }
     }
 
@@ -135,9 +233,14 @@ impl GateShape {
                     style: style,
                     shape_type: shape_type.clone(),
                 }
-            },
+            }
             GateShape::Ellipse {
-                center, radius_x, radius_y, degrees_rotation, style, shape_type,
+                center,
+                radius_x,
+                radius_y,
+                degrees_rotation,
+                style,
+                shape_type,
             } => {
                 let c = (center.0 - offset.0, center.1 - offset.1);
 
@@ -146,19 +249,39 @@ impl GateShape {
                     radius_x: *radius_x,
                     radius_y: *radius_y,
                     degrees_rotation: *degrees_rotation,
-                                        style: style,
+                    style: style,
                     shape_type: shape_type.clone(),
                 }
             }
-            GateShape::Handle { center, size, shape_center, shape_type } => {
-                
-                Self::Handle {
-                center: (center.0 + offset.0, center.1 + offset.1), shape_center: *shape_center, size: *size, shape_type: shape_type.clone()
-            }},
-            GateShape::Rectangle { x, y, width, height, style, shape_type } => {
+            GateShape::Handle {
+                center,
+                size,
+                shape_center,
+                shape_type,
+            } => Self::Handle {
+                center: (center.0 + offset.0, center.1 + offset.1),
+                shape_center: *shape_center,
+                size: *size,
+                shape_type: shape_type.clone(),
+            },
+            GateShape::Rectangle {
+                x,
+                y,
+                width,
+                height,
+                style,
+                shape_type,
+            } => {
                 let new_x = x + offset.0;
                 let new_y = y + offset.1;
-                Self::Rectangle { x: new_x, y: new_y, width: *width, height: *height, style: *style, shape_type: shape_type.clone() }
+                Self::Rectangle {
+                    x: new_x,
+                    y: new_y,
+                    width: *width,
+                    height: *height,
+                    style: *style,
+                    shape_type: shape_type.clone(),
+                }
             }
         }
     }

@@ -3,7 +3,7 @@ use dioxus::prelude::*;
 use crate::{
     file_load::FcsFiles,
     
-    plotters_dioxus::{AxisInfo, PseudoColourPlot, gates::{GateState, gate_buttons::GateShapeStub, gate_store::GateStateImplExt}, plot_helpers::{Param, ParameterStore, ParameterStoreImplExt, ParameterStoreStoreExt as _}},
+    plotters_dioxus::{AxisInfo, PseudoColourPlot, gates::{GateState, gate_store::GateStateImplExt, gate_types::GateType}, plot_helpers::{Param, ParameterStore, ParameterStoreImplExt, ParameterStoreStoreExt as _}},
     searchable_select::SearchableSelect,
 };
 use flow_fcs::{Fcs, TransformType, Transformable};
@@ -52,7 +52,7 @@ pub fn PlotWindow() -> Element {
     let mut gate_store = use_store(|| GateState::default());
     use_context_provider(|| gate_store);
 
-    let mut current_gate_type = use_signal(|| GateShapeStub::Polygon);
+    let mut current_gate_type = use_signal(|| GateType::Polygon);
     use_context_provider(|| current_gate_type);
 
     let _ = use_resource(move || async move {

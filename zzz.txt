@@ -1,25 +1,22 @@
-swap axis on gates when showing same gates with swap axis.
-
-
 gating hierarchy
 Gating hierarchy panel
 Select gated events
 
-Elipse gates
-Rectangle gates
 Line gates
+Bisect gates
 Quadrant gates
-Not gates
-
-Histogram
+Flexi-Quadrant Gates
+NOT gates
+AND gates
+OR gates
 
 Delete gates
-Sample-specific gating
 
 Metadata
 Metadata Groups
 Metadata-specific Gating
 Set Metadata from FCS or Omiq
+Sample-specific gating
 
 Paired samples (FMX FS)
 
@@ -32,6 +29,10 @@ Send Scaling to omiq Scaling
 Set Comp from omiq Comp
 
 
+Nice to have:
+NAND gates
+NOR gates
 
+Histogram
 
 

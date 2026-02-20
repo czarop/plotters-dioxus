@@ -2,7 +2,7 @@ use crate::plotters_dioxus::{
     PlotDrawable,
     gates::{
         gate_drag::PointDragData,
-        gate_styles::{DRAGGED_LINE, DrawingStyle, GateShape, ShapeType},
+        gate_types::{DRAGGED_LINE, DrawingStyle, GateShape, ShapeType},
     },
 };
 

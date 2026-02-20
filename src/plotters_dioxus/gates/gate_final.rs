@@ -1,4 +1,4 @@
-use std::{ops::Deref, sync::Arc};
+use std::{ops::Deref};
 
 use anyhow::anyhow;
 use flow_fcs::TransformType;
@@ -6,9 +6,8 @@ use flow_gates::{GateGeometry, create_ellipse_geometry, create_polygon_geometry,
 
 use crate::plotters_dioxus::{
     PlotDrawable, axis_info::{asinh_reverse_f32, asinh_transform_f32}, gates::{
-        gate_drag::PointDragData, gate_draw_helpers::{ellipse::{calculate_ellipse_nodes, draw_elipse, draw_ghost_point_for_ellipse, is_point_on_ellipse_perimeter, update_ellipse_geometry}, polygon::{draw_ghost_point_for_polygon, draw_polygon, is_point_on_polygon_perimeter}, rectangle::{draw_rectangle, is_point_on_rectangle_perimeter}}, gate_styles::{
-            DEFAULT_LINE, GateShape, SELECTED_LINE,
-            ShapeType,
+        gate_drag::PointDragData, gate_draw_helpers::{ellipse::{calculate_ellipse_nodes, draw_elipse, draw_ghost_point_for_ellipse, is_point_on_ellipse_perimeter, update_ellipse_geometry}, polygon::{draw_ghost_point_for_polygon, draw_polygon, is_point_on_polygon_perimeter}, rectangle::{draw_ghost_point_for_rectangle, draw_rectangle, is_point_on_rectangle_perimeter, update_rectangle_geometry}}, gate_types::{
+            DEFAULT_LINE, GateShape, GateType, SELECTED_LINE, ShapeType
         }
     }
 };
@@ -18,15 +17,16 @@ pub struct GateFinal {
     inner: flow_gates::Gate,
     selected: bool,
     drag_point: Option<PointDragData>,
-
+    gate_type: GateType
 }
 
 impl GateFinal {
-    pub fn new(gate: flow_gates::Gate, selected: bool) -> Self {
+    pub fn new(gate: flow_gates::Gate, selected: bool, gate_type: GateType) -> Self {
         GateFinal {
             inner: gate,
             selected,
             drag_point: None,
+            gate_type,
         }
     }
 
@@ -185,6 +185,7 @@ impl GateFinal {
                     max.get_coordinate(y_param),
                 ) {
                     // Create the 4 corners of the rectangle in sequence
+                    // [bottom-left, bottom-right, top-right, top-left]
                     vec![(x1, y1), (x2, y1), (x2, y2), (x1, y2)]
                 } else {
                     vec![]
@@ -254,7 +255,10 @@ impl GateFinal {
                 }
                 self.inner.geometry = create_polygon_geometry(p, x_param, y_param)?;
             },
-            GateGeometry::Rectangle { .. } => todo!(),
+            GateGeometry::Rectangle { .. } => {
+                let p = self.get_points();
+                self.inner.geometry = update_rectangle_geometry(p, new_point, point_index, x_param, y_param)?;
+            },
             GateGeometry::Ellipse { center, radius_x, radius_y, angle } => {
 
                 self.inner.geometry = update_ellipse_geometry(center, *radius_x, *radius_y, *angle, new_point, point_index, x_param, y_param)?;
@@ -376,6 +380,9 @@ impl PlotDrawable for GateFinal {
                     } => draw_ghost_point_for_polygon(&drag_data, &main_points),
                     GateGeometry::Ellipse { .. } => {
                         draw_ghost_point_for_ellipse(&self.inner.geometry, &drag_data, self.x_parameter_channel_name(), self.y_parameter_channel_name())
+                    }
+                    GateGeometry::Rectangle { .. } => {
+                        draw_ghost_point_for_rectangle(&drag_data, &main_points)
                     }
                     _ => todo!(),
                 }

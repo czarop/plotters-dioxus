@@ -1,8 +1,10 @@
+use std::any;
+
 use flow_gates::GateGeometry;
 
 use crate::plotters_dioxus::{
     PlotDrawable,
-    gates::gate_styles::{DrawingStyle, GateShape, ShapeType},
+    gates::{gate_drag::PointDragData, gate_types::{DRAGGED_LINE, DrawingStyle, GateShape, ShapeType}},
     plot_helpers::PlotMapper,
 };
 
@@ -107,4 +109,124 @@ pub fn is_point_on_rectangle_perimeter(
     } else {
         return Some(closest);
     }
+}
+
+pub fn draw_ghost_point_for_rectangle(
+    drag_data: &PointDragData,
+    main_points: &[(f32, f32)],
+) -> Option<Vec<GateShape>> {
+    // [bottom-left, bottom-right, top-right, top-left]
+    let idx = drag_data.point_index();
+    let current = drag_data.loc();
+
+    let (x, y, width, height) = match idx {
+    0 => { // Bottom-Left dragged -> Anchor is Top-Right (Index 2)
+        let anchor = main_points[2];
+        let x = current.0.min(anchor.0);
+        let y = current.1.max(anchor.1); // In data space, Top is Max Y
+        let w = (current.0 - anchor.0).abs();
+        let h = (current.1 - anchor.1).abs();
+        (x, y, w, h)
+    }
+    1 => { // Bottom-Right dragged -> Anchor is Top-Left (Index 3)
+        let anchor = main_points[3];
+        let x = current.0.min(anchor.0);
+        let y = current.1.max(anchor.1);
+        let w = (current.0 - anchor.0).abs();
+        let h = (current.1 - anchor.1).abs();
+        (x, y, w, h)
+    }
+    2 => { // Top-Right dragged -> Anchor is Bottom-Left (Index 0)
+        let anchor = main_points[0];
+        let x = current.0.min(anchor.0);
+        let y = current.1.max(anchor.1);
+        let w = (current.0 - anchor.0).abs();
+        let h = (current.1 - anchor.1).abs();
+        (x, y, w, h)
+    }
+    3 => { // Top-Left dragged -> Anchor is Bottom-Right (Index 1)
+        let anchor = main_points[1];
+        let x = current.0.min(anchor.0);
+        let y = current.1.max(anchor.1);
+        let w = (current.0 - anchor.0).abs();
+        let h = (current.1 - anchor.1).abs();
+        (x, y, w, h)
+    }
+    _ => unreachable!(),
+};
+
+    let new_rect = GateShape::Rectangle {
+        x,
+        y,
+        width,
+        height,
+        style: &DRAGGED_LINE,
+        shape_type: ShapeType::GhostPoint,
+    };
+
+    let point_curr = GateShape::Circle {
+        center: current,
+        radius: 5.0,
+        fill: "yellow",
+        shape_type: ShapeType::GhostPoint,
+    };
+
+    Some(vec![new_rect, point_curr])
+}
+
+pub fn update_rectangle_geometry(
+    mut current_points: Vec<(f32, f32)>,
+    new_point: (f32, f32),
+    point_index: usize,
+    x_param: &str,
+    y_param: &str,
+) -> anyhow::Result<GateGeometry> {
+
+    let n = current_points.len();
+
+    if point_index >= n {
+        return Err(anyhow::anyhow!("invalid point index for rectangle geometry"));
+    }
+
+    
+    let idx_before = (point_index + n - 1) % n;
+    let idx_after = (point_index + 1) % n;
+    
+    let p_prev = current_points[idx_before];
+    let p_next = current_points[idx_after];
+
+    let prev ;
+    let current = new_point;
+    let next ;
+    
+    match point_index {
+        0 => {
+            //top-left, bottom-left, bottom-right
+            prev = (current.0, p_prev.1);
+            next = (p_next.0, current.1);
+        },
+        1 => {
+            //bottom-left, bottom-right, top-right
+            prev = (p_prev.0, current.1);
+            next = (current.0, p_next.1);
+        },
+        2 => {
+            //bottom-right, top-right, top-left
+            prev = (current.0, p_prev.1);
+            next = (p_next.0, current.1);
+        },
+        3 => {
+            //top-right, top-left, bottom-left
+            prev = (p_prev.0, current.1);
+            next = (current.0, p_next.1);
+        },
+        _ => return Err(anyhow::anyhow!("invalid point index for rectangle geometry")),
+    }
+
+    current_points[point_index] = new_point;
+    current_points[idx_before] = prev;
+    current_points[idx_after] = next;
+
+    flow_gates::geometry::create_rectangle_geometry(current_points, x_param, y_param)
+        .map_err(|_| anyhow::anyhow!("failed to update rectangle geometry"))
 }
