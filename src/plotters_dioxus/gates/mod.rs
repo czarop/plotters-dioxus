@@ -7,3 +7,4 @@ pub use gate_store::{GateKey, GatePositionKey, GateState, GatesOnPlotKey, Id};
 pub mod gate_buttons;
 pub mod gate_draw_helpers;
 pub mod gate_traits;
+// pub mod gate_composite;

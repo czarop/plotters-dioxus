@@ -4,7 +4,7 @@ use flow_gates::{Gate, GateHierarchy};
 
 use std::{collections::HashMap, sync::{Arc, Mutex}};
 
-use crate::plotters_dioxus::{AxisInfo, gates::{gate_single::SingleGate, gate_traits::{DrawableGate}, gate_types::GateType}};
+use crate::plotters_dioxus::{AxisInfo, gates::{gate_single::{EllipseGate, PolygonGate, RectangleGate}, gate_traits::DrawableGate, gate_types::GateType}};
 
 pub type Id = std::sync::Arc<str>;
 
@@ -99,9 +99,19 @@ impl<Lens> Store<GateState, Lens> {
             gate.id.clone(),
         )?;
 
+        let g: Arc<Mutex<dyn DrawableGate + 'static>>  = match gate_type {
+            GateType::Polygon => Arc::new(Mutex::new(PolygonGate {inner: gate, selected: false, drag_point: None})),
+            GateType::Ellipse => Arc::new(Mutex::new(EllipseGate {inner: gate, selected: false, drag_point: None})),
+            GateType::Rectangle => Arc::new(Mutex::new(RectangleGate {inner: gate, selected: false, drag_point: None})),
+            GateType::Line => todo!(),
+            GateType::Bisector => todo!(),
+            GateType::Quadrant => todo!(),
+            GateType::FlexiQuadrant => todo!(),
+        };
+
         self.gate_registry()
             .write()
-            .insert(gate_key, Arc::new(Mutex::new(SingleGate::new(gate, false, gate_type))));
+            .insert(gate_key, g);
 
         Ok(())
     }

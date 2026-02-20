@@ -7,6 +7,8 @@ use crate::plotters_dioxus::{PlotDrawable, gates::gate_drag::PointDragData};
 pub trait DrawableGate: GateTrait + PlotDrawable {}
 
 pub trait GateTrait {
+    fn is_composite(&self) -> bool;
+
     fn get_id(&self) -> Arc<str>;
 
     fn get_params(&self) -> (Arc<str>, Arc<str>);

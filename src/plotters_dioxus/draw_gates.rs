@@ -1,6 +1,6 @@
 use crate::plotters_dioxus::{
         PlotDrawable, gates::{
-            GateState, gate_draft::GateDraft, gate_drag::{GateDragData, GateDragType, PointDragData, RotationData}, gate_draw_helpers::rectangle::map_rect_to_pixels, gate_single::SingleGate, gate_store::{GateStateImplExt, GateStateStoreExt as _}, gate_traits::DrawableGate, gate_types::{GateRenderShape, GateType, ShapeType}
+            GateState, gate_draft::GateDraft, gate_drag::{GateDragData, GateDragType, PointDragData, RotationData}, gate_draw_helpers::rectangle::map_rect_to_pixels, gate_store::{GateStateImplExt, GateStateStoreExt as _}, gate_traits::DrawableGate, gate_types::{GateRenderShape, GateType, ShapeType}
         }, plot_helpers::PlotMapper
     };
 

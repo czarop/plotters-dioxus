@@ -5,11 +5,6 @@ use flow_gates::{GateGeometry};
 
 use crate::plotters_dioxus::plot_helpers::PlotMapper;
 
-// #[derive(Clone, PartialEq)]
-// pub enum GateClass {
-//     Single(Gate),
-//     Composite(Vec<Gate>),
-// }
 
 #[derive(Clone, PartialEq, Copy)]
 pub enum GateType {
@@ -28,6 +23,15 @@ pub enum GateType {
 // decide how to work with ID's - GateFinal should have its own ID so it can be retrieved from the store
 // when a sub-gate is clicked on it 
 impl GateType {
+
+    pub fn is_composite(&self) -> bool {
+        matches!(self, GateType::Bisector | GateType::Quadrant | GateType::FlexiQuadrant)
+    }
+    
+    pub fn is_single(&self) -> bool {
+        !self.is_composite()
+    }
+
     pub fn to_gate_geometry(
         &self,
         mapper: &PlotMapper,
