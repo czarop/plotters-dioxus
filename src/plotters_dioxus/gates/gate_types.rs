@@ -1,9 +1,15 @@
 use crate::plotters_dioxus::gates::gate_store::Id;
 
 use anyhow::anyhow;
-use flow_gates::GateGeometry;
+use flow_gates::{GateGeometry};
 
 use crate::plotters_dioxus::plot_helpers::PlotMapper;
+
+// #[derive(Clone, PartialEq)]
+// pub enum GateClass {
+//     Single(Gate),
+//     Composite(Vec<Gate>),
+// }
 
 #[derive(Clone, PartialEq, Copy)]
 pub enum GateType {
@@ -11,11 +17,16 @@ pub enum GateType {
     Ellipse,
     Rectangle,
     Line,
-    Quadrant,
     Bisector,
-    FlexibleQuadrant,
+    Quadrant,
+    FlexiQuadrant,
 }
 
+// convert this to create GateFinal
+// GateFinal will store a GateClass containing it's gate(s)
+// GateFinal's drawself will return a composite list of shapes from the sub-gates
+// decide how to work with ID's - GateFinal should have its own ID so it can be retrieved from the store
+// when a sub-gate is clicked on it 
 impl GateType {
     pub fn to_gate_geometry(
         &self,
@@ -56,9 +67,9 @@ impl GateType {
                                 )
             },
             GateType::Line => todo!(),
-            GateType::Quadrant => todo!(),
             GateType::Bisector => todo!(),
-            GateType::FlexibleQuadrant => todo!(),
+            GateType::Quadrant => todo!(),
+            GateType::FlexiQuadrant => todo!(),
         }
     }
 }
@@ -74,7 +85,7 @@ pub enum ShapeType {
 }
 
 #[derive(PartialEq, Clone)]
-pub enum GateShape {
+pub enum GateRenderShape {
     PolyLine {
         points: Vec<(f32, f32)>,
         style: &'static DrawingStyle,
@@ -115,10 +126,10 @@ pub enum GateShape {
     },
 }
 
-impl GateShape {
+impl GateRenderShape {
     pub fn clone_with_type(&self, style: &'static DrawingStyle, shape_type: ShapeType) -> Self {
         match self {
-            GateShape::PolyLine {
+            GateRenderShape::PolyLine {
                 points,
                 style: _,
                 shape_type: _,
@@ -127,7 +138,7 @@ impl GateShape {
                 style: style,
                 shape_type: shape_type,
             },
-            GateShape::Circle {
+            GateRenderShape::Circle {
                 center,
                 radius,
                 fill,
@@ -138,7 +149,7 @@ impl GateShape {
                 fill: fill,
                 shape_type: shape_type.clone(),
             },
-            GateShape::Polygon {
+            GateRenderShape::Polygon {
                 points,
                 style: _,
                 shape_type: _,
@@ -147,14 +158,14 @@ impl GateShape {
                 style: style,
                 shape_type: shape_type.clone(),
             },
-            GateShape::Ellipse {
+            GateRenderShape::Ellipse {
                 center,
                 radius_x,
                 radius_y,
                 degrees_rotation,
                 style: _,
                 shape_type: _,
-            } => GateShape::Ellipse {
+            } => GateRenderShape::Ellipse {
                 center: *center,
                 radius_x: *radius_x,
                 radius_y: *radius_y,
@@ -162,7 +173,7 @@ impl GateShape {
                 style: style,
                 shape_type: shape_type.clone(),
             },
-            GateShape::Handle {
+            GateRenderShape::Handle {
                 center,
                 size,
                 shape_center,
@@ -173,7 +184,7 @@ impl GateShape {
                 shape_center: *shape_center,
                 shape_type: shape_type.clone(),
             },
-            GateShape::Rectangle {
+            GateRenderShape::Rectangle {
                 x,
                 y,
                 width,
@@ -193,7 +204,7 @@ impl GateShape {
 
     pub fn clone_with_offset(&self, offset: (f32, f32), style: &'static DrawingStyle) -> Self {
         match self {
-            GateShape::PolyLine {
+            GateRenderShape::PolyLine {
                 points,
                 style: _,
                 shape_type,
@@ -208,7 +219,7 @@ impl GateShape {
                     shape_type: shape_type.clone(),
                 }
             }
-            GateShape::Circle {
+            GateRenderShape::Circle {
                 center,
                 radius,
                 fill,
@@ -219,7 +230,7 @@ impl GateShape {
                 fill: fill,
                 shape_type: shape_type.clone(),
             },
-            GateShape::Polygon {
+            GateRenderShape::Polygon {
                 points,
                 style: _,
                 shape_type,
@@ -234,7 +245,7 @@ impl GateShape {
                     shape_type: shape_type.clone(),
                 }
             }
-            GateShape::Ellipse {
+            GateRenderShape::Ellipse {
                 center,
                 radius_x,
                 radius_y,
@@ -253,7 +264,7 @@ impl GateShape {
                     shape_type: shape_type.clone(),
                 }
             }
-            GateShape::Handle {
+            GateRenderShape::Handle {
                 center,
                 size,
                 shape_center,
@@ -264,7 +275,7 @@ impl GateShape {
                 size: *size,
                 shape_type: shape_type.clone(),
             },
-            GateShape::Rectangle {
+            GateRenderShape::Rectangle {
                 x,
                 y,
                 width,

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::plotters_dioxus::{
     PlotDrawable,
-    gates::gate_types::{DRAFT_LINE, GateShape, ShapeType},
+    gates::gate_types::{DRAFT_LINE, GateRenderShape, ShapeType},
 };
 
 #[derive(PartialEq, Clone)]
@@ -24,7 +24,7 @@ impl PlotDrawable for GateDraft {
         false
     }
 
-    fn draw_self(&self) -> Vec<GateShape> {
+    fn draw_self(&self) -> Vec<GateRenderShape> {
         match self {
             GateDraft::Polygon { points, .. } => draw_draft_polygon(points),
         }
@@ -42,12 +42,12 @@ impl GateDraft {
     }
 }
 
-fn draw_draft_polygon(points: &[(f32, f32)]) -> Vec<GateShape> {
+fn draw_draft_polygon(points: &[(f32, f32)]) -> Vec<GateRenderShape> {
     match points.len() {
         0 => vec![],
         1 => {
             let center = points[0];
-            vec![GateShape::Circle {
+            vec![GateRenderShape::Circle {
                 center,
                 radius: 3.0,
                 fill: "red",
@@ -58,7 +58,7 @@ fn draw_draft_polygon(points: &[(f32, f32)]) -> Vec<GateShape> {
             let start = points[0];
             let end = points[1];
 
-            vec![GateShape::PolyLine {
+            vec![GateRenderShape::PolyLine {
                 points: vec![start, end],
                 style: &DRAFT_LINE,
                 shape_type: ShapeType::DraftGate,
@@ -71,7 +71,7 @@ fn draw_draft_polygon(points: &[(f32, f32)]) -> Vec<GateShape> {
                 points_local.push(first.clone());
             }
 
-            vec![GateShape::Polygon {
+            vec![GateRenderShape::Polygon {
                 points: points_local,
                 style: &DRAFT_LINE,
                 shape_type: ShapeType::DraftGate,

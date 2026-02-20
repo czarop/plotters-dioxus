@@ -2,7 +2,7 @@ use flow_gates::{GateGeometry, GateNode};
 
 use crate::plotters_dioxus::{gates::{
     gate_drag::PointDragData,
-    gate_types::{DRAGGED_LINE, DrawingStyle, GateShape, ShapeType},
+    gate_types::{DRAGGED_LINE, DrawingStyle, GateRenderShape, ShapeType},
 }, plot_helpers::PlotMapper};
 
 pub fn is_point_on_ellipse_perimeter(
@@ -52,9 +52,9 @@ pub fn draw_elipse(
     angle_rotation: f32,
     style: &'static DrawingStyle,
     shape_type: ShapeType,
-) -> Vec<GateShape> {
+) -> Vec<GateRenderShape> {
     let degrees_rotation = -angle_rotation.to_degrees();
-    vec![GateShape::Ellipse {
+    vec![GateRenderShape::Ellipse {
         center,
         radius_x: rx,
         radius_y: ry,
@@ -80,7 +80,7 @@ pub fn draw_ghost_point_for_ellipse(
     drag_data: &PointDragData,
     x_param: &str,
     y_param: &str,
-) -> Option<Vec<GateShape>> {
+) -> Option<Vec<GateRenderShape>> {
     let (cursor_x, cursor_y) = drag_data.loc();
 
     if let GateGeometry::Ellipse { center, radius_x, radius_y, angle } = curr_geo {
@@ -120,13 +120,13 @@ pub fn draw_ghost_point_for_ellipse(
         };
 
         return Some(vec![
-            GateShape::Circle {
+            GateRenderShape::Circle {
                 center: ghost_circle_pos,
                 radius: 5.0,
                 fill: "yellow",
                 shape_type: ShapeType::GhostPoint,
             },
-            GateShape::Ellipse {
+            GateRenderShape::Ellipse {
                 center: (cx, cy),
                 radius_x: new_rx,
                 radius_y: new_ry,

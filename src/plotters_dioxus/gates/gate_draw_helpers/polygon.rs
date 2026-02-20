@@ -2,7 +2,7 @@ use crate::plotters_dioxus::{
     PlotDrawable,
     gates::{
         gate_drag::PointDragData,
-        gate_types::{DRAGGED_LINE, DrawingStyle, GateShape, ShapeType},
+        gate_types::{DRAGGED_LINE, DrawingStyle, GateRenderShape, ShapeType},
     },
 };
 
@@ -10,8 +10,8 @@ pub fn draw_polygon(
     points: &[(f32, f32)],
     style: &'static DrawingStyle,
     shape_type: ShapeType,
-) -> Vec<GateShape> {
-    vec![GateShape::Polygon {
+) -> Vec<GateRenderShape> {
+    vec![GateRenderShape::Polygon {
         points: points.to_vec(),
         style: style,
         shape_type,
@@ -21,7 +21,7 @@ pub fn draw_polygon(
 pub fn draw_ghost_point_for_polygon(
     drag_data: &PointDragData,
     main_points: &[(f32, f32)],
-) -> Option<Vec<GateShape>> {
+) -> Option<Vec<GateRenderShape>> {
     let idx = drag_data.point_index();
     let n = main_points.len();
 
@@ -34,12 +34,12 @@ pub fn draw_ghost_point_for_polygon(
     let current = drag_data.loc();
     let next = (p_next.0, p_next.1);
 
-    let line = GateShape::PolyLine {
+    let line = GateRenderShape::PolyLine {
         points: vec![prev, current, next],
         style: &DRAGGED_LINE,
         shape_type: ShapeType::GhostPoint,
     };
-    let point = GateShape::Circle {
+    let point = GateRenderShape::Circle {
         center: current,
         radius: 5.0,
         fill: "yellow",

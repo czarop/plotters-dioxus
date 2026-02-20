@@ -1,12 +1,12 @@
 use crate::plotters_dioxus::{
         PlotDrawable, gates::{
-            GateState, gate_draft::GateDraft, gate_drag::{GateDragData, GateDragType, PointDragData, RotationData}, gate_draw_helpers::rectangle::map_rect_to_pixels, gate_final::GateFinal, gate_store::{GateStateImplExt, GateStateStoreExt as _}, gate_types::{GateShape, GateType, ShapeType}
+            GateState, gate_draft::GateDraft, gate_drag::{GateDragData, GateDragType, PointDragData, RotationData}, gate_draw_helpers::rectangle::map_rect_to_pixels, gate_single::SingleGate, gate_store::{GateStateImplExt, GateStateStoreExt as _}, gate_traits::DrawableGate, gate_types::{GateRenderShape, GateType, ShapeType}
         }, plot_helpers::PlotMapper
     };
 
 use dioxus::prelude::*;
 use flow_gates::Gate;
-use std::{sync::Arc};
+use std::sync::{Arc, Mutex};
 
 #[component]
 pub fn GateLayer(
@@ -19,6 +19,8 @@ pub fn GateLayer(
     let mut next_gate_id = use_signal(|| 0);
     let mut selected_gate_id = use_signal(|| None::<Arc<str>>);
     let current_gate_type = use_context::<Signal<GateType>>();
+
+    let mut gates = use_signal(|| Vec::<Arc<Mutex<dyn DrawableGate>>>::new());
 
     // convert clicked coords into a draft gate
     let draft_gate = use_memo(move || {
@@ -47,21 +49,21 @@ pub fn GateLayer(
 
 
     // the list of finalised gates
-    let gates = use_memo(move || {
-        let gates = match gate_store.get_gates_for_plot(x_channel(), y_channel()) {
+    use_effect(move || {
+        let g = match gate_store.get_gates_for_plot(x_channel(), y_channel()) {
             Some(g) => g,
             None => vec![],
         };
-        next_gate_id.set(gates.len());
-        gates
+        next_gate_id.set(g.len());
+        gates.set(g);
     });
 
     use_effect(move || {
         if let Some(GateDragType::Point(point_drag_data)) = &*drag_data.read(){
             if let Some(selected_gate) = selected_gate_id.peek().clone() {
                 let gate_key = selected_gate.into();
-                if let Some(mut gate) = gate_store.gate_registry().get_mut(&gate_key) {
-                    gate.set_drag_point(Some(*point_drag_data));
+                if let Some(gate) = gate_store.gate_registry().get_mut(&gate_key) {
+                    gate.lock().unwrap().set_drag_point(Some(*point_drag_data));
                 }
             }
         };
@@ -86,6 +88,7 @@ pub fn GateLayer(
                                 .pixel_to_data(norm_x, norm_y, None, None);
 
                             let mut clicked_gate = None;
+
                             if draft_gate.peek().is_none() && drag_data.peek().is_none() {
                                 clicked_gate = was_gate_clicked(
                                     (norm_x, norm_y),
@@ -101,27 +104,25 @@ pub fn GateLayer(
                                 } else if drag_data.peek().is_none() {
                                     let curr_selected = selected_gate_id.take().unwrap();
                                     let gate_key = curr_selected.into();
-                                    if let Some(mut gate) = gate_store.gate_registry().get_mut(&gate_key)
+                                    if let Some(gate) = gate_store.gate_registry().get_mut(&gate_key)
                                     {
-                                        gate.set_selected(false);
-
+                                        gate.lock().unwrap().set_selected(false);
                                     }
-
                                 }
                             } else {
                                 if let Some(curr_selected) = selected_gate_id.take() {
                                     let gate_key = curr_selected.into();
-                                    if let Some(mut gate) = gate_store.gate_registry().get_mut(&gate_key)
+                                    if let Some(gate) = gate_store.gate_registry().get_mut(&gate_key)
                                     {
-                                        gate.set_selected(false);
+                                        gate.lock().unwrap().set_selected(false);
                                     }
                                 }
                                 let closest_gate = clicked_gate.unwrap();
-                                let gate_id = closest_gate.id.clone();
+                                let gate_id = closest_gate.lock().unwrap().get_id().clone();
                                 selected_gate_id.set(Some(gate_id.clone()));
                                 let gate_key = gate_id.into();
-                                if let Some(mut gate) = gate_store.gate_registry().get_mut(&gate_key) {
-                                    gate.set_selected(true);
+                                if let Some(gate) = gate_store.gate_registry().get_mut(&gate_key) {
+                                    gate.lock().unwrap().set_selected(true);
                                 }
                             }
                         }
@@ -245,10 +246,15 @@ pub fn GateLayer(
                                             &*gates.read(),
                                         );
                                         if clicked_gate.is_some()
-                                            && clicked_gate.as_ref().unwrap().is_selected()
+                                            && clicked_gate
+                                                .as_ref()
+                                                .unwrap()
+                                                .lock()
+                                                .unwrap()
+                                                .is_selected()
                                         {
                                             let data = GateDragData::new(
-                                                clicked_gate.unwrap().id.clone(),
+                                                clicked_gate.unwrap().lock().unwrap().get_id().clone(),
                                                 data_coords,
                                                 data_coords,
                                             );
@@ -260,10 +266,11 @@ pub fn GateLayer(
                             Some(dioxus_elements::input_data::MouseButton::Secondary) => {
                                 if let Some(curr_selected) = selected_gate_id.take() {
                                     let gate_key = curr_selected.into();
-                                    if let Some(mut gate) = gate_store.gate_registry().get_mut(&gate_key)
+                                    if let Some(gate) = gate_store.gate_registry().get_mut(&gate_key)
                                     {
-                                        gate.set_selected(false);
-                                        gate.set_drag_point(None);
+                                        let mut g = gate.lock().unwrap();
+                                        g.set_selected(false);
+                                        g.set_drag_point(None);
                                         draft_gate_coords.write().clear();
                                     }
                                 } else {
@@ -274,16 +281,20 @@ pub fn GateLayer(
                         }
                     },
 
-                    for (gate_index , gate) in gates.iter().enumerate() {
-
-                        for (shape_index , shape) in gate.draw_self().into_iter().enumerate() {
-                            RenderShape {
-                                shape,
-                                gate_id: gate.id.clone(),
-                                gate_index,
-                                shape_index,
-                                drag_data,
-                                plot_map,
+                    for (gate_index , gate) in (&*gates.read()).iter().enumerate() {
+                        {
+                            let g = gate.lock().unwrap();
+                            rsx! {
+                                for (shape_index , shape) in g.draw_self().into_iter().enumerate() {
+                                    RenderShape {
+                                        shape,
+                                        gate_id: g.get_id().clone(),
+                                        gate_index,
+                                        shape_index,
+                                        drag_data,
+                                        plot_map,
+                                    }
+                                }
                             }
                         }
                     }
@@ -312,8 +323,8 @@ pub fn GateLayer(
 fn was_gate_clicked(
     click_coords: (f32, f32),
     mapper: &PlotMapper,
-    gates: &[GateFinal],
-) -> Option<GateFinal> {
+    gates: &[Arc<Mutex<dyn DrawableGate>>],
+) -> Option<Arc<Mutex<dyn DrawableGate>>> {
     let (data_x, data_y) = mapper.pixel_to_data(click_coords.0, click_coords.1, None, None);
 
     let mut closest_gate = None;
@@ -321,7 +332,7 @@ fn was_gate_clicked(
     let tolerance = mapper.get_data_tolerance(5.0);
     let mut closest_dist = std::f32::INFINITY;
     for gate in gates {
-        if let Some(dist) = gate.is_point_on_perimeter((data_x, data_y), tolerance) {
+        if let Some(dist) = gate.lock().unwrap().is_point_on_perimeter((data_x, data_y), tolerance) {
             if dist < closest_dist {
                 closest_dist = dist;
                 closest_gate = Some(gate.clone());
@@ -354,7 +365,7 @@ fn RenderDraftGate(
 
 #[component]
 fn RenderShape(
-    shape: GateShape,
+    shape: GateRenderShape,
     gate_id: Arc<str>,
     gate_index: usize,
     shape_index: usize,
@@ -390,7 +401,7 @@ fn RenderShape(
             }
         };
         match shape {
-            GateShape::PolyLine {
+            GateRenderShape::PolyLine {
                 points,
                 style,
                 shape_type:_,
@@ -416,7 +427,7 @@ fn RenderShape(
                     }
                 }
             }
-            GateShape::Circle {
+            GateRenderShape::Circle {
                 center,
                 radius,
                 fill,
@@ -458,7 +469,7 @@ fn RenderShape(
                     }
                 }
             }
-            GateShape::Polygon {
+            GateRenderShape::Polygon {
                 points,
                 style,
                 shape_type:_,
@@ -485,7 +496,7 @@ fn RenderShape(
 
                 }
             }
-            GateShape::Ellipse {
+            GateRenderShape::Ellipse {
                 center,
                 radius_x,
                 radius_y,
@@ -517,7 +528,7 @@ fn RenderShape(
 
                 }
             },
-            GateShape::Handle {center, size, shape_center, shape_type} => {
+            GateRenderShape::Handle {center, size, shape_center, shape_type} => {
                 let c = mapper.data_to_pixel(center.0, center.1, None, None);
                 let cp = mapper.data_to_pixel(shape_center.0, shape_center.1, None, None);
                 
@@ -606,7 +617,7 @@ fn RenderShape(
                     }
                 }
             }
-            GateShape::Rectangle { x, y, width, height, style, shape_type } => {
+            GateRenderShape::Rectangle { x, y, width, height, style, shape_type:_ } => {
                 let (mx, my, m_width, m_height) = map_rect_to_pixels(x, y, width, height, mapper);
                     
                 rsx! {

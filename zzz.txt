@@ -1,3 +1,5 @@
+Now can write a CompositeGate struct implementing the same traits as gate_single. Complication is dealing with clicked on ID's
+
 gating hierarchy
 Gating hierarchy panel
 Select gated events

@@ -1,10 +1,10 @@
-use crate::plotters_dioxus::gates::gate_types::GateShape;
+use crate::plotters_dioxus::gates::gate_types::GateRenderShape;
 
 pub trait PlotDrawable {
     fn get_points(&self) -> Vec<(f32, f32)>;
     fn is_finalised(&self) -> bool;
 
-    fn draw_self(&self) -> Vec<GateShape>;
+    fn draw_self(&self) -> Vec<GateRenderShape>;
 
     fn is_near_segment(
         &self,

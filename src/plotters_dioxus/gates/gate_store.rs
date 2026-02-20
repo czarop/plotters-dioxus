@@ -2,9 +2,9 @@ use anyhow::anyhow;
 use dioxus::prelude::*;
 use flow_gates::{Gate, GateHierarchy};
 
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::{Arc, Mutex}};
 
-use crate::plotters_dioxus::{AxisInfo, PlotDrawable, gates::{gate_final::GateFinal, gate_types::GateType}};
+use crate::plotters_dioxus::{AxisInfo, gates::{gate_single::SingleGate, gate_traits::{DrawableGate}, gate_types::GateType}};
 
 pub type Id = std::sync::Arc<str>;
 
@@ -62,12 +62,12 @@ impl From<Arc<str>> for GateKey {
 /// to retrieve a list of gate id's shown on the plot.
 /// For each gate id, the actual gates can be retrieved from gate_registry.
 /// Check for file-specific positioning before drawing
-#[derive(Default, Store, Clone)]
+#[derive(Default, Store)]
 pub struct GateState {
     // For the Renderer: "What gates do I draw on this Plot?"
     pub gate_ids_by_view: HashMap<GatesOnPlotKey, Vec<GateKey>>,
     // For the Logic: "What is the actual data for Gate X?"
-    pub gate_registry: HashMap<GateKey, GateFinal>,
+    pub gate_registry: HashMap<GateKey, Arc<Mutex<dyn DrawableGate>>>,
     // For the Filtering: "How are these gates nested?"
     pub hierarchy: GateHierarchy,
     // are there file-specific overrides for gate positions
@@ -101,7 +101,7 @@ impl<Lens> Store<GateState, Lens> {
 
         self.gate_registry()
             .write()
-            .insert(gate_key, GateFinal::new(gate, false, gate_type));
+            .insert(gate_key, Arc::new(Mutex::new(SingleGate::new(gate, false, gate_type))));
 
         Ok(())
     }
@@ -133,14 +133,18 @@ impl<Lens> Store<GateState, Lens> {
         point_idx: usize,
         new_point: (f32, f32),
     ) -> anyhow::Result<()> {
+
         self.gate_registry()
-            .write()
-            .get_mut(&gate_id)
-            .and_then(|g| {
-                g.set_drag_point(None);
-                Some(g.replace_point(new_point, point_idx))
-            })
-            .ok_or(anyhow!("No Gate Found"))??;
+        .write()
+        .get(&gate_id)
+        .and_then(|g|{
+            let mut g = g.lock().unwrap();
+            g.set_drag_point(None);
+            
+            Some(g.replace_point(new_point, point_idx))
+        });
+
+        
 
         Ok(())
     }
@@ -149,19 +153,19 @@ impl<Lens> Store<GateState, Lens> {
 
         self.gate_registry()
         .write()
-        .get_mut(&gate_id)
-        .and_then(|g| {
+        .get(&gate_id)
+        .and_then(|g|{
+            let mut g = g.lock().unwrap();
             let points = g
                 .get_points()
                 .into_iter()
                 .map(|(x, y)| (x - data_space_offset.0, y - data_space_offset.1))
                 .collect();
         
+            Some(g.replace_points(points))
+        }).ok_or(anyhow!("No Gate Found"))??;
 
-        Some(g.replace_points(points))
-
-        })
-        .ok_or(anyhow!("No Gate Found"))??;
+        
 
         Ok(())
     }
@@ -172,48 +176,23 @@ impl<Lens> Store<GateState, Lens> {
         current_position: (f32, f32),
     ) -> anyhow::Result<()> {
         self.gate_registry()
-            .write()
-            .get_mut(&gate_id)
-            .and_then(|g| {
-           
-
+        .write()
+        .get(&gate_id)
+        .and_then(|g|{
+            let mut g = g.lock().unwrap();
             Some(g.rotate_gate(current_position))
-
-            })
-            .ok_or(anyhow!("No Gate Found"))??;
+        }).ok_or(anyhow!("No Gate Found"))??;
 
             Ok(())
         
-        // // we remove first to stop a flicker
-        // let mut gate = self.gate_registry()
-        // .write()
-        // .remove(&gate_id)
-        // .ok_or(anyhow!("No Gate Found"))?;
-
-        // match gate.rotate_gate(current_position){
-        //     Ok(_) => {},
-        //     Err(e) => {
-        //         self
-        //             .gate_registry()
-        //             .write()
-        //             .insert(gate_id, gate);
-        //         return Err(e);
-        //     },
-        // };
-
-        // self
-        //     .gate_registry()
-        //     .write()
-        //     .insert(gate_id, gate);
-
-        // Ok(())
+        
     }
 
     fn get_gates_for_plot(
         &self,
         x_axis_title: Arc<str>,
         y_axis_title: Arc<str>,
-    ) -> Option<Vec<GateFinal>> {
+    ) -> Option<Vec<Arc<Mutex<dyn DrawableGate>>>> {
         let key = GatesOnPlotKey::new(x_axis_title, y_axis_title, None);
         let key_options = self.gate_ids_by_view().get(key);
         let mut gate_list = vec![];
@@ -245,10 +224,9 @@ impl<Lens> Store<GateState, Lens> {
         if let Some(key_store) = key_options {
             let ids = key_store.read().clone();
             
-            // let registry_guard = registry.write();
             for k in ids {
                 if let Some(gate) = self.gate_registry().write().get_mut(&k) {
-                    gate.match_to_plot_axis(x, y)?;
+                    gate.lock().unwrap().match_to_plot_axis(x, y)?;
                 }
             }
         } 
@@ -289,9 +267,9 @@ impl<Lens> Store<GateState, Lens> {
     ) -> Result<(), Vec<String>> {
         let mut errors = vec![];
         for (_, gate) in self.gate_registry().write().iter_mut() {
-            let (x_marker, y_marker) = &gate.parameters;
+            let (x_marker, y_marker) = &gate.lock().unwrap().get_params();
             if marker == x_marker || marker == y_marker {
-                let res = gate.recalculate_gate_for_rescaled_axis(
+                let res = gate.lock().unwrap().recalculate_gate_for_rescaled_axis(
                     marker.clone(),
                     &old_axis_options.transform,
                     &new_axis_options.transform,

@@ -4,7 +4,7 @@ use flow_gates::GateGeometry;
 
 use crate::plotters_dioxus::{
     PlotDrawable,
-    gates::{gate_drag::PointDragData, gate_types::{DRAGGED_LINE, DrawingStyle, GateShape, ShapeType}},
+    gates::{gate_drag::PointDragData, gate_types::{DRAGGED_LINE, DrawingStyle, GateRenderShape, ShapeType}},
     plot_helpers::PlotMapper,
 };
 
@@ -68,9 +68,9 @@ pub fn draw_rectangle(
     max: (f32, f32),
     style: &'static DrawingStyle,
     shape_type: ShapeType,
-) -> Vec<GateShape> {
+) -> Vec<GateRenderShape> {
     let (x, y, width, height) = bounds_to_svg_rect(min, max);
-    vec![GateShape::Rectangle {
+    vec![GateRenderShape::Rectangle {
         x,
         y,
         width,
@@ -114,7 +114,7 @@ pub fn is_point_on_rectangle_perimeter(
 pub fn draw_ghost_point_for_rectangle(
     drag_data: &PointDragData,
     main_points: &[(f32, f32)],
-) -> Option<Vec<GateShape>> {
+) -> Option<Vec<GateRenderShape>> {
     // [bottom-left, bottom-right, top-right, top-left]
     let idx = drag_data.point_index();
     let current = drag_data.loc();
@@ -155,7 +155,7 @@ pub fn draw_ghost_point_for_rectangle(
     _ => unreachable!(),
 };
 
-    let new_rect = GateShape::Rectangle {
+    let new_rect = GateRenderShape::Rectangle {
         x,
         y,
         width,
@@ -164,7 +164,7 @@ pub fn draw_ghost_point_for_rectangle(
         shape_type: ShapeType::GhostPoint,
     };
 
-    let point_curr = GateShape::Circle {
+    let point_curr = GateRenderShape::Circle {
         center: current,
         radius: 5.0,
         fill: "yellow",
