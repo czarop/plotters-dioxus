@@ -63,7 +63,7 @@ pub fn GateLayer(
             if let Some(selected_gate) = selected_gate_id.peek().clone() {
                 let gate_key = selected_gate.into();
                 if let Some(gate) = gate_store.gate_registry().get_mut(&gate_key) {
-                    gate.lock().unwrap().set_drag_point(Some(*point_drag_data));
+                    gate.lock().unwrap().set_drag_point(Some(point_drag_data.clone()));
                 }
             }
         };
@@ -198,7 +198,6 @@ pub fn GateLayer(
                             if let Some(selected_gate_id) = &*selected_gate_id.peek() {
                                 match new_data {
                                     GateDragType::Point(point_drag_data) => {
-
                                         gate_store
                                             .move_gate_point(
                                                 selected_gate_id.clone().into(),
@@ -209,7 +208,6 @@ pub fn GateLayer(
 
                                     }
                                     GateDragType::Gate(gate_drag_data) => {
-                                        println!("move");
                                         let offset = gate_drag_data.offset();
                                         gate_store
                                             .move_gate(selected_gate_id.clone().into(), offset)

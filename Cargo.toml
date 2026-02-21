@@ -19,6 +19,7 @@ plotters-bitmap = "0.3.3"
 dioxus-primitives = { git = "https://github.com/DioxusLabs/components", version = "0.0.1", default-features = false }
 itertools = "0.14"
 rustc-hash = "2.1"
+indexmap = "2.1"
 
 [target.'cfg(windows)'.dependencies]
 polars = {version = "0.53", default-features = false, features = ["lazy", "performant", "timezones"]}

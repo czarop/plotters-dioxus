@@ -506,9 +506,19 @@ use crate::plotters_dioxus::{
 
 #[derive(PartialEq, Clone)]
 pub struct RectangleGate {
-    pub inner: flow_gates::Gate,
-    pub selected: bool,
-    pub drag_point: Option<PointDragData>,
+    inner: flow_gates::Gate,
+    selected: bool,
+    drag_point: Option<PointDragData>,
+}
+
+impl RectangleGate {
+    pub fn new(gate: flow_gates::Gate) -> Self {
+        Self {
+            inner: gate,
+            selected: false,
+            drag_point: None,
+        }
+    }
 }
 
 impl super::gate_traits::DrawableGate for RectangleGate {}
@@ -582,9 +592,19 @@ impl PlotDrawable for RectangleGate {
 
 #[derive(PartialEq, Clone)]
 pub struct PolygonGate {
-    pub inner: flow_gates::Gate,
-    pub selected: bool,
-    pub drag_point: Option<PointDragData>,
+    inner: flow_gates::Gate,
+    selected: bool,
+    drag_point: Option<PointDragData>,
+}
+
+impl PolygonGate {
+    pub fn new(gate: flow_gates::Gate) -> Self {
+        Self {
+            inner: gate,
+            selected: false,
+            drag_point: None,
+        }
+    }
 }
 
 impl super::gate_traits::DrawableGate for PolygonGate {}
@@ -658,6 +678,16 @@ pub struct EllipseGate {
     pub inner: flow_gates::Gate,
     pub selected: bool,
     pub drag_point: Option<PointDragData>,
+}
+
+impl EllipseGate {
+    pub fn new(gate: flow_gates::Gate) -> Self {
+        Self {
+            inner: gate,
+            selected: false,
+            drag_point: None,
+        }
+    }
 }
 
 impl super::gate_traits::DrawableGate for EllipseGate {}
@@ -745,6 +775,92 @@ impl PlotDrawable for EllipseGate {
             return crate::collate_vecs!(main, selected, ghost);
         }
         vec![]
+    }
+}
+
+#[derive(PartialEq, Clone)]
+pub struct LineGate {
+    pub inner: flow_gates::Gate,
+    pub selected: bool,
+    pub drag_point: Option<PointDragData>,
+}
+
+impl LineGate {
+    pub fn new(gate: flow_gates::Gate) -> Self {
+        Self {
+            inner: gate,
+            selected: false,
+            drag_point: None,
+        }
+    }
+}
+
+impl super::gate_traits::DrawableGate for LineGate {}
+
+impl GateTrait for LineGate {
+    fn is_selected(&self) -> bool { self.selected }
+    fn set_selected(&mut self, state: bool) { self.selected = state; }
+    fn is_drag_point(&self) -> bool { self.drag_point.is_some() }
+    fn set_drag_point(&mut self, data: Option<PointDragData>) { self.drag_point = data; }
+    fn get_id(&self) -> Arc<str> { self.inner.id.clone() }
+    fn is_composite(&self) -> bool { false }
+    fn get_params(&self) -> (Arc<str>, Arc<str>) { self.inner.parameters.clone() }
+
+    fn is_point_on_perimeter(&self, point: (f32, f32), tolerance: (f32, f32)) -> Option<f32> {
+        is_point_on_rectangle_perimeter(self, point, tolerance)
+    }
+
+    fn match_to_plot_axis(&mut self, plot_x: &str, plot_y: &str) -> anyhow::Result<()> {
+        let (x, y) = (&self.inner.parameters.0, &self.inner.parameters.1);
+        if plot_x == x.as_ref() && plot_y == y.as_ref() { return Ok(()); }
+        if plot_x == y.as_ref() && plot_y == x.as_ref() {
+            let pts: Vec<_> = self.get_points().into_iter().map(|(x, y)| (y, x)).collect();
+            self.inner.geometry = create_rectangle_geometry(pts, y, x)?;
+            self.inner.parameters = (y.clone(), x.clone());
+            return Ok(());
+        }
+        Err(anyhow!("Axis mismatch for Rectangle Gate"))
+    }
+
+    fn replace_point(&mut self, new_point: (f32, f32), point_index: usize) -> anyhow::Result<()> {
+        let p = self.get_points();
+        self.inner.geometry = update_rectangle_geometry(p, new_point, point_index, &self.inner.parameters.0, &self.inner.parameters.1)?;
+        Ok(())
+    }
+
+    fn replace_points(&mut self, points: Vec<(f32, f32)>) -> anyhow::Result<()> {
+        self.inner.geometry = create_rectangle_geometry(points, &self.inner.parameters.0, &self.inner.parameters.1)?;
+        Ok(())
+    }
+
+    fn rotate_gate(&mut self, _mouse_pos: (f32, f32)) -> anyhow::Result<()> { Ok(()) }
+
+    fn recalculate_gate_for_rescaled_axis(&mut self, param: Arc<str>, old: &TransformType, new: &TransformType) -> anyhow::Result<()> {
+        let points = rescale_helper(&self.get_points(), &param, &self.inner.parameters.0, old, new)?;
+        self.inner.geometry = create_rectangle_geometry(points, &self.inner.parameters.0, &self.inner.parameters.1)?;
+        Ok(())
+    }
+}
+
+impl PlotDrawable for LineGate {
+    fn get_points(&self) -> Vec<(f32, f32)> {
+        if let GateGeometry::Rectangle { min, max } = &self.inner.geometry {
+            let (x1, y1) = (min.get_coordinate(&self.inner.parameters.0), min.get_coordinate(&self.inner.parameters.1));
+            let (x2, y2) = (max.get_coordinate(&self.inner.parameters.0), max.get_coordinate(&self.inner.parameters.1));
+            if let (Some(x1), Some(y1), Some(x2), Some(y2)) = (x1, y1, x2, y2) {
+                return vec![(x1, y1), (x2, y1), (x2, y2), (x1, y2)];
+            }
+        }
+        vec![]
+    }
+    fn is_finalised(&self) -> bool { true }
+    fn draw_self(&self) -> Vec<GateRenderShape> {
+        let style = if self.selected { &SELECTED_LINE } else { &DEFAULT_LINE };
+        let pts = self.get_points();
+        let main = draw_rectangle(pts[0], pts[2], style, ShapeType::Gate(self.inner.id.clone()));
+        let selected = if self.selected { Some(draw_circles_for_selected_gate(&pts, 0)) } else { None };
+        let ghost = self.drag_point.as_ref().and_then(|d| draw_ghost_point_for_rectangle(d, &pts));
+        crate::collate_vecs!(main, selected, ghost)
     }
 }
 

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::plotters_dioxus::gates::gate_store::Id;
 
 use anyhow::anyhow;
@@ -128,6 +130,14 @@ pub enum GateRenderShape {
         style: &'static DrawingStyle,
         shape_type: ShapeType,
     },
+    Line {
+        x1: f32,
+        y1: f32,
+        x2: f32,
+        y2: f32,
+        style: &'static DrawingStyle,
+        shape_type: ShapeType,
+    }
 }
 
 impl GateRenderShape {
@@ -200,6 +210,14 @@ impl GateRenderShape {
                 y: *y,
                 width: *width,
                 height: *height,
+                style: *style,
+                shape_type: shape_type.clone(),
+            },
+            GateRenderShape::Line { x1, y1, x2, y2, style, shape_type } => Self::Line {
+                x1: *x1,
+                y1: *y1,
+                x2: *x2,
+                y2: *y2,
                 style: *style,
                 shape_type: shape_type.clone(),
             },
@@ -298,6 +316,9 @@ impl GateRenderShape {
                     shape_type: shape_type.clone(),
                 }
             }
+            GateRenderShape::Line { x1, y1, x2, y2, style, shape_type } => {
+                Self::Line { x1: *x1 + offset.0, y1: *y1 + offset.1, x2: *x2 + offset.0, y2: *y2 + offset.1, style: *style, shape_type: shape_type.clone() }
+            },
         }
     }
 }

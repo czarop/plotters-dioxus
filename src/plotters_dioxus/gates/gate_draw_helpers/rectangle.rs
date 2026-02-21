@@ -1,5 +1,3 @@
-use std::any;
-
 use flow_gates::GateGeometry;
 
 use crate::plotters_dioxus::{

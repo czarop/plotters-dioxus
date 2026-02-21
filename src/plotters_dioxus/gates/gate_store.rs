@@ -100,9 +100,9 @@ impl<Lens> Store<GateState, Lens> {
         )?;
 
         let g: Arc<Mutex<dyn DrawableGate + 'static>>  = match gate_type {
-            GateType::Polygon => Arc::new(Mutex::new(PolygonGate {inner: gate, selected: false, drag_point: None})),
-            GateType::Ellipse => Arc::new(Mutex::new(EllipseGate {inner: gate, selected: false, drag_point: None})),
-            GateType::Rectangle => Arc::new(Mutex::new(RectangleGate {inner: gate, selected: false, drag_point: None})),
+            GateType::Polygon => Arc::new(Mutex::new(PolygonGate::new(gate))),
+            GateType::Ellipse => Arc::new(Mutex::new(EllipseGate::new(gate))),
+            GateType::Rectangle => Arc::new(Mutex::new(RectangleGate::new(gate))),
             GateType::Line => todo!(),
             GateType::Bisector => todo!(),
             GateType::Quadrant => todo!(),

@@ -40,7 +40,7 @@ impl GateDragData {
     }
 }
 
-#[derive(Clone, PartialEq, Copy)]
+#[derive(Clone, PartialEq)]
 pub struct PointDragData {
     point_index: usize,
     loc: (f32, f32),
@@ -52,10 +52,12 @@ impl PointDragData {
     }
     pub fn clone_from_data(new_loc: (f32, f32), old_data: Self) -> Self {
         Self {
+        
             point_index: old_data.point_index,
             loc: new_loc,
         }
     }
+
     pub fn point_index(&self) -> usize {
         self.point_index
     }
