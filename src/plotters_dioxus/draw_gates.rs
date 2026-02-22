@@ -634,6 +634,25 @@ fn RenderShape(
                     }
 
                 }
+            },
+            GateRenderShape::Line { x1, y1, x2, y2, style, shape_type:_ } => {
+                let p1 = mapper.data_to_pixel(x1, y1, None, None);
+                let p2 = mapper.data_to_pixel(x2, y2, None, None);
+                rsx! {
+                    g { transform,
+                        line {
+                            key: "{gate_id}-{gate_index}-{shape_index}",
+                            x1: "{p1.0}",
+                            y1: "{p1.1}",
+                            x2: "{p2.0}",
+                            y2: "{p2.1}",
+                            stroke: style.stroke,
+                            stroke_width: style.stroke_width,
+                            stroke_dasharray: if style.dashed { "4" } else { "none" },
+                        }
+                    }
+
+                }
             }
         }
     } else {

@@ -27,11 +27,19 @@ pub fn create_default_line(
         .map_err(|_| anyhow::anyhow!("failed to create rectangle geometry"))
 }
 
-pub fn bounds_to_svg_line(min: (f32, f32), max: (f32, f32)) -> (f32, f32, f32) {
+pub fn bounds_to_svg_line(min: (f32, f32), max: (f32, f32), y_coord: f32) -> (f32, f32, f32) {
     let width = (max.0 - min.0).abs();
     let x = min.0;
-    let y = max.1;
+    let y = y_coord;
     (x, y, width)
+}
+
+pub fn bounds_to_line_coords(min: (f32, f32), max: (f32, f32), y_coord: f32) -> ((f32, f32),(f32, f32)) {
+    let width = (max.0 - min.0).abs();
+    let x1 = min.0;
+    let x2 = x1 + width;
+    let y = y_coord;
+    ((x1, y), (x2, y))
 }
 
 // pub fn map_line_to_pixels(
@@ -65,10 +73,11 @@ pub fn bounds_to_svg_line(min: (f32, f32), max: (f32, f32)) -> (f32, f32, f32) {
 pub fn draw_line(
     min: (f32, f32),
     max: (f32, f32),
+    y_coord: f32,
     style: &'static DrawingStyle,
     shape_type: ShapeType,
 ) -> Vec<GateRenderShape> {
-    let (x, y, width) = bounds_to_svg_line(min, max);
+    let (x, y, width) = bounds_to_svg_line(min, max, y_coord);
     vec![GateRenderShape::Line {
         x1: x,
         y1: y,
@@ -80,96 +89,80 @@ pub fn draw_line(
 }
 
 pub fn is_point_on_line(
-    shape: &dyn PlotDrawable,
+    shape: & crate::plotters_dioxus::gates::gate_single::LineGate,
     point: (f32, f32),
     tolerance: (f32, f32),
 ) -> Option<f32> {
-    let points = shape.get_points();
-    if points.len() != 2 {
+    let rect_bounds = shape.get_points();
+    if rect_bounds.len() != 4 {
         return None;
-    }
-    let mut closest = std::f32::INFINITY;
-    for segment in points.windows(2) {
-        if let Some(dis) = shape.is_near_segment(point, segment[0], segment[1], tolerance) {
-            closest = closest.min(dis);
-        }
     }
 
-    if closest == std::f32::INFINITY {
-        return None;
-    } else {
-        return Some(closest);
+    let (min, max) = (rect_bounds[0], rect_bounds[2]);
+
+    let line_coords = bounds_to_line_coords(min, max, shape.y_coord);
+
+    if let Some(dis) = shape.is_near_segment(point, line_coords.0, line_coords.1, tolerance) {
+        return Some(dis);
     }
+    None
 }
 
-pub fn draw_ghost_point_for_rectangle(
+pub fn draw_ghost_point_for_line(
     drag_data: &PointDragData,
-    main_points: &[(f32, f32)],
+    y_coord: f32,
+    current_rect_bounds: &[(f32, f32)],
 ) -> Option<Vec<GateRenderShape>> {
-    // [bottom-left, bottom-right, top-right, top-left]
+    // [left, right]
     let idx = drag_data.point_index();
-    let current = drag_data.loc();
+    let (current_x, _) = drag_data.loc();
 
-    let (x, y, width, height) = match idx {
+    if current_rect_bounds.len() != 4 {
+        return None;
+    }
+
+    let (min, max) = (current_rect_bounds[0], current_rect_bounds[2]);
+
+    let ((cx1, cy1), (cx2, cy2)) = bounds_to_line_coords(min, max, y_coord);
+
+    let (x1, y1, x2, y2) = match idx {
         0 => {
-            // Bottom-Left dragged -> Anchor is Top-Right (Index 2)
-            let anchor = main_points[2];
-            let x = current.0.min(anchor.0);
-            let y = current.1.max(anchor.1); // In data space, Top is Max Y
-            let w = (current.0 - anchor.0).abs();
-            let h = (current.1 - anchor.1).abs();
-            (x, y, w, h)
+            
+            ((cx1 - current_x).abs(), cy1, cx2, cy2)
         }
         1 => {
-            // Bottom-Right dragged -> Anchor is Top-Left (Index 3)
-            let anchor = main_points[3];
-            let x = current.0.min(anchor.0);
-            let y = current.1.max(anchor.1);
-            let w = (current.0 - anchor.0).abs();
-            let h = (current.1 - anchor.1).abs();
-            (x, y, w, h)
-        }
-        2 => {
-            // Top-Right dragged -> Anchor is Bottom-Left (Index 0)
-            let anchor = main_points[0];
-            let x = current.0.min(anchor.0);
-            let y = current.1.max(anchor.1);
-            let w = (current.0 - anchor.0).abs();
-            let h = (current.1 - anchor.1).abs();
-            (x, y, w, h)
-        }
-        3 => {
-            // Top-Left dragged -> Anchor is Bottom-Right (Index 1)
-            let anchor = main_points[1];
-            let x = current.0.min(anchor.0);
-            let y = current.1.max(anchor.1);
-            let w = (current.0 - anchor.0).abs();
-            let h = (current.1 - anchor.1).abs();
-            (x, y, w, h)
+            (cx1, cy1, (cx2 - current_x).abs(), cy2)
         }
         _ => unreachable!(),
     };
 
-    let new_rect = GateRenderShape::Rectangle {
-        x,
-        y,
-        width,
-        height,
+    let new_line = GateRenderShape::Line {
+        x1,
+        y1,
+        x2,
+        y2,
         style: &DRAGGED_LINE,
         shape_type: ShapeType::GhostPoint,
     };
 
-    let point_curr = GateRenderShape::Circle {
-        center: current,
+    let left_curr = GateRenderShape::Circle {
+        center: (cx1, cy1),
         radius: 5.0,
         fill: "yellow",
         shape_type: ShapeType::GhostPoint,
     };
 
-    Some(vec![new_rect, point_curr])
+    let right_curr = GateRenderShape::Circle {
+        center: (cx2, cy2),
+        radius: 5.0,
+        fill: "yellow",
+        shape_type: ShapeType::GhostPoint,
+    };
+
+    Some(vec![new_line, left_curr, right_curr])
 }
 
-pub fn update_rectangle_geometry(
+pub fn update_line_geometry( // not done
     mut current_points: Vec<(f32, f32)>,
     new_point: (f32, f32),
     point_index: usize,

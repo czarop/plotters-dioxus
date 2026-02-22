@@ -16,12 +16,10 @@ use crate::plotters_dioxus::{
             ellipse::{
                 calculate_ellipse_nodes, draw_elipse, draw_ghost_point_for_ellipse,
                 is_point_on_ellipse_perimeter, update_ellipse_geometry,
-            },
-            polygon::{draw_ghost_point_for_polygon, draw_polygon, is_point_on_polygon_perimeter},
-            rectangle::{
+            }, line::{draw_ghost_point_for_line, draw_line, is_point_on_line}, polygon::{draw_ghost_point_for_polygon, draw_polygon, is_point_on_polygon_perimeter}, rectangle::{
                 draw_ghost_point_for_rectangle, draw_rectangle, is_point_on_rectangle_perimeter,
                 update_rectangle_geometry,
-            },
+            }
         },
         gate_traits::GateTrait,
         gate_types::{DEFAULT_LINE, GateRenderShape, GateType, SELECTED_LINE, ShapeType},
@@ -783,14 +781,16 @@ pub struct LineGate {
     pub inner: flow_gates::Gate,
     pub selected: bool,
     pub drag_point: Option<PointDragData>,
+    pub y_coord: f32,
 }
 
 impl LineGate {
-    pub fn new(gate: flow_gates::Gate) -> Self {
+    pub fn new(gate: flow_gates::Gate, y_coord: f32) -> Self {
         Self {
             inner: gate,
             selected: false,
             drag_point: None,
+            y_coord,
         }
     }
 }
@@ -807,7 +807,7 @@ impl GateTrait for LineGate {
     fn get_params(&self) -> (Arc<str>, Arc<str>) { self.inner.parameters.clone() }
 
     fn is_point_on_perimeter(&self, point: (f32, f32), tolerance: (f32, f32)) -> Option<f32> {
-        is_point_on_rectangle_perimeter(self, point, tolerance)
+        is_point_on_line(self, point, tolerance)
     }
 
     fn match_to_plot_axis(&mut self, plot_x: &str, plot_y: &str) -> anyhow::Result<()> {
@@ -857,9 +857,9 @@ impl PlotDrawable for LineGate {
     fn draw_self(&self) -> Vec<GateRenderShape> {
         let style = if self.selected { &SELECTED_LINE } else { &DEFAULT_LINE };
         let pts = self.get_points();
-        let main = draw_rectangle(pts[0], pts[2], style, ShapeType::Gate(self.inner.id.clone()));
+        let main = draw_line(pts[0], pts[2], self.y_coord, style, ShapeType::Gate(self.inner.id.clone()));
         let selected = if self.selected { Some(draw_circles_for_selected_gate(&pts, 0)) } else { None };
-        let ghost = self.drag_point.as_ref().and_then(|d| draw_ghost_point_for_rectangle(d, &pts));
+        let ghost = self.drag_point.as_ref().and_then(|d| draw_ghost_point_for_line(d, self.y_coord, &pts));
         crate::collate_vecs!(main, selected, ghost)
     }
 }
