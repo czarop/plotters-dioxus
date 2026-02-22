@@ -16,7 +16,7 @@ use crate::plotters_dioxus::{
             ellipse::{
                 calculate_ellipse_nodes, draw_elipse, draw_ghost_point_for_ellipse,
                 is_point_on_ellipse_perimeter, update_ellipse_geometry,
-            }, line::{draw_ghost_point_for_line, draw_line, is_point_on_line}, polygon::{draw_ghost_point_for_polygon, draw_polygon, is_point_on_polygon_perimeter}, rectangle::{
+            }, line::{draw_ghost_point_for_line, draw_line, is_point_on_line, update_line_geometry}, polygon::{draw_ghost_point_for_polygon, draw_polygon, is_point_on_polygon_perimeter}, rectangle::{
                 draw_ghost_point_for_rectangle, draw_rectangle, is_point_on_rectangle_perimeter,
                 update_rectangle_geometry,
             }
@@ -824,7 +824,7 @@ impl GateTrait for LineGate {
 
     fn replace_point(&mut self, new_point: (f32, f32), point_index: usize) -> anyhow::Result<()> {
         let p = self.get_points();
-        self.inner.geometry = update_rectangle_geometry(p, new_point, point_index, &self.inner.parameters.0, &self.inner.parameters.1)?;
+        self.inner.geometry = update_line_geometry(p, new_point, point_index, &self.inner.parameters.0, &self.inner.parameters.1)?;
         Ok(())
     }
 

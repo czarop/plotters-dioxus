@@ -134,6 +134,7 @@ pub fn GateLayer(
                         let py = local_coords.y as f32;
                         let x_param = &*x_channel.peek();
                         let y_param = &*y_channel.peek();
+                        let (dx, dy) = mapper.pixel_to_data(px, py, None, None);
 
                         let points = {
                             if let Some(curr_gate) = &*draft_gate.peek() {
@@ -150,6 +151,11 @@ pub fn GateLayer(
                             .peek()
                             .to_gate_geometry(&mapper, px, py, x_param, y_param, points);
 
+                        let geo = if let GateType::Line(_) = &*current_gate_type.peek() {
+                            GateType::Line(Some(dy))
+                        } else {
+                            current_gate_type.peek().cloned()
+                        };
                         match geometry_res {
                             Ok(gate) => {
                                 let id = *next_gate_id.peek();
@@ -161,7 +167,7 @@ pub fn GateLayer(
                                     y_channel(),
                                 );
                                 gate_store
-                                    .add_gate(g, None, *current_gate_type.peek())
+                                    .add_gate(g, None, geo)
                                     .expect("Failed to add gate to gate store");
                                 *next_gate_id.write() += 1;
                             }

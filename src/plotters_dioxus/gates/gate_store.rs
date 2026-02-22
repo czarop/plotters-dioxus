@@ -4,7 +4,7 @@ use flow_gates::{Gate, GateHierarchy};
 
 use std::{collections::HashMap, sync::{Arc, Mutex}};
 
-use crate::plotters_dioxus::{AxisInfo, gates::{gate_single::{EllipseGate, PolygonGate, RectangleGate}, gate_traits::DrawableGate, gate_types::GateType}};
+use crate::plotters_dioxus::{AxisInfo, gates::{gate_single::{EllipseGate, LineGate, PolygonGate, RectangleGate}, gate_traits::DrawableGate, gate_types::GateType}};
 
 pub type Id = std::sync::Arc<str>;
 
@@ -103,7 +103,11 @@ impl<Lens> Store<GateState, Lens> {
             GateType::Polygon => Arc::new(Mutex::new(PolygonGate::new(gate))),
             GateType::Ellipse => Arc::new(Mutex::new(EllipseGate::new(gate))),
             GateType::Rectangle => Arc::new(Mutex::new(RectangleGate::new(gate))),
-            GateType::Line => todo!(),
+            GateType::Line (y_coord) => if let Some(y_coord) = y_coord {
+                Arc::new(Mutex::new(LineGate::new(gate, y_coord)))
+            } else {
+                Err(anyhow!("Line gate requires y coordinate for initialization"))?
+            }
             GateType::Bisector => todo!(),
             GateType::Quadrant => todo!(),
             GateType::FlexiQuadrant => todo!(),

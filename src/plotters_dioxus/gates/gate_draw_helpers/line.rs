@@ -163,13 +163,13 @@ pub fn draw_ghost_point_for_line(
 }
 
 pub fn update_line_geometry( // not done
-    mut current_points: Vec<(f32, f32)>,
+    mut current_rect_points: Vec<(f32, f32)>,
     new_point: (f32, f32),
     point_index: usize,
     x_param: &str,
     y_param: &str,
 ) -> anyhow::Result<GateGeometry> {
-    let n = current_points.len();
+    let n = current_rect_points.len();
 
     if point_index >= n {
         return Err(anyhow::anyhow!(
@@ -180,8 +180,8 @@ pub fn update_line_geometry( // not done
     let idx_before = (point_index + n - 1) % n;
     let idx_after = (point_index + 1) % n;
 
-    let p_prev = current_points[idx_before];
-    let p_next = current_points[idx_after];
+    let p_prev = current_rect_points[idx_before];
+    let p_next = current_rect_points[idx_after];
 
     let prev;
     let current = new_point;
@@ -215,10 +215,10 @@ pub fn update_line_geometry( // not done
         }
     }
 
-    current_points[point_index] = new_point;
-    current_points[idx_before] = prev;
-    current_points[idx_after] = next;
+    current_rect_points[point_index] = new_point;
+    current_rect_points[idx_before] = prev;
+    current_rect_points[idx_after] = next;
 
-    flow_gates::geometry::create_rectangle_geometry(current_points, x_param, y_param)
+    flow_gates::geometry::create_rectangle_geometry(current_rect_points, x_param, y_param)
         .map_err(|_| anyhow::anyhow!("failed to update rectangle geometry"))
 }

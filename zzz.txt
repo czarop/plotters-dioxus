@@ -1,4 +1,5 @@
-Now can write a CompositeGate struct implementing the same traits as gate_single. Complication is dealing with clicked on ID's
+Now can write a CompositeGate struct implementing the same traits as gate_single.
+Make GateFinal immutable, pass in is_slected and drag points to draw_self. Make moveGate etc return Self.
 
 gating hierarchy
 Gating hierarchy panel

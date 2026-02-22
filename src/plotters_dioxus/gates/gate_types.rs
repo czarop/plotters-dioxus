@@ -13,7 +13,7 @@ pub enum GateType {
     Polygon,
     Ellipse,
     Rectangle,
-    Line,
+    Line(Option<f32>),
     Bisector,
     Quadrant,
     FlexiQuadrant,
@@ -72,7 +72,15 @@ impl GateType {
                                     y_param,
                                 )
             },
-            GateType::Line => todo!(),
+            GateType::Line(_) => {
+                crate::plotters_dioxus::gates::gate_draw_helpers::line::create_default_line(
+                    &mapper,
+                    click_x,
+                    50f32,
+                    x_param,
+                    y_param,
+                )
+            },
             GateType::Bisector => todo!(),
             GateType::Quadrant => todo!(),
             GateType::FlexiQuadrant => todo!(),
