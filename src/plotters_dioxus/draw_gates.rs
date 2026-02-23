@@ -214,9 +214,10 @@ pub fn GateLayer(
 
                                     }
                                     GateDragType::Gate(gate_drag_data) => {
-                                        let offset = gate_drag_data.offset();
                                         gate_store
-                                            .move_gate(selected_gate_id.clone().into(), offset)
+                                            .move_gate(
+                                                gate_drag_data
+                                            )
                                             .expect("Gate Move Failed");
                                     }
                                     GateDragType::Rotation(rotation_data) => {

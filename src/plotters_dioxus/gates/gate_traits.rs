@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use flow_fcs::TransformType;
 
-use crate::plotters_dioxus::{PlotDrawable, gates::gate_drag::PointDragData};
+use crate::plotters_dioxus::{PlotDrawable, gates::gate_drag::{GateDragData, PointDragData}};
 
 pub trait DrawableGate: GateTrait + PlotDrawable {}
 
@@ -36,5 +36,5 @@ pub trait GateTrait {
 
     fn replace_point(&mut self, new_point: (f32, f32), point_index: usize) -> anyhow::Result<()>;
 
-    fn replace_points(&mut self, points: Vec<(f32, f32)>) -> anyhow::Result<()>;
+    fn replace_points(&mut self, gate_drag_data: GateDragData) -> anyhow::Result<()>;
 }

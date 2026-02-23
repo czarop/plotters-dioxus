@@ -4,7 +4,7 @@ use crate::plotters_dioxus::{
     PlotDrawable,
     gates::{
         gate_drag::PointDragData,
-        gate_types::{DRAGGED_LINE, DrawingStyle, GateRenderShape, ShapeType},
+        gate_types::{DRAGGED_LINE, GREY_LINE_DASHED, DrawingStyle, GateRenderShape, ShapeType},
     },
     plot_helpers::PlotMapper,
 };
@@ -42,50 +42,109 @@ pub fn bounds_to_line_coords(min: (f32, f32), max: (f32, f32), y_coord: f32) -> 
     ((x1, y), (x2, y))
 }
 
-// pub fn map_line_to_pixels(
-//     data_x: f32,
-//     data_y: f32,
-//     data_width: f32,
-//     data_height: f32,
-//     mapper: &PlotMapper,
-// ) -> (f32, f32, f32, f32) {
-//     // 1. Identify the two data-space corners
-//     // (Assuming data_y is the "top" and data_x is the "left")
-//     let x_min = data_x;
-//     let x_max = data_x + data_width;
-//     let y_max = data_y;
-//     let y_min = data_y - data_height;
-
-//     // 2. Map both points to pixel space
-//     let (p1_x, p1_y) = mapper.data_to_pixel(x_min, y_max, None, None);
-//     let (p2_x, p2_y) = mapper.data_to_pixel(x_max, y_min, None, None);
-
-//     // 3. Calculate SVG attributes from the mapped pixels
-//     // We use .min() and .abs() because screen Y is inverted
-//     let rect_x = p1_x.min(p2_x);
-//     let rect_y = p1_y.min(p2_y);
-//     let rect_width = (p1_x - p2_x).abs();
-//     let rect_height = (p1_y - p2_y).abs();
-
-//     (rect_x, rect_y, rect_width, rect_height)
-// }
-
 pub fn draw_line(
     min: (f32, f32),
     max: (f32, f32),
     y_coord: f32,
     style: &'static DrawingStyle,
     shape_type: ShapeType,
+    point_drag_data : &Option<PointDragData>,
+    axis_matched: bool,
 ) -> Vec<GateRenderShape> {
-    let (x, y, width) = bounds_to_svg_line(min, max, y_coord);
+    println!("({}, {}), ({}, {})", min.0, min.1, max.0, max.1);
+    let coords = bounds_to_svg_line(min, max, y_coord);
+
+    let mut x1 = coords.0;
+    let mut x2 = coords.0 + coords.2;
+    let y = coords.1;
+
+
+    if let Some(pdd) = point_drag_data {
+        match pdd.point_index() {
+            0 => {
+                x1 = pdd.loc().0;
+
+                
+            }
+            1 => {
+                x2 = pdd.loc().0;
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    println!("{}, {}, {}", x1, x2, y);
+
+    if axis_matched {
     vec![GateRenderShape::Line {
-        x1: x,
+        x1: x1,
         y1: y,
-        x2: x + width,
+        x2: x2,
         y2: y,
         style,
         shape_type,
     }]
+} else {
+        vec![GateRenderShape::Line {
+            x1: x1,
+            y1: y,
+            x2: x2,
+            y2: y,
+            style,
+            shape_type,
+        }]
+}
+}
+
+pub fn draw_circles_for_line(min: (f32, f32), max: (f32, f32), y_coord: f32, point_drag_data: &Option<PointDragData>) -> Vec<GateRenderShape> {
+
+    let mut coords = bounds_to_line_coords(min, max, y_coord);
+    let style;
+    if let Some(pdd) = point_drag_data {
+        style = &DRAGGED_LINE;
+        match pdd.point_index() {
+            0 => {
+                coords.0 .0 = pdd.loc().0;
+            }
+            1 => {
+                coords.1 .0 = pdd.loc().0;
+            }
+            _ => unreachable!(),
+        }
+    } else {
+        style = &GREY_LINE_DASHED;
+    }
+
+    let ((cx1, cy1), (cx2, cy2)) = coords;
+
+    vec![
+        GateRenderShape::Line { 
+            x1: cx1, 
+            y1: min.1, 
+            x2: cx1, 
+            y2: max.1, 
+            style, 
+            shape_type: ShapeType::GhostPoint },
+        GateRenderShape::Line { 
+            x1: cx2, 
+            y1: min.1, 
+            x2: cx2, 
+            y2: max.1, 
+            style, 
+            shape_type: ShapeType::GhostPoint },
+        GateRenderShape::Circle {
+            center: (cx1, cy1),
+            radius: 3.0,
+            fill: "red",
+            shape_type: ShapeType::Point(0),
+        },
+        GateRenderShape::Circle {
+            center: (cx2, cy2),
+            radius: 3.0,
+            fill: "red",
+            shape_type: ShapeType::Point(1),
+        },
+    ]
 }
 
 pub fn is_point_on_line(
@@ -162,7 +221,7 @@ pub fn draw_ghost_point_for_line(
     Some(vec![new_line, left_curr, right_curr])
 }
 
-pub fn update_line_geometry( // not done
+pub fn update_line_geometry(
     mut current_rect_points: Vec<(f32, f32)>,
     new_point: (f32, f32),
     point_index: usize,
@@ -177,45 +236,35 @@ pub fn update_line_geometry( // not done
         ));
     }
 
-    let idx_before = (point_index + n - 1) % n;
-    let idx_after = (point_index + 1) % n;
+    
 
-    let p_prev = current_rect_points[idx_before];
-    let p_next = current_rect_points[idx_after];
 
-    let prev;
     let current = new_point;
-    let next;
 
-    match point_index {
+
+    // [bottom-left, bottom-right, top-right, top-left]
+    let (idx_before, idx_after) = match point_index {
         0 => {
-            //top-left, bottom-left, bottom-right
-            prev = (current.0, p_prev.1);
-            next = (p_next.0, current.1);
+            //left
+            (0, 3)
         }
         1 => {
-            //bottom-left, bottom-right, top-right
-            prev = (p_prev.0, current.1);
-            next = (current.0, p_next.1);
-        }
-        2 => {
-            //bottom-right, top-right, top-left
-            prev = (current.0, p_prev.1);
-            next = (p_next.0, current.1);
-        }
-        3 => {
-            //top-right, top-left, bottom-left
-            prev = (p_prev.0, current.1);
-            next = (current.0, p_next.1);
+            //right
+            (1, 2)
         }
         _ => {
             return Err(anyhow::anyhow!(
                 "invalid point index for rectangle geometry"
             ));
         }
-    }
+    };
 
-    current_rect_points[point_index] = new_point;
+    let p_prev = current_rect_points[idx_before];
+    let p_next = current_rect_points[idx_after];
+
+    let prev = (current.0, p_prev.1);
+    let next = (current.0, p_next.1);
+
     current_rect_points[idx_before] = prev;
     current_rect_points[idx_after] = next;
 

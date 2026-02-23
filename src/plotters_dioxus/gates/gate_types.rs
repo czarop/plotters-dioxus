@@ -360,6 +360,8 @@ pub static SELECTED_LINE: DrawingStyle = DrawingStyle {
     dashed: false,
 };
 
+
+
 pub static DRAGGED_LINE: DrawingStyle = DrawingStyle {
     stroke: "yellow",
     fill: "none",
@@ -367,9 +369,16 @@ pub static DRAGGED_LINE: DrawingStyle = DrawingStyle {
     dashed: true,
 };
 
-pub static DRAGGED_GATE: DrawingStyle = DrawingStyle {
+pub static GREY_LINE: DrawingStyle = DrawingStyle {
     stroke: "grey",
     fill: "none",
     stroke_width: 2.0,
     dashed: false,
+};
+
+pub static GREY_LINE_DASHED: DrawingStyle = DrawingStyle {
+    stroke: "grey",
+    fill: "none",
+    stroke_width: 2.0,
+    dashed: true,
 };

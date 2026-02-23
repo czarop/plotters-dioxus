@@ -35,8 +35,8 @@ impl GateDragData {
         let y_offset = self.start_loc.1 - self.current_loc.1;
         (x_offset, y_offset)
     }
-    pub fn gate_id(&self) -> &str {
-        &self.gate_id
+    pub fn gate_id(&self) -> Arc<str> {
+        self.gate_id.clone()
     }
 }
 

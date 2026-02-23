@@ -4,7 +4,7 @@ use flow_gates::{Gate, GateHierarchy};
 
 use std::{collections::HashMap, sync::{Arc, Mutex}};
 
-use crate::plotters_dioxus::{AxisInfo, gates::{gate_single::{EllipseGate, LineGate, PolygonGate, RectangleGate}, gate_traits::DrawableGate, gate_types::GateType}};
+use crate::plotters_dioxus::{AxisInfo, gates::{gate_drag::GateDragData, gate_single::{EllipseGate, LineGate, PolygonGate, RectangleGate}, gate_traits::DrawableGate, gate_types::GateType}};
 
 pub type Id = std::sync::Arc<str>;
 
@@ -163,20 +163,14 @@ impl<Lens> Store<GateState, Lens> {
         Ok(())
     }
 
-    fn move_gate(&mut self, gate_id: GateKey, data_space_offset: (f32, f32)) -> Result<()> {
+    fn move_gate(&mut self, get_drag_data: GateDragData) -> Result<()> {
 
         self.gate_registry()
         .write()
-        .get(&gate_id)
+        .get(&get_drag_data.gate_id().into())
         .and_then(|g|{
             let mut g = g.lock().unwrap();
-            let points = g
-                .get_points()
-                .into_iter()
-                .map(|(x, y)| (x - data_space_offset.0, y - data_space_offset.1))
-                .collect();
-        
-            Some(g.replace_points(points))
+            Some(g.replace_points(get_drag_data))
         }).ok_or(anyhow!("No Gate Found"))??;
 
         
@@ -207,7 +201,7 @@ impl<Lens> Store<GateState, Lens> {
         x_axis_title: Arc<str>,
         y_axis_title: Arc<str>,
     ) -> Option<Vec<Arc<Mutex<dyn DrawableGate>>>> {
-        let key = GatesOnPlotKey::new(x_axis_title, y_axis_title, None);
+        let key = GatesOnPlotKey::new(x_axis_title.clone(), y_axis_title.clone(), None);
         let key_options = self.gate_ids_by_view().get(key);
         let mut gate_list = vec![];
         if let Some(key_store) = key_options {
@@ -216,6 +210,14 @@ impl<Lens> Store<GateState, Lens> {
             let registry_guard = registry.read();
             for k in ids {
                 if let Some(gate_store_entry) = registry_guard.get(&k) {
+                    // let param =  gate_store_entry.lock().unwrap().get_params();
+                    // let is_swappable = gate_store_entry.lock().unwrap().is_axis_swappable();
+                    // if param.0 != x_axis_title.clone() || param.1 != y_axis_title.clone() {
+                    //     if !is_swappable {
+                    //         continue;
+                    //     }
+                        
+                    // }
                     gate_list.push(gate_store_entry.clone());
                 }
             }
