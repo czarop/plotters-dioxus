@@ -16,7 +16,7 @@ use crate::plotters_dioxus::{
             ellipse::{
                 calculate_ellipse_nodes, draw_elipse, draw_ghost_point_for_ellipse,
                 is_point_on_ellipse_perimeter, update_ellipse_geometry,
-            }, line::{draw_circles_for_line, draw_ghost_point_for_line, draw_line, is_point_on_line, update_line_geometry}, polygon::{draw_ghost_point_for_polygon, draw_polygon, is_point_on_polygon_perimeter}, rectangle::{
+            }, line::{draw_circles_for_line, draw_line, is_point_on_line, update_line_geometry}, polygon::{draw_ghost_point_for_polygon, draw_polygon, is_point_on_polygon_perimeter}, rectangle::{
                 draw_ghost_point_for_rectangle, draw_rectangle, is_point_on_rectangle_perimeter,
                 update_rectangle_geometry,
             }
@@ -65,6 +65,7 @@ impl GateTrait for RectangleGate {
             let pts: Vec<_> = self.get_points().into_iter().map(|(x, y)| (y, x)).collect();
             self.inner.geometry = create_rectangle_geometry(pts, y, x)?;
             self.inner.parameters = (y.clone(), x.clone());
+            println!("match to plot completed for rectangle gate, new params: {:?}", self.inner.parameters);
             return Ok(());
         }
         Err(anyhow!("Axis mismatch for Rectangle Gate"))
@@ -111,6 +112,7 @@ impl PlotDrawable for RectangleGate {
     }
     fn is_finalised(&self) -> bool { true }
     fn draw_self(&self) -> Vec<GateRenderShape> {
+        println!("drawing rectangle gate: {}", self.inner.id);
         let style = if self.selected { &SELECTED_LINE } else { &DEFAULT_LINE };
         let pts = self.get_points();
         let main = draw_rectangle(pts[0], pts[2], style, ShapeType::Gate(self.inner.id.clone()));
@@ -370,27 +372,42 @@ impl GateTrait for LineGate {
             let pts: Vec<_> = self.get_points().into_iter().map(|(x, y)| (y, x)).collect();
             self.inner.geometry = create_rectangle_geometry(pts, y, x)?;
             self.inner.parameters = (y.clone(), x.clone());
-            self.axis_matched = false;
+            self.axis_matched = !self.axis_matched;
+            println!("match to plot completed for line gate, new params: {:?}, axis matched: {}", self.inner.parameters, self.axis_matched);
             return Ok(());
         }
-        Err(anyhow!("Axis mismatch for Rectangle Gate"))
+        Err(anyhow!("Axis mismatch for Line Gate"))
     }
 
     fn replace_point(&mut self, new_point: (f32, f32), point_index: usize) -> anyhow::Result<()> {
         let p = self.get_points();
-        self.inner.geometry = update_line_geometry(p, new_point, point_index, &self.inner.parameters.0, &self.inner.parameters.1)?;
+        self.inner.geometry = update_line_geometry(p, new_point, point_index, &self.inner.parameters.0, &self.inner.parameters.1, self.axis_matched)?;
         Ok(())
     }
 
     fn replace_points(&mut self, gate_drag_data: GateDragData) -> anyhow::Result<()> {
         let x_offset = gate_drag_data.offset().0;
-        self.y_coord = gate_drag_data.current_loc().1;
+        let y_offset = gate_drag_data.offset().1;
         
-        let points: Vec<(f32, f32)> = self
+        let points: Vec<(f32, f32)> = match self.axis_matched {
+            true => {
+                self.y_coord = gate_drag_data.current_loc().1;
+                self
                 .get_points()
                 .into_iter()
                 .map(|(x, y)| (x - x_offset, y))
-                .collect();
+                .collect()
+            },
+            false => {
+                self.y_coord = gate_drag_data.current_loc().0;
+                self
+                .get_points()
+                .into_iter()
+                .map(|(x, y)| (x, y - y_offset))
+                .collect()
+            },
+        };
+        
 
         if points.len() != 4 {
             return Err(anyhow!("Line gate geometry must have exactly 4 points"));
@@ -423,13 +440,13 @@ impl PlotDrawable for LineGate {
     }
     fn is_finalised(&self) -> bool { true }
     fn draw_self(&self) -> Vec<GateRenderShape> {
+        println!("drawing line gate: {}", self.inner.id);
         let style = if self.selected { &SELECTED_LINE } else { &DEFAULT_LINE };
         let pts = self.get_points();
-        
         let main = draw_line(pts[0], pts[2], self.y_coord, style, ShapeType::Gate(self.inner.id.clone()), &self.drag_point, self.axis_matched);
         let selected = if self.selected { 
-            
-            Some(draw_circles_for_line(pts[0], pts[2], self.y_coord, &self.drag_point))
+
+            Some(draw_circles_for_line(pts[0], pts[2], self.y_coord, &self.drag_point, self.axis_matched))
              
         } else { 
             None 
