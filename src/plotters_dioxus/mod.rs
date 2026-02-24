@@ -2,8 +2,6 @@ pub mod draw_gates;
 pub mod draw_plot;
 pub mod gates;
 pub use draw_plot::PseudoColourPlot;
-pub mod traits;
-pub use traits::PlotDrawable;
 pub mod macros;
 pub mod plot_helpers;
 pub mod plot_window;

@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use crate::plotters_dioxus::{
-    PlotDrawable,
     gates::gate_types::{DRAFT_LINE, GateRenderShape, ShapeType},
 };
 
@@ -14,25 +13,23 @@ pub enum GateDraft {
     },
 }
 
-impl PlotDrawable for GateDraft {
-    fn get_points(&self) -> Vec<(f32, f32)> {
+impl GateDraft {
+    pub fn get_points(&self) -> Vec<(f32, f32)> {
         match self {
             GateDraft::Polygon { points, .. } => points.clone(),
         }
     }
-    fn is_finalised(&self) -> bool {
+    pub fn is_finalised(&self) -> bool {
         false
     }
 
-    fn draw_self(&self) -> Vec<GateRenderShape> {
+    pub fn draw_self(&self) -> Vec<GateRenderShape> {
         match self {
             GateDraft::Polygon { points, .. } => draw_draft_polygon(points),
         }
     }
 
-}
 
-impl GateDraft {
     pub fn new_polygon(points: Vec<(f32, f32)>, x_param: Arc<str>, y_param: Arc<str>) -> Self {
         GateDraft::Polygon {
             points,

@@ -1,14 +1,12 @@
-use std::{ops::Deref, sync::Arc};
+use std::{ sync::Arc};
 
 use anyhow::anyhow;
 use flow_fcs::TransformType;
 use flow_gates::{
     GateGeometry, create_ellipse_geometry, create_polygon_geometry, create_rectangle_geometry,
-    geometry, types::LabelPosition,
 };
 
 use crate::plotters_dioxus::{
-    PlotDrawable,
     axis_info::{asinh_reverse_f32, asinh_transform_f32},
     gates::{
         gate_drag::{GateDragData, PointDragData},
@@ -21,35 +19,33 @@ use crate::plotters_dioxus::{
                 update_rectangle_geometry,
             }
         },
-        gate_traits::GateTrait,
-        gate_types::{DEFAULT_LINE, GateRenderShape, GateType, SELECTED_LINE, ShapeType},
+        gate_types::{DEFAULT_LINE, GateRenderShape, SELECTED_LINE, ShapeType},
     },
 };
 
 #[derive(PartialEq, Clone)]
 pub struct RectangleGate {
     inner: flow_gates::Gate,
-    selected: bool,
-    drag_point: Option<PointDragData>,
+    // selected: bool,
+    // drag_point: Option<PointDragData>,
 }
 
 impl RectangleGate {
     pub fn new(gate: flow_gates::Gate) -> Self {
         Self {
             inner: gate,
-            selected: false,
-            drag_point: None,
+            // selected: false,
+            // drag_point: None,
         }
     }
 }
 
-impl super::gate_traits::DrawableGate for RectangleGate {}
+impl super::gate_traits::DrawableGate for RectangleGate {
 
-impl GateTrait for RectangleGate {
-    fn is_selected(&self) -> bool { self.selected }
-    fn set_selected(&mut self, state: bool) { self.selected = state; }
-    fn is_drag_point(&self) -> bool { self.drag_point.is_some() }
-    fn set_drag_point(&mut self, data: Option<PointDragData>) { self.drag_point = data; }
+    // fn is_selected(&self) -> bool { self.selected }
+    // fn set_selected(&mut self, state: bool) { self.selected = state;}
+    // fn is_drag_point(&self) -> bool { self.drag_point.is_some() }
+    // fn set_drag_point(&mut self, data: Option<PointDragData>) { self.drag_point = data;}
     fn get_id(&self) -> Arc<str> { self.inner.id.clone() }
     fn is_composite(&self) -> bool { false }
     fn get_params(&self) -> (Arc<str>, Arc<str>) { self.inner.parameters.clone() }
@@ -97,9 +93,6 @@ impl GateTrait for RectangleGate {
         Ok(())
     }
 
-}
-
-impl PlotDrawable for RectangleGate {
     fn get_points(&self) -> Vec<(f32, f32)> {
         if let GateGeometry::Rectangle { min, max } = &self.inner.geometry {
             let (x1, y1) = (min.get_coordinate(&self.inner.parameters.0), min.get_coordinate(&self.inner.parameters.1));
@@ -125,27 +118,26 @@ impl PlotDrawable for RectangleGate {
 #[derive(PartialEq, Clone)]
 pub struct PolygonGate {
     inner: flow_gates::Gate,
-    selected: bool,
-    drag_point: Option<PointDragData>,
+    // selected: bool,
+    // drag_point: Option<PointDragData>,
 }
 
 impl PolygonGate {
     pub fn new(gate: flow_gates::Gate) -> Self {
         Self {
             inner: gate,
-            selected: false,
-            drag_point: None,
+            // selected: false,
+            // drag_point: None,
         }
     }
 }
 
-impl super::gate_traits::DrawableGate for PolygonGate {}
+impl super::gate_traits::DrawableGate for PolygonGate {
 
-impl GateTrait for PolygonGate {
-    fn is_selected(&self) -> bool { self.selected }
-    fn set_selected(&mut self, state: bool) { self.selected = state; }
-    fn is_drag_point(&self) -> bool { self.drag_point.is_some() }
-    fn set_drag_point(&mut self, data: Option<PointDragData>) { self.drag_point = data; }
+    // fn is_selected(&self) -> bool { self.selected }
+    // fn set_selected(&mut self, state: bool) { self.selected = state;}
+    // fn is_drag_point(&self) -> bool { self.drag_point.is_some() }
+    // fn set_drag_point(&mut self, data: Option<PointDragData>) { self.drag_point = data;}
     fn get_id(&self) -> Arc<str> { self.inner.id.clone() }
     fn is_composite(&self) -> bool { false }
     fn get_params(&self) -> (Arc<str>, Arc<str>) { self.inner.parameters.clone() }
@@ -193,9 +185,6 @@ impl GateTrait for PolygonGate {
         Ok(())
     }
 
-}
-
-impl PlotDrawable for PolygonGate {
     fn get_points(&self) -> Vec<(f32, f32)> {
         if let GateGeometry::Polygon { nodes, .. } = &self.inner.geometry {
             return nodes.iter().filter_map(|n| Some((n.get_coordinate(&self.inner.parameters.0)?, n.get_coordinate(&self.inner.parameters.1)?))).collect();
@@ -216,27 +205,25 @@ impl PlotDrawable for PolygonGate {
 #[derive(PartialEq, Clone)]
 pub struct EllipseGate {
     pub inner: flow_gates::Gate,
-    pub selected: bool,
-    pub drag_point: Option<PointDragData>,
+    // pub selected: bool,
+    // pub drag_point: Option<PointDragData>,
 }
 
 impl EllipseGate {
     pub fn new(gate: flow_gates::Gate) -> Self {
         Self {
             inner: gate,
-            selected: false,
-            drag_point: None,
+            // selected: false,
+            // drag_point: None,
         }
     }
 }
 
-impl super::gate_traits::DrawableGate for EllipseGate {}
-
-impl GateTrait for EllipseGate {
-    fn is_selected(&self) -> bool { self.selected }
-    fn set_selected(&mut self, state: bool) { self.selected = state; }
-    fn is_drag_point(&self) -> bool { self.drag_point.is_some() }
-    fn set_drag_point(&mut self, data: Option<PointDragData>) { self.drag_point = data; }
+impl super::gate_traits::DrawableGate for EllipseGate {
+    // fn is_selected(&self) -> bool { self.selected }
+    // fn set_selected(&mut self, state: bool) { self.selected = state;}
+    // fn is_drag_point(&self) -> bool { self.drag_point.is_some() }
+    // fn set_drag_point(&mut self, data: Option<PointDragData>) { self.drag_point = data;}
     fn get_id(&self) -> Arc<str> { self.inner.id.clone() }
     fn is_composite(&self) -> bool { false }
     fn get_params(&self) -> (Arc<str>, Arc<str>) { self.inner.parameters.clone() }
@@ -260,6 +247,7 @@ impl GateTrait for EllipseGate {
             self.inner.parameters = (y.clone(), x.clone());
             return Ok(());
         }
+
         Err(anyhow!("Axis mismatch for Ellipse Gate"))
     }
 
@@ -295,9 +283,6 @@ impl GateTrait for EllipseGate {
         Ok(())
     }
     
-}
-
-impl PlotDrawable for EllipseGate {
     fn get_points(&self) -> Vec<(f32, f32)> {
         if let GateGeometry::Ellipse { center, radius_x, radius_y, angle } = &self.inner.geometry {
             let cx = center.get_coordinate(&self.inner.parameters.0);
@@ -329,31 +314,35 @@ impl PlotDrawable for EllipseGate {
 #[derive(PartialEq, Clone)]
 pub struct LineGate {
     pub inner: flow_gates::Gate,
-    pub selected: bool,
-    pub drag_point: Option<PointDragData>,
-    pub y_coord: f32,
-    pub axis_matched: bool,
+    // pub selected: bool,
+    // pub drag_point: Option<PointDragData>,
+    pub height: f32,
+    axis_matched: bool,
 }
 
 impl LineGate {
-    pub fn new(gate: flow_gates::Gate, y_coord: f32) -> Self {
+    pub fn new(gate: flow_gates::Gate, height: f32) -> Self {
         Self {
             inner: gate,
-            selected: false,
-            drag_point: None,
-            y_coord,
-            axis_matched: true
+            // selected: false,
+            // drag_point: None,
+            height: height,
+            axis_matched: true,
         }
     }
 }
 
-impl super::gate_traits::DrawableGate for LineGate {}
+impl super::gate_traits::DrawableGate for LineGate {
 
-impl GateTrait for LineGate {
-    fn is_selected(&self) -> bool { self.selected }
-    fn set_selected(&mut self, state: bool) { self.selected = state; }
-    fn is_drag_point(&self) -> bool { self.drag_point.is_some() }
-    fn set_drag_point(&mut self, data: Option<PointDragData>) { self.drag_point = data; }
+    // fn is_selected(&self) -> bool { self.selected }
+    // fn set_selected(&mut self, state: bool) { 
+    //     self.selected = state;
+    // }
+    // fn is_drag_point(&self) -> bool { 
+    //     self.drag_point.is_some() }
+    // fn set_drag_point(&mut self, data: Option<PointDragData>) { 
+    //     self.drag_point = data;
+    // }
     fn get_id(&self) -> Arc<str> { self.inner.id.clone() }
     fn is_composite(&self) -> bool { false }
     fn get_params(&self) -> (Arc<str>, Arc<str>) { self.inner.parameters.clone() }
@@ -391,7 +380,7 @@ impl GateTrait for LineGate {
         
         let points: Vec<(f32, f32)> = match self.axis_matched {
             true => {
-                self.y_coord = gate_drag_data.current_loc().1;
+                self.height = gate_drag_data.current_loc().1;
                 self
                 .get_points()
                 .into_iter()
@@ -399,7 +388,7 @@ impl GateTrait for LineGate {
                 .collect()
             },
             false => {
-                self.y_coord = gate_drag_data.current_loc().0;
+                self.height = gate_drag_data.current_loc().0;
                 self
                 .get_points()
                 .into_iter()
@@ -413,7 +402,6 @@ impl GateTrait for LineGate {
             return Err(anyhow!("Line gate geometry must have exactly 4 points"));
         }
         self.inner.geometry = create_rectangle_geometry(points, &self.inner.parameters.0, &self.inner.parameters.1)?;
-        
         Ok(())
     }
 
@@ -425,9 +413,6 @@ impl GateTrait for LineGate {
         Ok(())
     }
     
-}
-
-impl PlotDrawable for LineGate {
     fn get_points(&self) -> Vec<(f32, f32)> {
         if let GateGeometry::Rectangle { min, max } = &self.inner.geometry {
             let (x1, y1) = (min.get_coordinate(&self.inner.parameters.0), min.get_coordinate(&self.inner.parameters.1));
@@ -443,10 +428,10 @@ impl PlotDrawable for LineGate {
         println!("drawing line gate: {}", self.inner.id);
         let style = if self.selected { &SELECTED_LINE } else { &DEFAULT_LINE };
         let pts = self.get_points();
-        let main = draw_line(pts[0], pts[2], self.y_coord, style, ShapeType::Gate(self.inner.id.clone()), &self.drag_point, self.axis_matched);
+        let main = draw_line(pts[0], pts[2], self.height, style, ShapeType::Gate(self.inner.id.clone()), &self.drag_point, self.axis_matched);
         let selected = if self.selected { 
 
-            Some(draw_circles_for_line(pts[0], pts[2], self.y_coord, &self.drag_point, self.axis_matched))
+            Some(draw_circles_for_line(pts[0], pts[2], self.height, &self.drag_point, self.axis_matched))
              
         } else { 
             None 

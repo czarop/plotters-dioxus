@@ -1,10 +1,7 @@
-use crate::plotters_dioxus::{
-    PlotDrawable,
-    gates::{
-        gate_drag::PointDragData,
-        gate_types::{DRAGGED_LINE, DrawingStyle, GateRenderShape, ShapeType},
-    },
-};
+use crate::plotters_dioxus::gates::{
+        gate_drag::PointDragData, gate_traits::DrawableGate, gate_types::{DRAGGED_LINE, DrawingStyle, GateRenderShape, ShapeType}
+    };
+use crate::plotters_dioxus::gates::gate_traits::DrawableGate;
 
 pub fn draw_polygon(
     points: &[(f32, f32)],
@@ -49,7 +46,7 @@ pub fn draw_ghost_point_for_polygon(
 }
 
 pub fn is_point_on_polygon_perimeter(
-    shape: &dyn PlotDrawable,
+    shape: &crate::plotters_dioxus::gates::gate_single::PolygonGate,
     point: (f32, f32),
     tolerance: (f32, f32),
 ) -> Option<f32> {

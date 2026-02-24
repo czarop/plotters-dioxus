@@ -1,7 +1,7 @@
 use flow_gates::GateGeometry;
-
+use crate::plotters_dioxus::gates::gate_traits::DrawableGate;
 use crate::plotters_dioxus::{
-    PlotDrawable,
+    
     gates::{gate_drag::PointDragData, gate_types::{DRAGGED_LINE, DrawingStyle, GateRenderShape, ShapeType}},
     plot_helpers::PlotMapper,
 };
@@ -79,7 +79,7 @@ pub fn draw_rectangle(
 }
 
 pub fn is_point_on_rectangle_perimeter(
-    shape: &dyn PlotDrawable,
+    shape: &crate::plotters_dioxus::gates::gate_single::RectangleGate,
     point: (f32, f32),
     tolerance: (f32, f32),
 ) -> Option<f32> {

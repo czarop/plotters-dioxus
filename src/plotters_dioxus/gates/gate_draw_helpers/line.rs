@@ -1,7 +1,6 @@
 use flow_gates::GateGeometry;
-
+use crate::plotters_dioxus::gates::gate_traits::DrawableGate;
 use crate::plotters_dioxus::{
-    PlotDrawable,
     gates::{
         gate_drag::PointDragData,
         gate_types::{DRAGGED_LINE, GREY_LINE_DASHED, DrawingStyle, GateRenderShape, ShapeType},
@@ -249,7 +248,7 @@ pub fn is_point_on_line(
 
     let (min, max) = (rect_bounds[0], rect_bounds[2]);
 
-    let line_coords = bounds_to_line_coords(min, max, shape.y_coord, shape.axis_matched);
+    let line_coords = bounds_to_line_coords(min, max, shape.height, shape.axis_matched);
 
     if let Some(dis) = shape.is_near_segment(point, line_coords.0, line_coords.1, tolerance) {
         return Some(dis);

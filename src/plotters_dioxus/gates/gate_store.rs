@@ -153,7 +153,7 @@ impl<Lens> Store<GateState, Lens> {
         .get(&gate_id)
         .and_then(|g|{
             let mut g = g.lock().unwrap();
-            g.set_drag_point(None);
+            // g.set_drag_point(None);
             
             Some(g.replace_point(new_point, point_idx))
         });

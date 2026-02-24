@@ -1,5 +1,5 @@
 use crate::plotters_dioxus::{
-        PlotDrawable, gates::{
+         gates::{
             GateState, gate_draft::GateDraft, gate_drag::{GateDragData, GateDragType, PointDragData, RotationData}, gate_draw_helpers::rectangle::map_rect_to_pixels, gate_store::{GateStateImplExt, GateStateStoreExt as _}, gate_traits::DrawableGate, gate_types::{GateRenderShape, GateType, ShapeType}
         }, plot_helpers::PlotMapper
     };
@@ -285,17 +285,13 @@ pub fn GateLayer(
                             _ => {}
                         }
                     },
-
-                    for (gate_index , gate) in (&*gates.read()).iter().enumerate() {
-                        {
-                            let g = gate.lock().unwrap();
-                            rsx! {
-                                for (shape_index , shape) in g.draw_self().into_iter().enumerate() {
-                                    RenderShape {
-                                        shape,
-                                        gate_id: g.get_id().clone(),
+                    if let Some(gates) = gate_store.get_gates_for_plot(x_channel(), y_channel()) {
+                        for (gate_index , gate) in gates.iter().enumerate() {
+                            {
+                                rsx! {
+                                    GateWrapper {
+                                        gate: gate.clone(),
                                         gate_index,
-                                        shape_index,
                                         drag_data,
                                         plot_map,
                                     }
@@ -303,6 +299,7 @@ pub fn GateLayer(
                             }
                         }
                     }
+
                     match draft_gate() {
                         Some(draft) => {
                             let id = "draft".to_string();
@@ -321,6 +318,45 @@ pub fn GateLayer(
                 }
             },
             None => rsx! {},
+        }
+    }
+}
+
+#[derive(Props, Clone)]
+pub struct GateWrapperProps {
+    gate: Arc<Mutex<dyn DrawableGate>>,
+    gate_index: usize,
+    drag_data: Signal<Option<GateDragType>>,
+    plot_map: ReadSignal<Option<PlotMapper>>
+}
+
+impl PartialEq for GateWrapperProps {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.gate, &other.gate)
+    }
+}
+
+#[component]
+fn GateWrapper(
+    props: GateWrapperProps
+) -> Element {
+    // This lock ONLY happens if this specific gate needs to redraw
+    let g = props.gate.lock().unwrap();
+    let gate_id = g.get_id().clone();
+    
+    println!("Only printing for gate: {}", gate_id);
+
+    rsx! {
+        for (shape_index , shape) in g.draw_self().into_iter().enumerate() {
+            RenderShape {
+                key: "{gate_id}-{shape_index}",
+                shape,
+                gate_id: gate_id.clone(),
+                gate_index: props.gate_index,
+                shape_index,
+                drag_data: props.drag_data,
+                plot_map: props.plot_map,
+            }
         }
     }
 }
