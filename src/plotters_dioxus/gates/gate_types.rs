@@ -3,10 +3,9 @@ use std::sync::Arc;
 use crate::plotters_dioxus::gates::gate_store::Id;
 
 use anyhow::anyhow;
-use flow_gates::{GateGeometry};
+use flow_gates::GateGeometry;
 
 use crate::plotters_dioxus::plot_helpers::PlotMapper;
-
 
 #[derive(Clone, PartialEq, Copy)]
 pub enum GateType {
@@ -23,13 +22,15 @@ pub enum GateType {
 // GateFinal will store a GateClass containing it's gate(s)
 // GateFinal's drawself will return a composite list of shapes from the sub-gates
 // decide how to work with ID's - GateFinal should have its own ID so it can be retrieved from the store
-// when a sub-gate is clicked on it 
+// when a sub-gate is clicked on it
 impl GateType {
-
     pub fn is_composite(&self) -> bool {
-        matches!(self, GateType::Bisector | GateType::Quadrant | GateType::FlexiQuadrant)
+        matches!(
+            self,
+            GateType::Bisector | GateType::Quadrant | GateType::FlexiQuadrant
+        )
     }
-    
+
     pub fn is_single(&self) -> bool {
         !self.is_composite()
     }
@@ -145,7 +146,7 @@ pub enum GateRenderShape {
         y2: f32,
         style: &'static DrawingStyle,
         shape_type: ShapeType,
-    }
+    },
 }
 
 impl GateRenderShape {
@@ -221,7 +222,14 @@ impl GateRenderShape {
                 style: *style,
                 shape_type: shape_type.clone(),
             },
-            GateRenderShape::Line { x1, y1, x2, y2, style, shape_type } => Self::Line {
+            GateRenderShape::Line {
+                x1,
+                y1,
+                x2,
+                y2,
+                style,
+                shape_type,
+            } => Self::Line {
                 x1: *x1,
                 y1: *y1,
                 x2: *x2,
@@ -324,8 +332,20 @@ impl GateRenderShape {
                     shape_type: shape_type.clone(),
                 }
             }
-            GateRenderShape::Line { x1, y1, x2, y2, style, shape_type } => {
-                Self::Line { x1: *x1 + offset.0, y1: *y1 + offset.1, x2: *x2 + offset.0, y2: *y2 + offset.1, style: *style, shape_type: shape_type.clone() }
+            GateRenderShape::Line {
+                x1,
+                y1,
+                x2,
+                y2,
+                style,
+                shape_type,
+            } => Self::Line {
+                x1: *x1 + offset.0,
+                y1: *y1 + offset.1,
+                x2: *x2 + offset.0,
+                y2: *y2 + offset.1,
+                style: *style,
+                shape_type: shape_type.clone(),
             },
         }
     }
@@ -359,8 +379,6 @@ pub static SELECTED_LINE: DrawingStyle = DrawingStyle {
     stroke_width: 2.0,
     dashed: false,
 };
-
-
 
 pub static DRAGGED_LINE: DrawingStyle = DrawingStyle {
     stroke: "yellow",

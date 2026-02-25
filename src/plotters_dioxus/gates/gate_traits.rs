@@ -2,14 +2,20 @@ use std::sync::Arc;
 
 use flow_fcs::TransformType;
 
-use crate::plotters_dioxus::{gates::{gate_drag::{GateDragData, PointDragData}, gate_types::GateRenderShape}};
+use crate::plotters_dioxus::gates::{
+    gate_drag::{GateDragData, PointDragData},
+    gate_types::GateRenderShape,
+};
 
-pub trait DrawableGate{
-
+pub trait DrawableGate {
     fn get_points(&self) -> Vec<(f32, f32)>;
     fn is_finalised(&self) -> bool;
 
-    fn draw_self(&self) -> Vec<GateRenderShape>;
+    fn draw_self(
+        &self,
+        is_selected: bool,
+        drag_point: Option<PointDragData>,
+    ) -> Vec<GateRenderShape>;
 
     fn is_near_segment(
         &self,
@@ -62,18 +68,38 @@ pub trait DrawableGate{
 
     fn is_point_on_perimeter(&self, point: (f32, f32), tolerance: (f32, f32)) -> Option<f32>;
 
-    fn match_to_plot_axis(&mut self, plot_x_param: &str, plot_y_param: &str) -> anyhow::Result<()>;
+    fn match_to_plot_axis(
+        &self,
+        plot_x_param: &str,
+        plot_y_param: &str,
+    ) -> anyhow::Result<Option<Box<dyn DrawableGate>>>;
 
     fn recalculate_gate_for_rescaled_axis(
-        &mut self,
+        &self,
         param: std::sync::Arc<str>,
         old_transform: &TransformType,
         new_transform: &TransformType,
-    ) -> anyhow::Result<()>;
+    ) -> anyhow::Result<Box<dyn DrawableGate>>;
 
-    fn rotate_gate(&mut self, mouse_position: (f32, f32)) -> anyhow::Result<()>;
+    fn rotate_gate(
+        &self,
+        mouse_position: (f32, f32),
+    ) -> anyhow::Result<Option<Box<dyn DrawableGate>>>;
 
-    fn replace_point(&mut self, new_point: (f32, f32), point_index: usize) -> anyhow::Result<()>;
+    fn replace_point(
+        &self,
+        new_point: (f32, f32),
+        point_index: usize,
+    ) -> anyhow::Result<Box<dyn DrawableGate>>;
 
-    fn replace_points(&mut self, gate_drag_data: GateDragData) -> anyhow::Result<()>;
+    fn replace_points(&self, gate_drag_data: GateDragData)
+    -> anyhow::Result<Box<dyn DrawableGate>>;
+
+    fn clone_box(&self) -> Box<dyn DrawableGate>;
+}
+
+impl Clone for Box<dyn DrawableGate> {
+    fn clone(&self) -> Self {
+        self.clone_box()
+    }
 }

@@ -7,15 +7,13 @@ use plotters::coord::Shift;
 use plotters::prelude::*;
 use plotters_bitmap::BitMapBackend;
 
-use std::{sync::Arc};
+use std::sync::Arc;
 
 use flow_plots::{
     BasePlotOptions, ColorMaps, DensityPlot, DensityPlotOptions, Plot, render::RenderConfig,
 };
 
-use crate::plotters_dioxus::{
-    AxisInfo, draw_gates::GateLayer, plot_helpers::{PlotMapper}
-};
+use crate::plotters_dioxus::{AxisInfo, draw_gates::GateLayer, plot_helpers::PlotMapper};
 
 pub type DioxusDrawingArea<'a> = DrawingArea<BitMapBackend<'a>, Shift>;
 
@@ -95,7 +93,7 @@ pub fn PseudoColourPlot(
                 plot_map,
                 x_channel: x_axis_info().param.fluoro.clone(),
                 y_channel: y_axis_info().param.fluoro.clone(),
-            
+
             }
         }
     }

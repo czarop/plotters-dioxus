@@ -1,7 +1,8 @@
 use crate::plotters_dioxus::gates::{
-        gate_drag::PointDragData, gate_traits::DrawableGate, gate_types::{DRAGGED_LINE, DrawingStyle, GateRenderShape, ShapeType}
-    };
-use crate::plotters_dioxus::gates::gate_traits::DrawableGate;
+    gate_drag::PointDragData,
+    gate_traits::DrawableGate,
+    gate_types::{DRAGGED_LINE, DrawingStyle, GateRenderShape, ShapeType},
+};
 
 pub fn draw_polygon(
     points: &[(f32, f32)],

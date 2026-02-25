@@ -1,12 +1,19 @@
 use crate::plotters_dioxus::{
-         gates::{
-            GateState, gate_draft::GateDraft, gate_drag::{GateDragData, GateDragType, PointDragData, RotationData}, gate_draw_helpers::rectangle::map_rect_to_pixels, gate_store::{GateStateImplExt, GateStateStoreExt as _}, gate_traits::DrawableGate, gate_types::{GateRenderShape, GateType, ShapeType}
-        }, plot_helpers::PlotMapper
-    };
+    gates::{
+        GateState,
+        gate_draft::GateDraft,
+        gate_drag::{GateDragData, GateDragType, PointDragData, RotationData},
+        gate_draw_helpers::rectangle::map_rect_to_pixels,
+        gate_store::{GateStateImplExt},
+        gate_traits::DrawableGate,
+        gate_types::{GateRenderShape, GateType, ShapeType},
+    },
+    plot_helpers::PlotMapper,
+};
 
 use dioxus::prelude::*;
 use flow_gates::Gate;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc};
 
 #[component]
 pub fn GateLayer(
@@ -20,12 +27,11 @@ pub fn GateLayer(
     let mut selected_gate_id = use_signal(|| None::<Arc<str>>);
     let current_gate_type = use_context::<Signal<GateType>>();
 
-    let mut gates = use_signal(|| Vec::<Arc<Mutex<dyn DrawableGate>>>::new());
+    let mut gates = use_signal(|| Vec::<Arc<dyn DrawableGate>>::new());
 
     // convert clicked coords into a draft gate
     let draft_gate = use_memo(move || {
-        
-        if let GateType::Polygon = &*current_gate_type.read(){
+        if let GateType::Polygon = &*current_gate_type.read() {
             let cur_coords = draft_gate_coords();
             if cur_coords.len() > 0 {
                 let gate_draft = GateDraft::new_polygon(cur_coords, x_channel(), y_channel());
@@ -43,10 +49,11 @@ pub fn GateLayer(
 
     use_effect(move || {
         let x_param = x_channel();
-        let y_param= y_channel();
-        let _ = gate_store.match_gates_to_plot(x_param, y_param).inspect_err(|e| println!("{}", e.to_string()));
+        let y_param = y_channel();
+        let _ = gate_store
+            .match_gates_to_plot(x_param, y_param)
+            .inspect_err(|e| println!("{}", e.to_string()));
     });
-
 
     // the list of finalised gates
     use_effect(move || {
@@ -56,18 +63,6 @@ pub fn GateLayer(
         };
         next_gate_id.set(g.len());
         gates.set(g);
-    });
-
-    use_effect(move || {
-        if let Some(GateDragType::Point(point_drag_data)) = &*drag_data.read(){
-            if let Some(selected_gate) = selected_gate_id.peek().clone() {
-                let gate_key = selected_gate.into();
-                if let Some(gate) = gate_store.gate_registry().get_mut(&gate_key) {
-                    gate.lock().unwrap().set_drag_point(Some(point_drag_data.clone()));
-                }
-            }
-        };
-        
     });
 
     rsx! {
@@ -102,28 +97,13 @@ pub fn GateLayer(
                                         draft_gate_coords.write().push((data_x, data_y));
                                     }
                                 } else if drag_data.peek().is_none() {
-                                    let curr_selected = selected_gate_id.take().unwrap();
-                                    let gate_key = curr_selected.into();
-                                    if let Some(gate) = gate_store.gate_registry().get_mut(&gate_key)
-                                    {
-                                        gate.lock().unwrap().set_selected(false);
-                                    }
+                                    let _ = selected_gate_id.take().unwrap();
                                 }
                             } else {
-                                if let Some(curr_selected) = selected_gate_id.take() {
-                                    let gate_key = curr_selected.into();
-                                    if let Some(gate) = gate_store.gate_registry().get_mut(&gate_key)
-                                    {
-                                        gate.lock().unwrap().set_selected(false);
-                                    }
-                                }
+                                let _ = selected_gate_id.take();
                                 let closest_gate = clicked_gate.unwrap();
-                                let gate_id = closest_gate.lock().unwrap().get_id().clone();
+                                let gate_id = closest_gate.get_id().clone();
                                 selected_gate_id.set(Some(gate_id.clone()));
-                                let gate_key = gate_id.into();
-                                if let Some(gate) = gate_store.gate_registry().get_mut(&gate_key) {
-                                    gate.lock().unwrap().set_selected(true);
-                                }
                             }
                         }
                         drag_data.set(None);
@@ -134,7 +114,7 @@ pub fn GateLayer(
                         let py = local_coords.y as f32;
                         let x_param = &*x_channel.peek();
                         let y_param = &*y_channel.peek();
-                        let (dx, dy) = mapper.pixel_to_data(px, py, None, None);
+                        let (_, dy) = mapper.pixel_to_data(px, py, None, None);
 
                         let points = {
                             if let Some(curr_gate) = &*draft_gate.peek() {
@@ -250,49 +230,52 @@ pub fn GateLayer(
                                             &mapper,
                                             &*gates.read(),
                                         );
-                                        if clicked_gate.is_some()
-                                            && clicked_gate
-                                                .as_ref()
-                                                .unwrap()
-                                                .lock()
-                                                .unwrap()
-                                                .is_selected()
-                                        {
-                                            let data = GateDragData::new(
-                                                clicked_gate.unwrap().lock().unwrap().get_id().clone(),
-                                                data_coords,
-                                                data_coords,
-                                            );
-                                            drag_data.set(Some(GateDragType::Gate(data)));
+
+                                        if let Some(cg) = clicked_gate {
+                                            if selected_gate_id().unwrap_or_default()
+                                                == cg.get_id()
+                                            {
+                                                let data = GateDragData::new(
+                                                    cg.get_id(),
+                                                    data_coords,
+                                                    data_coords,
+                                                );
+                                                drag_data.set(Some(GateDragType::Gate(data)));
+                                            }
                                         }
                                     }
                                 }
                             }
                             Some(dioxus_elements::input_data::MouseButton::Secondary) => {
-                                if let Some(curr_selected) = selected_gate_id.take() {
-                                    let gate_key = curr_selected.into();
-                                    if let Some(gate) = gate_store.gate_registry().get_mut(&gate_key)
-                                    {
-                                        let mut g = gate.lock().unwrap();
-                                        g.set_selected(false);
-                                        g.set_drag_point(None);
-                                        draft_gate_coords.write().clear();
-                                    }
-                                } else {
-                                    draft_gate_coords.write().clear();
-                                }
+                                let _ = selected_gate_id.take();
+                                draft_gate_coords.write().clear();
                             }
                             _ => {}
                         }
                     },
                     if let Some(gates) = gate_store.get_gates_for_plot(x_channel(), y_channel()) {
                         for (gate_index , gate) in gates.iter().enumerate() {
+
                             {
+                                let is_selected = if let Some(id) = &*selected_gate_id.read() {
+                                    id == &gate.get_id()
+                                } else {
+                                    false
+                                };
+
+                                let dd = if let Some(GateDragType::Point(dd)) = &*drag_data.read() {
+                                    if is_selected { Some(dd.clone()) } else { None }
+                                } else {
+                                    None
+                                };
+
                                 rsx! {
                                     GateWrapper {
                                         gate: gate.clone(),
                                         gate_index,
-                                        drag_data,
+                                        is_selected,
+                                        drag_data: dd,
+                                        drag_data_setter: drag_data,
                                         plot_map,
                                     }
                                 }
@@ -324,37 +307,53 @@ pub fn GateLayer(
 
 #[derive(Props, Clone)]
 pub struct GateWrapperProps {
-    gate: Arc<Mutex<dyn DrawableGate>>,
+    gate: Arc<dyn DrawableGate>,
     gate_index: usize,
-    drag_data: Signal<Option<GateDragType>>,
-    plot_map: ReadSignal<Option<PlotMapper>>
+    is_selected: bool,
+    drag_data: Option<PointDragData>,
+    drag_data_setter: Signal<Option<GateDragType>>,
+    plot_map: ReadSignal<Option<PlotMapper>>,
 }
 
 impl PartialEq for GateWrapperProps {
     fn eq(&self, other: &Self) -> bool {
-        Arc::ptr_eq(&self.gate, &other.gate)
-    }
+        self.is_selected == other.is_selected 
+        && self.gate_index == other.gate_index
+        && Arc::ptr_eq(&self.gate, &other.gate) 
+        && self.drag_data == other.drag_data
+        && self.drag_data_setter == other.drag_data_setter
+        && self.plot_map == other.plot_map
+    } 
 }
 
 #[component]
-fn GateWrapper(
-    props: GateWrapperProps
-) -> Element {
-    // This lock ONLY happens if this specific gate needs to redraw
-    let g = props.gate.lock().unwrap();
+fn GateWrapper(props: GateWrapperProps) -> Element {
+    let g = props.gate;
     let gate_id = g.get_id().clone();
+
+    let is_selected = props.is_selected;
     
+    let drag_data = if let Some(dd) = props.drag_data {
+    
+    if is_selected {
+            Some(dd.clone())
+        } else {
+            None
+        }
+    } else {
+        None
+    };
     println!("Only printing for gate: {}", gate_id);
 
     rsx! {
-        for (shape_index , shape) in g.draw_self().into_iter().enumerate() {
+        for (shape_index , shape) in g.draw_self(is_selected, drag_data).into_iter().enumerate() {
             RenderShape {
                 key: "{gate_id}-{shape_index}",
                 shape,
                 gate_id: gate_id.clone(),
                 gate_index: props.gate_index,
                 shape_index,
-                drag_data: props.drag_data,
+                drag_data: props.drag_data_setter,
                 plot_map: props.plot_map,
             }
         }
@@ -364,8 +363,8 @@ fn GateWrapper(
 fn was_gate_clicked(
     click_coords: (f32, f32),
     mapper: &PlotMapper,
-    gates: &[Arc<Mutex<dyn DrawableGate>>],
-) -> Option<Arc<Mutex<dyn DrawableGate>>> {
+    gates: &[Arc<dyn DrawableGate>],
+) -> Option<Arc<dyn DrawableGate>> {
     let (data_x, data_y) = mapper.pixel_to_data(click_coords.0, click_coords.1, None, None);
 
     let mut closest_gate = None;
@@ -373,7 +372,9 @@ fn was_gate_clicked(
     let tolerance = mapper.get_data_tolerance(5.0);
     let mut closest_dist = std::f32::INFINITY;
     for gate in gates {
-        if let Some(dist) = gate.lock().unwrap().is_point_on_perimeter((data_x, data_y), tolerance) {
+        if let Some(dist) = gate
+            .is_point_on_perimeter((data_x, data_y), tolerance)
+        {
             if dist < closest_dist {
                 closest_dist = dist;
                 closest_gate = Some(gate.clone());
@@ -437,7 +438,7 @@ fn RenderShape(
                     } else {
                         format!("none")
                     }
-                },
+                }
                 _ => format!("none"),
             }
         };
@@ -445,7 +446,7 @@ fn RenderShape(
             GateRenderShape::PolyLine {
                 points,
                 style,
-                shape_type:_,
+                shape_type: _,
             } => {
                 let mapped = points
                     .iter()
@@ -513,7 +514,7 @@ fn RenderShape(
             GateRenderShape::Polygon {
                 points,
                 style,
-                shape_type:_,
+                shape_type: _,
             } => {
                 let mapped_points = points
                     .iter()
@@ -543,7 +544,7 @@ fn RenderShape(
                 radius_y,
                 degrees_rotation,
                 style,
-                shape_type:_,
+                shape_type: _,
             } => {
                 let cp = mapper.data_to_pixel(center.0, center.1, None, None);
                 let x_edge = mapper.data_to_pixel(center.0 + radius_x, center.1, None, None);
@@ -568,14 +569,19 @@ fn RenderShape(
                     }
 
                 }
-            },
-            GateRenderShape::Handle {center, size, shape_center, shape_type} => {
+            }
+            GateRenderShape::Handle {
+                center,
+                size,
+                shape_center,
+                shape_type,
+            } => {
                 let c = mapper.data_to_pixel(center.0, center.1, None, None);
                 let cp = mapper.data_to_pixel(shape_center.0, shape_center.1, None, None);
-                
+
                 let pixel_offset = 15.0;
                 let handle_x = c.0;
-                let handle_y = c.1 - (size + pixel_offset); 
+                let handle_y = c.1 - (size + pixel_offset);
 
                 let translate = {
                     if let Some(GateDragType::Gate(data)) = &&*drag_data.read() {
@@ -589,10 +595,11 @@ fn RenderShape(
                         } else {
                             None
                         }
-                } else {
-                    None
-                }};
-                let rotate = { 
+                    } else {
+                        None
+                    }
+                };
+                let rotate = {
                     if let Some(GateDragType::Rotation(data)) = &*drag_data.read() {
                         if let ShapeType::Rotation(handle_angle_rad) = shape_type {
                             let angle = -(handle_angle_rad.to_degrees()) + data.rotation_deg();
@@ -600,7 +607,6 @@ fn RenderShape(
                         } else {
                             None
                         }
-                    
                     } else if let ShapeType::Rotation(handle_angle_rad) = shape_type {
                         let r = -(handle_angle_rad.to_degrees());
                         Some(format!("rotate({} {} {})", r, cp.0, cp.1))
@@ -615,7 +621,7 @@ fn RenderShape(
                     .collect::<Vec<_>>()
                     .join(" ");
 
-                rsx!{
+                rsx! {
                     g { transform,
                         line {
                             x1: "{c.0}",
@@ -658,9 +664,16 @@ fn RenderShape(
                     }
                 }
             }
-            GateRenderShape::Rectangle { x, y, width, height, style, shape_type:_ } => {
+            GateRenderShape::Rectangle {
+                x,
+                y,
+                width,
+                height,
+                style,
+                shape_type: _,
+            } => {
                 let (mx, my, m_width, m_height) = map_rect_to_pixels(x, y, width, height, mapper);
-                    
+
                 rsx! {
                     g { transform,
                         rect {
@@ -677,8 +690,15 @@ fn RenderShape(
                     }
 
                 }
-            },
-            GateRenderShape::Line { x1, y1, x2, y2, style, shape_type:_ } => {
+            }
+            GateRenderShape::Line {
+                x1,
+                y1,
+                x2,
+                y2,
+                style,
+                shape_type: _,
+            } => {
                 let p1 = mapper.data_to_pixel(x1, y1, None, None);
                 let p2 = mapper.data_to_pixel(x2, y2, None, None);
                 rsx! {

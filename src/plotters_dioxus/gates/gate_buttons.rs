@@ -1,8 +1,6 @@
-
 use dioxus::prelude::*;
 
 use crate::plotters_dioxus::gates::gate_types::GateType;
-
 
 #[component]
 pub fn NewGateButtons(callback: EventHandler<GateType>) -> Element {

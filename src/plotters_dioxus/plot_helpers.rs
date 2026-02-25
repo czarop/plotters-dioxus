@@ -3,9 +3,9 @@ use flow_fcs::{TransformType, Transformable};
 use flow_gates::transforms::{
     get_plotting_area, pixel_to_raw, pixel_to_raw_y, raw_to_pixel, raw_to_pixel_y,
 };
-use std::{collections::{HashMap}, ops::RangeInclusive, sync::Arc};
+use std::{collections::HashMap, ops::RangeInclusive, sync::Arc};
 
-use crate::{plotters_dioxus::{AxisInfo, gates::Id}};
+use crate::plotters_dioxus::{AxisInfo, gates::Id};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct PlotMapper {
@@ -114,7 +114,6 @@ impl PlotMapper {
         self.view_height
     }
 
-
     pub fn x_axis_min_max(&self) -> (f32, f32) {
         (*self.x_data_range.start(), *self.x_data_range.end())
     }
@@ -126,7 +125,6 @@ impl PlotMapper {
     pub fn x_axis_range(&self) -> f32 {
         let raw_x = self.x_data_range.end() - self.x_data_range.start();
         self.x_transform.transform(&raw_x)
-        
     }
 
     pub fn y_axis_range(&self) -> f32 {
@@ -159,75 +157,81 @@ impl std::fmt::Display for Param {
 
 #[derive(Default, Store, Clone)]
 pub struct ParameterStore {
-    pub settings: HashMap<Id, AxisInfo>
+    pub settings: HashMap<Id, AxisInfo>,
 }
 
 #[store(pub name = ParameterStoreImplExt)]
 impl<Lens> Store<ParameterStore, Lens> {
+    fn add_new_axis_settings(&mut self, p: &Param, fcs_file: &flow_fcs::Fcs) {
+        self.settings()
+            .write()
+            .entry(p.fluoro.clone())
+            .or_insert_with(|| {
+                // Determine transform based on channel metadata
+                let transform = fcs_file
+                    .parameters
+                    .get(p.fluoro.as_ref())
+                    .map(|t| {
+                        if t.is_fluorescence() {
+                            TransformType::Arcsinh { cofactor: 6000.0 }
+                        } else {
+                            TransformType::Linear
+                        }
+                    })
+                    .unwrap_or(TransformType::Linear);
 
-    fn add_new_axis_settings(
-        &mut self,
-    p: &Param, 
-    fcs_file: &flow_fcs::Fcs, 
-) {
-    self.settings().write().entry(p.fluoro.clone()).or_insert_with(|| {
-        // Determine transform based on channel metadata
-        let transform = fcs_file
-            .parameters
-            .get(p.fluoro.as_ref())
-            .map(|t| {
-                if t.is_fluorescence() {
-                    TransformType::Arcsinh { cofactor: 6000.0 }
+                // Set logical lower bounds based on transform type
+                let lower = if matches!(transform, TransformType::Linear) {
+                    0.0
                 } else {
-                    TransformType::Linear
-                }
-            })
-            .unwrap_or(TransformType::Linear);
+                    -10000.0
+                };
 
-        // Set logical lower bounds based on transform type
-        let lower = if matches!(transform, TransformType::Linear) {
-            0.0
-        } else {
-            -10000.0
-        };
-
-        AxisInfo::new_from_raw(p.clone(), lower, 4194304.0, transform)
-    });
-}
+                AxisInfo::new_from_raw(p.clone(), lower, 4194304.0, transform)
+            });
+    }
 
     fn update_cofactor(&mut self, id: &Id, cofactor: f32) -> Option<(AxisInfo, AxisInfo)> {
         let mut old = None;
         let mut new = None;
-        self.settings().write().entry(id.clone()).and_modify( |axis| {
-            if let TransformType::Arcsinh { .. } = axis.transform {
-                let old_axis = std::mem::take(axis);
-                let new_axis = (&old_axis).into_archsinh(cofactor).unwrap_or(old_axis.clone());
-                new = Some(new_axis.clone());
-                old = Some(old_axis);
-                *axis = new_axis;
-            }
-        });
-        
+        self.settings()
+            .write()
+            .entry(id.clone())
+            .and_modify(|axis| {
+                if let TransformType::Arcsinh { .. } = axis.transform {
+                    let old_axis = std::mem::take(axis);
+                    let new_axis = (&old_axis)
+                        .into_archsinh(cofactor)
+                        .unwrap_or(old_axis.clone());
+                    new = Some(new_axis.clone());
+                    old = Some(old_axis);
+                    *axis = new_axis;
+                }
+            });
 
         if new.is_some() && old.is_some() {
-            return Some((old.unwrap(), new.unwrap()))
+            return Some((old.unwrap(), new.unwrap()));
         }
 
         None
     }
 
     fn update_lower(&mut self, id: &Id, lower: f32) {
-        self.settings().write().entry(id.clone()).and_modify(|axis| {
-            let old_axis = std::mem::take(axis);
-            *axis = old_axis.into_new_lower(lower);
-        });
+        self.settings()
+            .write()
+            .entry(id.clone())
+            .and_modify(|axis| {
+                let old_axis = std::mem::take(axis);
+                *axis = old_axis.into_new_lower(lower);
+            });
     }
     fn update_upper(&mut self, id: &Id, upper: f32) {
-        self.settings().write().entry(id.clone()).and_modify(|axis| {
-            let old_axis = std::mem::take(axis);
-            *axis = old_axis.into_new_upper(upper);
-        });
+        self.settings()
+            .write()
+            .entry(id.clone())
+            .and_modify(|axis| {
+                let old_axis = std::mem::take(axis);
+                *axis = old_axis.into_new_upper(upper);
+            });
     }
-
-
 }

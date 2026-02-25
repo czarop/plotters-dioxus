@@ -1,9 +1,12 @@
 use flow_gates::{GateGeometry, GateNode};
 
-use crate::plotters_dioxus::{gates::{
-    gate_drag::PointDragData,
-    gate_types::{DRAGGED_LINE, DrawingStyle, GateRenderShape, ShapeType},
-}, plot_helpers::PlotMapper};
+use crate::plotters_dioxus::{
+    gates::{
+        gate_drag::PointDragData,
+        gate_types::{DRAGGED_LINE, DrawingStyle, GateRenderShape, ShapeType},
+    },
+    plot_helpers::PlotMapper,
+};
 
 pub fn is_point_on_ellipse_perimeter(
     point: (f32, f32),
@@ -63,15 +66,21 @@ pub fn draw_elipse(
         shape_type,
     }]
 }
-pub fn calculate_ellipse_nodes(cx: f32, cy: f32, rx: f32, ry: f32, angle_rad: f32) -> Vec<(f32, f32)> {
+pub fn calculate_ellipse_nodes(
+    cx: f32,
+    cy: f32,
+    rx: f32,
+    ry: f32,
+    angle_rad: f32,
+) -> Vec<(f32, f32)> {
     let (sin_a, cos_a) = angle_rad.sin_cos();
 
     vec![
-        (cx, cy),                                   // 0. Center
-        (cx + rx * cos_a, cy + rx * sin_a),         // 1. Right (Local X+)
-        (cx + ry * sin_a, cy - ry * cos_a),         // 2. Top (Local Y-)
-        (cx - rx * cos_a, cy - rx * sin_a),         // 3. Left (Local X-)
-        (cx - ry * sin_a, cy + ry * cos_a),         // 4. Bottom (Local Y+)
+        (cx, cy),                           // 0. Center
+        (cx + rx * cos_a, cy + rx * sin_a), // 1. Right (Local X+)
+        (cx + ry * sin_a, cy - ry * cos_a), // 2. Top (Local Y-)
+        (cx - rx * cos_a, cy - rx * sin_a), // 3. Left (Local X-)
+        (cx - ry * sin_a, cy + ry * cos_a), // 4. Bottom (Local Y+)
     ]
 }
 
@@ -83,13 +92,24 @@ pub fn draw_ghost_point_for_ellipse(
 ) -> Option<Vec<GateRenderShape>> {
     let (cursor_x, cursor_y) = drag_data.loc();
 
-    if let GateGeometry::Ellipse { center, radius_x, radius_y, angle } = curr_geo {
+    if let GateGeometry::Ellipse {
+        center,
+        radius_x,
+        radius_y,
+        angle,
+    } = curr_geo
+    {
         let cx = center.get_coordinate(x_param).unwrap_or_default();
         let cy = center.get_coordinate(y_param).unwrap_or_default();
         let index = drag_data.point_index();
 
         let (new_rx, new_ry, new_angle) = calculate_projected_radii(
-            (cursor_x, cursor_y), (cx, cy), *radius_x, *radius_y, *angle, index,
+            (cursor_x, cursor_y),
+            (cx, cy),
+            *radius_x,
+            *radius_y,
+            *angle,
+            index,
         );
 
         let (sin_n, cos_n) = new_angle.sin_cos();
@@ -108,12 +128,12 @@ pub fn draw_ghost_point_for_ellipse(
                 // let dist = new_ry + 20.0;
                 // (cx - dist * sin_n, cy + dist * cos_n)
                 let handle_distance = new_ry + 20.0; // Distance from center to the handle
-    
+
                 // Position the ghost dot relative to the rotated top of the ellipse
                 // (cx - dist * sin, cy + dist * cos)
                 let gx = cx - handle_distance * sin_n;
                 let gy = cy + handle_distance * cos_n;
-                
+
                 (gx, gy)
             }
             _ => (cursor_x, cursor_y),
@@ -152,25 +172,28 @@ pub fn calculate_projected_radii(
     let (sin_a, cos_a) = current_angle_rad.sin_cos();
 
     match point_index {
-        1 | 3 => { // Horizontal Axis (Right/Left)
+        1 | 3 => {
+            // Horizontal Axis (Right/Left)
             let rx = (dx * cos_a + dy * sin_a).abs();
             (rx, current_ry, current_angle_rad)
         }
-        2 | 4 => { // Vertical Axis (Top/Bottom)
+        2 | 4 => {
+            // Vertical Axis (Top/Bottom)
             // Projects cursor onto the Minor Axis vector (sin, -cos)
             let ry = (dx * sin_a - dy * cos_a).abs();
             (current_rx, ry, current_angle_rad)
         }
         // 5 => { // Rotation Handle
-        //     let mouse_angle = dy.atan2(dx); 
-        //     let new_angle = mouse_angle + std::f32::consts::FRAC_PI_2; 
+        //     let mouse_angle = dy.atan2(dx);
+        //     let new_angle = mouse_angle + std::f32::consts::FRAC_PI_2;
         //     (current_rx, current_ry, new_angle)
         // }
-        5 => { // Rotation Handle
-            let mouse_angle = dy.atan2(dx); 
-            // In Y-up Data Space, Top is +PI/2. 
+        5 => {
+            // Rotation Handle
+            let mouse_angle = dy.atan2(dx);
+            // In Y-up Data Space, Top is +PI/2.
             // We subtract PI/2 to align the Ellipse's 0-degree axis.
-            let new_angle = mouse_angle - std::f32::consts::FRAC_PI_2; 
+            let new_angle = mouse_angle - std::f32::consts::FRAC_PI_2;
             (current_rx, current_ry, new_angle)
         }
         _ => (current_rx, current_ry, current_angle_rad),
@@ -193,37 +216,54 @@ pub fn update_ellipse_geometry(
     let (final_cx, final_cy, final_rx, final_ry, final_angle) = if point_index == 0 {
         (new_point.0, new_point.1, old_rx, old_ry, old_angle)
     } else {
-        let (rx, ry, angle) = calculate_projected_radii(new_point, (cx, cy), old_rx, old_ry, old_angle, point_index);
+        let (rx, ry, angle) =
+            calculate_projected_radii(new_point, (cx, cy), old_rx, old_ry, old_angle, point_index);
         (cx, cy, rx, ry, angle)
     };
 
     // CALL THE HELPER HERE
-    let sanitized_points = calculate_ellipse_nodes_y_up(final_cx, final_cy, final_rx, final_ry, final_angle);
+    let sanitized_points =
+        calculate_ellipse_nodes_y_up(final_cx, final_cy, final_rx, final_ry, final_angle);
 
-    Ok(flow_gates::create_ellipse_geometry(sanitized_points, x_param, y_param)?)
+    Ok(flow_gates::create_ellipse_geometry(
+        sanitized_points,
+        x_param,
+        y_param,
+    )?)
 }
 
-pub fn calculate_ellipse_nodes_y_up(cx: f32, cy: f32, rx: f32, ry: f32, angle_rad: f32) -> Vec<(f32, f32)> {
+pub fn calculate_ellipse_nodes_y_up(
+    cx: f32,
+    cy: f32,
+    rx: f32,
+    ry: f32,
+    angle_rad: f32,
+) -> Vec<(f32, f32)> {
     let (sin_a, cos_a) = angle_rad.sin_cos();
 
     vec![
-        (cx, cy),                                   // 0. Center
-        (cx + rx * cos_a, cy + rx * sin_a),         // 1. Right (Local X+)
-        (cx - ry * sin_a, cy + ry * cos_a),         // 2. Top (Local Y+)
-        (cx - rx * cos_a, cy - rx * sin_a),         // 3. Left (Local X-)
-        (cx + ry * sin_a, cy - ry * cos_a),         // 4. Bottom (Local Y-)
+        (cx, cy),                           // 0. Center
+        (cx + rx * cos_a, cy + rx * sin_a), // 1. Right (Local X+)
+        (cx - ry * sin_a, cy + ry * cos_a), // 2. Top (Local Y+)
+        (cx - rx * cos_a, cy - rx * sin_a), // 3. Left (Local X-)
+        (cx + ry * sin_a, cy - ry * cos_a), // 4. Bottom (Local Y-)
     ]
 }
 
-pub fn create_default_ellipse(plot_map: &PlotMapper, cx_raw: f32, cy_raw: f32, rx_raw: f32, ry_raw: f32, x_channel: &str, y_channel: &str) -> anyhow::Result<GateGeometry> {
-    let data_coords = plot_map
-        .pixel_to_data(cx_raw, cy_raw, None, None);
+pub fn create_default_ellipse(
+    plot_map: &PlotMapper,
+    cx_raw: f32,
+    cy_raw: f32,
+    rx_raw: f32,
+    ry_raw: f32,
+    x_channel: &str,
+    y_channel: &str,
+) -> anyhow::Result<GateGeometry> {
+    let data_coords = plot_map.pixel_to_data(cx_raw, cy_raw, None, None);
     let (click_x, click_y) = data_coords;
 
-    let edge_x_data = plot_map
-        .pixel_to_data(cx_raw + rx_raw, cy_raw, None, None);
-    let edge_y_data = plot_map
-        .pixel_to_data(cx_raw, cy_raw + ry_raw, None, None);
+    let edge_x_data = plot_map.pixel_to_data(cx_raw + rx_raw, cy_raw, None, None);
+    let edge_y_data = plot_map.pixel_to_data(cx_raw, cy_raw + ry_raw, None, None);
     let rx = (edge_x_data.0 - click_x).abs();
     let ry = (edge_y_data.1 - click_y).abs();
     let coords = vec![
@@ -233,10 +273,6 @@ pub fn create_default_ellipse(plot_map: &PlotMapper, cx_raw: f32, cy_raw: f32, r
         (click_x - rx, click_y),
         (click_x, click_y - ry),
     ];
-    flow_gates::geometry::create_ellipse_geometry(
-            coords,
-            x_channel,
-            y_channel,
-        )
+    flow_gates::geometry::create_ellipse_geometry(coords, x_channel, y_channel)
         .map_err(|_| anyhow::anyhow!("failed to create ellipse geometry"))
 }

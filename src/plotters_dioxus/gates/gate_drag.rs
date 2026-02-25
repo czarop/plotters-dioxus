@@ -52,7 +52,6 @@ impl PointDragData {
     }
     pub fn clone_from_data(new_loc: (f32, f32), old_data: Self) -> Self {
         Self {
-        
             point_index: old_data.point_index,
             loc: new_loc,
         }
@@ -75,7 +74,12 @@ pub struct RotationData {
 }
 
 impl RotationData {
-    pub fn new(gate_id: Arc<str>, gate_center_loc: (f32, f32), start_loc: (f32, f32), current_loc: (f32, f32)) -> Self {
+    pub fn new(
+        gate_id: Arc<str>,
+        gate_center_loc: (f32, f32),
+        start_loc: (f32, f32),
+        current_loc: (f32, f32),
+    ) -> Self {
         Self {
             gate_id,
             gate_center_loc,
@@ -92,7 +96,7 @@ impl RotationData {
             current_loc: new_loc,
         }
     }
-    pub fn gate_id(&self) -> &str{
+    pub fn gate_id(&self) -> &str {
         &self.gate_id
     }
     pub fn start_loc(&self) -> (f32, f32) {
@@ -104,7 +108,6 @@ impl RotationData {
     pub fn pivot_point(&self) -> (f32, f32) {
         self.gate_center_loc
     }
-
 
     pub fn rotation_rad(&self) -> f32 {
         let (cx, cy) = self.gate_center_loc;
@@ -126,7 +129,6 @@ impl RotationData {
 
         // Convert to degrees for your Ellipse geometry
         delta_rad.to_degrees()
-    
     }
 }
 
@@ -134,7 +136,7 @@ impl RotationData {
 pub enum GateDragType {
     Point(PointDragData),
     Gate(GateDragData),
-    Rotation(RotationData)
+    Rotation(RotationData),
 }
 
 impl GateDragType {
@@ -148,7 +150,7 @@ impl GateDragType {
             }
             GateDragType::Rotation(rotation_data) => {
                 GateDragType::Rotation(RotationData::clone_from_data(point, rotation_data))
-            },
+            }
         }
     }
 }

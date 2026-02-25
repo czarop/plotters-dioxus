@@ -1,8 +1,6 @@
 use std::sync::Arc;
 
-use crate::plotters_dioxus::{
-    gates::gate_types::{DRAFT_LINE, GateRenderShape, ShapeType},
-};
+use crate::plotters_dioxus::gates::gate_types::{DRAFT_LINE, GateRenderShape, ShapeType};
 
 #[derive(PartialEq, Clone)]
 pub enum GateDraft {
@@ -28,7 +26,6 @@ impl GateDraft {
             GateDraft::Polygon { points, .. } => draw_draft_polygon(points),
         }
     }
-
 
     pub fn new_polygon(points: Vec<(f32, f32)>, x_param: Arc<str>, y_param: Arc<str>) -> Self {
         GateDraft::Polygon {

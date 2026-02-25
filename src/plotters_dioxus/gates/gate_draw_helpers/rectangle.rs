@@ -1,10 +1,12 @@
-use flow_gates::GateGeometry;
 use crate::plotters_dioxus::gates::gate_traits::DrawableGate;
 use crate::plotters_dioxus::{
-    
-    gates::{gate_drag::PointDragData, gate_types::{DRAGGED_LINE, DrawingStyle, GateRenderShape, ShapeType}},
+    gates::{
+        gate_drag::PointDragData,
+        gate_types::{DRAGGED_LINE, DrawingStyle, GateRenderShape, ShapeType},
+    },
     plot_helpers::PlotMapper,
 };
+use flow_gates::GateGeometry;
 
 pub fn create_default_rectangle(
     plot_map: &PlotMapper,
@@ -118,40 +120,44 @@ pub fn draw_ghost_point_for_rectangle(
     let current = drag_data.loc();
 
     let (x, y, width, height) = match idx {
-    0 => { // Bottom-Left dragged -> Anchor is Top-Right (Index 2)
-        let anchor = main_points[2];
-        let x = current.0.min(anchor.0);
-        let y = current.1.max(anchor.1); // In data space, Top is Max Y
-        let w = (current.0 - anchor.0).abs();
-        let h = (current.1 - anchor.1).abs();
-        (x, y, w, h)
-    }
-    1 => { // Bottom-Right dragged -> Anchor is Top-Left (Index 3)
-        let anchor = main_points[3];
-        let x = current.0.min(anchor.0);
-        let y = current.1.max(anchor.1);
-        let w = (current.0 - anchor.0).abs();
-        let h = (current.1 - anchor.1).abs();
-        (x, y, w, h)
-    }
-    2 => { // Top-Right dragged -> Anchor is Bottom-Left (Index 0)
-        let anchor = main_points[0];
-        let x = current.0.min(anchor.0);
-        let y = current.1.max(anchor.1);
-        let w = (current.0 - anchor.0).abs();
-        let h = (current.1 - anchor.1).abs();
-        (x, y, w, h)
-    }
-    3 => { // Top-Left dragged -> Anchor is Bottom-Right (Index 1)
-        let anchor = main_points[1];
-        let x = current.0.min(anchor.0);
-        let y = current.1.max(anchor.1);
-        let w = (current.0 - anchor.0).abs();
-        let h = (current.1 - anchor.1).abs();
-        (x, y, w, h)
-    }
-    _ => unreachable!(),
-};
+        0 => {
+            // Bottom-Left dragged -> Anchor is Top-Right (Index 2)
+            let anchor = main_points[2];
+            let x = current.0.min(anchor.0);
+            let y = current.1.max(anchor.1); // In data space, Top is Max Y
+            let w = (current.0 - anchor.0).abs();
+            let h = (current.1 - anchor.1).abs();
+            (x, y, w, h)
+        }
+        1 => {
+            // Bottom-Right dragged -> Anchor is Top-Left (Index 3)
+            let anchor = main_points[3];
+            let x = current.0.min(anchor.0);
+            let y = current.1.max(anchor.1);
+            let w = (current.0 - anchor.0).abs();
+            let h = (current.1 - anchor.1).abs();
+            (x, y, w, h)
+        }
+        2 => {
+            // Top-Right dragged -> Anchor is Bottom-Left (Index 0)
+            let anchor = main_points[0];
+            let x = current.0.min(anchor.0);
+            let y = current.1.max(anchor.1);
+            let w = (current.0 - anchor.0).abs();
+            let h = (current.1 - anchor.1).abs();
+            (x, y, w, h)
+        }
+        3 => {
+            // Top-Left dragged -> Anchor is Bottom-Right (Index 1)
+            let anchor = main_points[1];
+            let x = current.0.min(anchor.0);
+            let y = current.1.max(anchor.1);
+            let w = (current.0 - anchor.0).abs();
+            let h = (current.1 - anchor.1).abs();
+            (x, y, w, h)
+        }
+        _ => unreachable!(),
+    };
 
     let new_rect = GateRenderShape::Rectangle {
         x,
@@ -179,46 +185,50 @@ pub fn update_rectangle_geometry(
     x_param: &str,
     y_param: &str,
 ) -> anyhow::Result<GateGeometry> {
-
     let n = current_points.len();
 
     if point_index >= n {
-        return Err(anyhow::anyhow!("invalid point index for rectangle geometry"));
+        return Err(anyhow::anyhow!(
+            "invalid point index for rectangle geometry"
+        ));
     }
 
-    
     let idx_before = (point_index + n - 1) % n;
     let idx_after = (point_index + 1) % n;
-    
+
     let p_prev = current_points[idx_before];
     let p_next = current_points[idx_after];
 
-    let prev ;
+    let prev;
     let current = new_point;
-    let next ;
-    
+    let next;
+
     match point_index {
         0 => {
             //top-left, bottom-left, bottom-right
             prev = (current.0, p_prev.1);
             next = (p_next.0, current.1);
-        },
+        }
         1 => {
             //bottom-left, bottom-right, top-right
             prev = (p_prev.0, current.1);
             next = (current.0, p_next.1);
-        },
+        }
         2 => {
             //bottom-right, top-right, top-left
             prev = (current.0, p_prev.1);
             next = (p_next.0, current.1);
-        },
+        }
         3 => {
             //top-right, top-left, bottom-left
             prev = (p_prev.0, current.1);
             next = (current.0, p_next.1);
-        },
-        _ => return Err(anyhow::anyhow!("invalid point index for rectangle geometry")),
+        }
+        _ => {
+            return Err(anyhow::anyhow!(
+                "invalid point index for rectangle geometry"
+            ));
+        }
     }
 
     current_points[point_index] = new_point;

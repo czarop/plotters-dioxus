@@ -2,8 +2,11 @@ use dioxus::prelude::*;
 
 use crate::{
     file_load::FcsFiles,
-    
-    plotters_dioxus::{AxisInfo, PseudoColourPlot, gates::{GateState, gate_store::GateStateImplExt, gate_types::GateType}, plot_helpers::{Param, ParameterStore, ParameterStoreImplExt, ParameterStoreStoreExt as _}},
+    plotters_dioxus::{
+        AxisInfo, PseudoColourPlot,
+        gates::{GateState, gate_store::GateStateImplExt, gate_types::GateType},
+        plot_helpers::{Param, ParameterStore, ParameterStoreImplExt, ParameterStoreStoreExt as _},
+    },
     searchable_select::SearchableSelect,
 };
 use flow_fcs::{Fcs, TransformType, Transformable};
@@ -174,14 +177,14 @@ pub fn PlotWindow() -> Element {
                 .settings()
                 .get(x_fluoro.clone())
                 .ok_or_else(|| anyhow::anyhow!("No data yet"))?()
-                .transform
-                .clone();
+            .transform
+            .clone();
             let y_transform = parameter_settings
                 .settings()
                 .get(y_fluoro.clone())
                 .ok_or_else(|| anyhow::anyhow!("No data yet"))?()
-                .transform
-                .clone();
+            .transform
+            .clone();
 
             if let Some(Ok(fcs_file)) = &*fcs_file_resource.read() {
                 match get_scaled_data_to_display(
@@ -191,15 +194,16 @@ pub fn PlotWindow() -> Element {
                     x_transform,
                     y_transform,
                 )
-                .await{
+                .await
+                {
                     Ok(d) => {
                         plot_data_signal.set(d);
                         Ok(())
-                    },
+                    }
                     Err(e) => {
                         plot_data_signal.set(vec![]);
                         Err(anyhow::anyhow!(e.to_string()))
-                    },
+                    }
                 }
             } else {
                 plot_data_signal.set(vec![]);
@@ -207,8 +211,6 @@ pub fn PlotWindow() -> Element {
             }
         }
     });
-
-    
 
     rsx! {
         document::Stylesheet { href: CSS_STYLE }
@@ -391,7 +393,7 @@ pub fn PlotWindow() -> Element {
                     }
                     None => rsx! {},
                 }
-            
+
             }
         }
         div { class: "status-message",

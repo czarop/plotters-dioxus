@@ -1,12 +1,12 @@
-use flow_gates::GateGeometry;
 use crate::plotters_dioxus::gates::gate_traits::DrawableGate;
 use crate::plotters_dioxus::{
     gates::{
         gate_drag::PointDragData,
-        gate_types::{DRAGGED_LINE, GREY_LINE_DASHED, DrawingStyle, GateRenderShape, ShapeType},
+        gate_types::{DRAGGED_LINE, DrawingStyle, GREY_LINE_DASHED, GateRenderShape, ShapeType},
     },
     plot_helpers::PlotMapper,
 };
+use flow_gates::GateGeometry;
 
 pub fn create_default_line(
     plot_map: &PlotMapper,
@@ -26,26 +26,32 @@ pub fn create_default_line(
         .map_err(|_| anyhow::anyhow!("failed to create rectangle geometry"))
 }
 
-pub fn bounds_to_svg_line(min: (f32, f32), max: (f32, f32), loc: f32, axis_matched: bool) -> (f32, f32, f32) {
-
+pub fn bounds_to_svg_line(
+    min: (f32, f32),
+    max: (f32, f32),
+    loc: f32,
+    axis_matched: bool,
+) -> (f32, f32, f32) {
     if axis_matched {
-    let width = (max.0 - min.0).abs();
-    let x = min.0;
-    let y = loc;
-    (x, y, width)
+        let width = (max.0 - min.0).abs();
+        let x = min.0;
+        let y = loc;
+        (x, y, width)
     } else {
         let width = (max.1 - min.1).abs();
-    let x = loc;
-    let y = min.1;
-    (x, y, width)
+        let x = loc;
+        let y = min.1;
+        (x, y, width)
     }
-
 }
 
-
-
-pub fn bounds_to_line_coords(min: (f32, f32), max: (f32, f32), loc: f32, axis_matched: bool) -> ((f32, f32),(f32, f32)) {
-    if axis_matched{
+pub fn bounds_to_line_coords(
+    min: (f32, f32),
+    max: (f32, f32),
+    loc: f32,
+    axis_matched: bool,
+) -> ((f32, f32), (f32, f32)) {
+    if axis_matched {
         let width = (max.0 - min.0).abs();
         let x1 = min.0;
         let x2 = x1 + width;
@@ -53,13 +59,12 @@ pub fn bounds_to_line_coords(min: (f32, f32), max: (f32, f32), loc: f32, axis_ma
         return ((x1, y), (x2, y));
     } else {
         let width = (max.1 - min.1).abs();
-        let x =loc;
+        let x = loc;
 
         let y1 = min.1;
         let y2 = y1 + width;
         return ((x, y1), (x, y2));
     }
-    
 }
 
 pub fn draw_line(
@@ -68,58 +73,51 @@ pub fn draw_line(
     y_coord: f32,
     style: &'static DrawingStyle,
     shape_type: ShapeType,
-    point_drag_data : &Option<PointDragData>,
+    point_drag_data: &Option<PointDragData>,
     axis_matched: bool,
 ) -> Vec<GateRenderShape> {
     println!("({}, {}), ({}, {})", min.0, min.1, max.0, max.1);
     let coords = bounds_to_svg_line(min, max, y_coord, axis_matched);
     if axis_matched {
-    
-    let mut x1 = coords.0;
-    let mut x2 = coords.0 + coords.2;
-    let y = coords.1;
+        let mut x1 = coords.0;
+        let mut x2 = coords.0 + coords.2;
+        let y = coords.1;
 
-
-    if let Some(pdd) = point_drag_data {
-        match pdd.point_index() {
-            0 => {
-                x1 = pdd.loc().0;
+        if let Some(pdd) = point_drag_data {
+            match pdd.point_index() {
+                0 => {
+                    x1 = pdd.loc().0;
+                }
+                1 => {
+                    x2 = pdd.loc().0;
+                }
+                _ => unreachable!(),
             }
-            1 => {
-                x2 = pdd.loc().0;
-            }
-            _ => unreachable!(),
         }
-    }
 
+        vec![GateRenderShape::Line {
+            x1: x1,
+            y1: y,
+            x2: x2,
+            y2: y,
+            style,
+            shape_type,
+        }]
+    } else {
+        let mut y1 = coords.1;
+        let mut y2 = y1 + coords.2;
 
-
-    
-    vec![GateRenderShape::Line {
-        x1: x1,
-        y1: y,
-        x2: x2,
-        y2: y,
-        style,
-        shape_type,
-    }]
-} else {
-
-    let mut y1 = coords.1;
-    let mut y2 = y1 + coords.2;
-
-
-    if let Some(pdd) = point_drag_data {
-        match pdd.point_index() {
-            0 => {
-                y1 = pdd.loc().1;
+        if let Some(pdd) = point_drag_data {
+            match pdd.point_index() {
+                0 => {
+                    y1 = pdd.loc().1;
+                }
+                1 => {
+                    y2 = pdd.loc().1;
+                }
+                _ => unreachable!(),
             }
-            1 => {
-                y2 = pdd.loc().1;
-            }
-            _ => unreachable!(),
         }
-    }
         vec![GateRenderShape::Line {
             x1: y_coord,
             y1: y1,
@@ -128,34 +126,34 @@ pub fn draw_line(
             style,
             shape_type,
         }]
-}
+    }
 }
 
-pub fn draw_circles_for_line(min: (f32, f32), max: (f32, f32), loc: f32, point_drag_data: &Option<PointDragData>, axis_matched: bool) -> Vec<GateRenderShape> {
-
+pub fn draw_circles_for_line(
+    min: (f32, f32),
+    max: (f32, f32),
+    loc: f32,
+    point_drag_data: &Option<PointDragData>,
+    axis_matched: bool,
+) -> Vec<GateRenderShape> {
     let mut coords = bounds_to_line_coords(min, max, loc, axis_matched);
     let style;
     if let Some(pdd) = point_drag_data {
         style = &DRAGGED_LINE;
         match pdd.point_index() {
-            0 => {
-                match axis_matched {
-                    true => coords.0 .0 = pdd.loc().0,
-                    false => coords.0 .1 = pdd.loc().1,
-                }
-            }
-            1 => {
-                match axis_matched {
-                    true => coords.1 .0 = pdd.loc().0,
-                    false => coords.1 .1 = pdd.loc().1,
-                }
-            }
+            0 => match axis_matched {
+                true => coords.0.0 = pdd.loc().0,
+                false => coords.0.1 = pdd.loc().1,
+            },
+            1 => match axis_matched {
+                true => coords.1.0 = pdd.loc().0,
+                false => coords.1.1 = pdd.loc().1,
+            },
             _ => unreachable!(),
         }
     } else {
         style = &GREY_LINE_DASHED;
     }
-
 
     let mut x1 = coords.0.0;
     let mut y1 = coords.0.1;
@@ -167,79 +165,82 @@ pub fn draw_circles_for_line(min: (f32, f32), max: (f32, f32), loc: f32, point_d
             y1 = min.1;
             y2 = max.1;
 
-            (GateRenderShape::Line { 
-            x1: x1, 
-            y1: y1, 
-            x2: x1, 
-            y2: y2, 
-            style, 
-            shape_type: ShapeType::GhostPoint },
-        GateRenderShape::Line { 
-            x1: x2, 
-            y1: y1, 
-            x2: x2, 
-            y2: y2, 
-            style, 
-            shape_type: ShapeType::GhostPoint },
-        GateRenderShape::Circle {
-            center: (coords.0.0, coords.0.1),
-            radius: 3.0,
-            fill: "red",
-            shape_type: ShapeType::Point(0),
-        },
-        GateRenderShape::Circle {
-            center: (coords.1.0, coords.1.1),
-            radius: 3.0,
-            fill: "red",
-            shape_type: ShapeType::Point(1),
-        },)
-
-        },
+            (
+                GateRenderShape::Line {
+                    x1: x1,
+                    y1: y1,
+                    x2: x1,
+                    y2: y2,
+                    style,
+                    shape_type: ShapeType::GhostPoint,
+                },
+                GateRenderShape::Line {
+                    x1: x2,
+                    y1: y1,
+                    x2: x2,
+                    y2: y2,
+                    style,
+                    shape_type: ShapeType::GhostPoint,
+                },
+                GateRenderShape::Circle {
+                    center: (coords.0.0, coords.0.1),
+                    radius: 3.0,
+                    fill: "red",
+                    shape_type: ShapeType::Point(0),
+                },
+                GateRenderShape::Circle {
+                    center: (coords.1.0, coords.1.1),
+                    radius: 3.0,
+                    fill: "red",
+                    shape_type: ShapeType::Point(1),
+                },
+            )
+        }
         false => {
             x1 = min.0;
             x2 = max.0;
 
-            (GateRenderShape::Line { 
-            x1: x1, 
-            y1: y1, 
-            x2: x2, 
-            y2: y1, 
-            style, 
-            shape_type: ShapeType::GhostPoint },
-        GateRenderShape::Line { 
-            x1: x1, 
-            y1: y2, 
-            x2: x2, 
-            y2: y2, 
-            style, 
-            shape_type: ShapeType::GhostPoint },
-        GateRenderShape::Circle {
-            center: (coords.0.0, coords.0.1),
-            radius: 3.0,
-            fill: "red",
-            shape_type: ShapeType::Point(0),
-        },
-        GateRenderShape::Circle {
-            center: (coords.1.0, coords.1.1),
-            radius: 3.0,
-            fill: "red",
-            shape_type: ShapeType::Point(1),
-        },)
+            (
+                GateRenderShape::Line {
+                    x1: x1,
+                    y1: y1,
+                    x2: x2,
+                    y2: y1,
+                    style,
+                    shape_type: ShapeType::GhostPoint,
+                },
+                GateRenderShape::Line {
+                    x1: x1,
+                    y1: y2,
+                    x2: x2,
+                    y2: y2,
+                    style,
+                    shape_type: ShapeType::GhostPoint,
+                },
+                GateRenderShape::Circle {
+                    center: (coords.0.0, coords.0.1),
+                    radius: 3.0,
+                    fill: "red",
+                    shape_type: ShapeType::Point(0),
+                },
+                GateRenderShape::Circle {
+                    center: (coords.1.0, coords.1.1),
+                    radius: 3.0,
+                    fill: "red",
+                    shape_type: ShapeType::Point(1),
+                },
+            )
         }
     };
 
-
-    vec![
-        l1,
-        l2,
-        c1, c2
-    ]
+    vec![l1, l2, c1, c2]
 }
 
 pub fn is_point_on_line(
-    shape: & crate::plotters_dioxus::gates::gate_single::LineGate,
+    shape: &crate::plotters_dioxus::gates::gate_single::LineGate,
     point: (f32, f32),
     tolerance: (f32, f32),
+    axis_matched: bool,
 ) -> Option<f32> {
     let rect_bounds = shape.get_points();
     if rect_bounds.len() != 4 {
@@ -248,7 +249,7 @@ pub fn is_point_on_line(
 
     let (min, max) = (rect_bounds[0], rect_bounds[2]);
 
-    let line_coords = bounds_to_line_coords(min, max, shape.height, shape.axis_matched);
+    let line_coords = bounds_to_line_coords(min, max, shape.height, axis_matched);
 
     if let Some(dis) = shape.is_near_segment(point, line_coords.0, line_coords.1, tolerance) {
         return Some(dis);
@@ -288,7 +289,7 @@ pub fn is_point_on_line(
 //             } else {
 //                 (cx1, (cy1 - current_y).abs(), cx2, cy2)
 //             }
-            
+
 //         }
 //         1 => {
 //             if axis_matched{
@@ -296,7 +297,7 @@ pub fn is_point_on_line(
 //             } else {
 //                 (cx1, cy1, cx2, (cy2 - current_y).abs())
 //             }
-            
+
 //         }
 //         _ => unreachable!(),
 //     };
@@ -333,7 +334,7 @@ pub fn update_line_geometry(
     point_index: usize,
     x_param: &str,
     y_param: &str,
-    axis_matched: bool
+    axis_matched: bool,
 ) -> anyhow::Result<GateGeometry> {
     let n = current_rect_points.len();
 
@@ -343,12 +344,9 @@ pub fn update_line_geometry(
         ));
     }
 
-    
-
-
     let current = new_point;
 
-    match axis_matched{
+    match axis_matched {
         true => {
             // [bottom-left, bottom-right, top-right, top-left]
             let (idx_before, idx_after) = match point_index {
@@ -375,7 +373,7 @@ pub fn update_line_geometry(
 
             current_rect_points[idx_before] = prev;
             current_rect_points[idx_after] = next;
-        },
+        }
         false => {
             // [bottom-left, bottom-right, top-right, top-left]
             let (idx_before, idx_after) = match point_index {
@@ -402,9 +400,8 @@ pub fn update_line_geometry(
 
             current_rect_points[idx_before] = prev;
             current_rect_points[idx_after] = next;
-        },
+        }
     }
-    
 
     flow_gates::geometry::create_rectangle_geometry(current_rect_points, x_param, y_param)
         .map_err(|_| anyhow::anyhow!("failed to update rectangle geometry"))

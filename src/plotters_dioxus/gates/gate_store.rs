@@ -2,9 +2,20 @@ use anyhow::anyhow;
 use dioxus::prelude::*;
 use flow_gates::{Gate, GateHierarchy};
 
-use std::{collections::HashMap, sync::{Arc, Mutex}};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
-use crate::plotters_dioxus::{AxisInfo, gates::{gate_drag::GateDragData, gate_single::{EllipseGate, LineGate, PolygonGate, RectangleGate}, gate_traits::DrawableGate, gate_types::GateType}};
+use crate::plotters_dioxus::{
+    AxisInfo,
+    gates::{
+        gate_drag::GateDragData,
+        gate_single::{EllipseGate, LineGate, PolygonGate, RectangleGate},
+        gate_traits::DrawableGate,
+        gate_types::GateType,
+    },
+};
 
 pub type Id = std::sync::Arc<str>;
 
@@ -67,7 +78,7 @@ pub struct GateState {
     // For the Renderer: "What gates do I draw on this Plot?"
     pub gate_ids_by_view: HashMap<GatesOnPlotKey, Vec<GateKey>>,
     // For the Logic: "What is the actual data for Gate X?"
-    pub gate_registry: HashMap<GateKey, Arc<Mutex<dyn DrawableGate>>>,
+    pub gate_registry: HashMap<GateKey, Arc<dyn DrawableGate>>,
     // For the Filtering: "How are these gates nested?"
     pub hierarchy: GateHierarchy,
     // are there file-specific overrides for gate positions
@@ -76,7 +87,12 @@ pub struct GateState {
 
 #[store(pub name = GateStateImplExt)]
 impl<Lens> Store<GateState, Lens> {
-    fn add_gate(&mut self, gate: Gate, parental_gate_id: Option<Id>, gate_type: GateType) -> Result<()> {
+    fn add_gate(
+        &mut self,
+        gate: Gate,
+        parental_gate_id: Option<Id>,
+        gate_type: GateType,
+    ) -> Result<()> {
         println!(
             "{}, {}",
             gate.x_parameter_channel_name(),
@@ -99,23 +115,25 @@ impl<Lens> Store<GateState, Lens> {
             gate.id.clone(),
         )?;
 
-        let g: Arc<Mutex<dyn DrawableGate + 'static>>  = match gate_type {
-            GateType::Polygon => Arc::new(Mutex::new(PolygonGate::new(gate))),
-            GateType::Ellipse => Arc::new(Mutex::new(EllipseGate::new(gate))),
-            GateType::Rectangle => Arc::new(Mutex::new(RectangleGate::new(gate))),
-            GateType::Line (y_coord) => if let Some(y_coord) = y_coord {
-                Arc::new(Mutex::new(LineGate::new(gate, y_coord)))
-            } else {
-                Err(anyhow!("Line gate requires y coordinate for initialization"))?
+        let g: Arc<dyn DrawableGate + 'static> = match gate_type {
+            GateType::Polygon => Arc::new(PolygonGate::try_new(gate)?),
+            GateType::Ellipse => Arc::new(EllipseGate::try_new(gate)?),
+            GateType::Rectangle => Arc::new(RectangleGate::try_new(gate)?),
+            GateType::Line(y_coord) => {
+                if let Some(y_coord) = y_coord {
+                    Arc::new(LineGate::try_new(gate, y_coord)?)
+                } else {
+                    Err(anyhow!(
+                        "Line gate requires y coordinate for initialization"
+                    ))?
+                }
             }
             GateType::Bisector => todo!(),
             GateType::Quadrant => todo!(),
             GateType::FlexiQuadrant => todo!(),
         };
 
-        self.gate_registry()
-            .write()
-            .insert(gate_key, g);
+        self.gate_registry().write().insert(gate_key, g);
 
         Ok(())
     }
@@ -148,33 +166,27 @@ impl<Lens> Store<GateState, Lens> {
         new_point: (f32, f32),
     ) -> anyhow::Result<()> {
 
-        self.gate_registry()
-        .write()
-        .get(&gate_id)
-        .and_then(|g|{
-            let mut g = g.lock().unwrap();
-            // g.set_drag_point(None);
-            
-            Some(g.replace_point(new_point, point_idx))
-        });
-
-        
+        if let Some(mut gate_ptr) = self
+            .gate_registry()
+            .get_mut(&gate_id)
+        {
+            if let Ok(new_gate_box) = gate_ptr.replace_point(new_point, point_idx) {
+                *gate_ptr = Arc::from(new_gate_box);
+            }
+        }
 
         Ok(())
     }
 
-    fn move_gate(&mut self, get_drag_data: GateDragData) -> Result<()> {
-
-        self.gate_registry()
-        .write()
-        .get(&get_drag_data.gate_id().into())
-        .and_then(|g|{
-            let mut g = g.lock().unwrap();
-            Some(g.replace_points(get_drag_data))
-        }).ok_or(anyhow!("No Gate Found"))??;
-
-        
-
+    fn move_gate(&mut self, gate_drag_data: GateDragData) -> Result<()> {
+        if let Some(mut gate_ptr) = self
+            .gate_registry()
+            .get_mut(&gate_drag_data.gate_id().into())
+        {
+            if let Ok(new_gate_box) = gate_ptr.replace_points(gate_drag_data) {
+                *gate_ptr = Arc::from(new_gate_box);
+            }
+        }
         Ok(())
     }
 
@@ -183,24 +195,23 @@ impl<Lens> Store<GateState, Lens> {
         gate_id: GateKey,
         current_position: (f32, f32),
     ) -> anyhow::Result<()> {
-        self.gate_registry()
-        .write()
-        .get(&gate_id)
-        .and_then(|g|{
-            let mut g = g.lock().unwrap();
-            Some(g.rotate_gate(current_position))
-        }).ok_or(anyhow!("No Gate Found"))??;
+        if let Some(mut gate_ptr) = self
+            .gate_registry()
+            .get_mut(&gate_id)
+        {
+            if let Ok(Some(new_gate_box)) = gate_ptr.rotate_gate(current_position) {
+                *gate_ptr = Arc::from(new_gate_box);
+            }
+        }
 
-            Ok(())
-        
-        
+        Ok(())
     }
 
     fn get_gates_for_plot(
         &self,
         x_axis_title: Arc<str>,
         y_axis_title: Arc<str>,
-    ) -> Option<Vec<Arc<Mutex<dyn DrawableGate>>>> {
+    ) -> Option<Vec<Arc<dyn DrawableGate>>> {
         let key = GatesOnPlotKey::new(x_axis_title.clone(), y_axis_title.clone(), None);
         let key_options = self.gate_ids_by_view().get(key);
         let mut gate_list = vec![];
@@ -216,7 +227,7 @@ impl<Lens> Store<GateState, Lens> {
                     //     if !is_swappable {
                     //         continue;
                     //     }
-                        
+
                     // }
                     gate_list.push(gate_store_entry.clone());
                 }
@@ -236,16 +247,20 @@ impl<Lens> Store<GateState, Lens> {
         let y: &str = &y_axis_title;
         let key = GatesOnPlotKey::new(x_axis_title.clone(), y_axis_title.clone(), None);
         let key_options = self.gate_ids_by_view().get(key);
-        
+
         if let Some(key_store) = key_options {
             let ids = key_store.read().clone();
-            
+
             for k in ids {
-                if let Some(gate) = self.gate_registry().write().get_mut(&k) {
-                    gate.lock().unwrap().match_to_plot_axis(x, y)?;
+                if let Some(mut gate) = self.gate_registry().get_mut(&k) {
+                    if let Ok(Some(g)) = gate.match_to_plot_axis(x, y){
+                        *gate = Arc::from(g);
+                    };
                 }
             }
-        } 
+        }
+
+        
         return Ok(());
     }
 
@@ -283,17 +298,18 @@ impl<Lens> Store<GateState, Lens> {
     ) -> Result<(), Vec<String>> {
         let mut errors = vec![];
         for (_, gate) in self.gate_registry().write().iter_mut() {
-            let (x_marker, y_marker) = &gate.lock().unwrap().get_params();
+            let (x_marker, y_marker) = &gate.get_params();
             if marker == x_marker || marker == y_marker {
-                let res = gate.lock().unwrap().recalculate_gate_for_rescaled_axis(
+                match gate.recalculate_gate_for_rescaled_axis(
                     marker.clone(),
                     &old_axis_options.transform,
                     &new_axis_options.transform,
-                );
+                ){
+                    Ok(g) => *gate = Arc::from(g),
+                    Err(e) => errors.push(e.to_string()),
+                } 
 
-                let _ = res.inspect_err(|e| {
-                    errors.push(e.to_string());
-                });
+
             }
         }
         if errors.is_empty() {
