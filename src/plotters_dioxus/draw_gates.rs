@@ -66,6 +66,8 @@ pub fn GateLayer(
         gates.set(g);
     });
 
+    let mut dbl_click_lockout = use_signal(|| false);
+
     rsx! {
         match plot_map() {
             Some(mapper) => rsx! {
@@ -99,6 +101,11 @@ pub fn GateLayer(
                                     }
                                 } else if drag_data.peek().is_none() {
                                     let _ = selected_gate_id.take().unwrap();
+                                    dbl_click_lockout.set(true);
+                                    spawn(async move {
+                                        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                                        dbl_click_lockout.set(false);
+                                    });
                                 }
                             } else {
                                 let _ = selected_gate_id.take();
@@ -110,6 +117,9 @@ pub fn GateLayer(
                         drag_data.set(None);
                     },
                     ondoubleclick: move |evt| {
+                        if selected_gate_id.peek().is_some() || dbl_click_lockout() {
+                            return;
+                        }
                         let local_coords = evt.data.coordinates().element();
                         let px = local_coords.x as f32;
                         let py = local_coords.y as f32;
@@ -408,7 +418,6 @@ fn RenderShape(
     let plot_map = use_context::<Signal<Option<PlotMapper>>>();
     let mut drag_data_signal = use_context::<Signal<Option<GateDragType>>>();
     if let Some(mapper) = &*plot_map.read() {
-        println!("drawing shape {} {}", &gate_id, shape_index);
         let transform = {
             match drag_data {
                 Some(GateDragType::Gate(data)) => {
