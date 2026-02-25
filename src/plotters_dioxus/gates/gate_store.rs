@@ -4,7 +4,7 @@ use flow_gates::{Gate, GateHierarchy};
 
 use std::{
     collections::HashMap,
-    sync::{Arc, Mutex},
+    sync::{Arc},
 };
 
 use crate::plotters_dioxus::{
@@ -93,11 +93,6 @@ impl<Lens> Store<GateState, Lens> {
         parental_gate_id: Option<Id>,
         gate_type: GateType,
     ) -> Result<()> {
-        println!(
-            "{}, {}",
-            gate.x_parameter_channel_name(),
-            gate.y_parameter_channel_name()
-        );
         let (x_param, y_param) = &gate.parameters;
         let key = GatesOnPlotKey::new(x_param.clone(), y_param.clone(), parental_gate_id.clone());
 
@@ -184,7 +179,6 @@ impl<Lens> Store<GateState, Lens> {
             .get_mut(&gate_drag_data.gate_id().into())
         {
             if let Ok(new_gate_box) = gate_ptr.replace_points(gate_drag_data) {
-                println!("Gate moved in store");
                 *gate_ptr = Arc::from(new_gate_box);
             }
         }
@@ -222,14 +216,6 @@ impl<Lens> Store<GateState, Lens> {
             let registry_guard = registry.read();
             for k in ids {
                 if let Some(gate_store_entry) = registry_guard.get(&k) {
-                    // let param =  gate_store_entry.lock().unwrap().get_params();
-                    // let is_swappable = gate_store_entry.lock().unwrap().is_axis_swappable();
-                    // if param.0 != x_axis_title.clone() || param.1 != y_axis_title.clone() {
-                    //     if !is_swappable {
-                    //         continue;
-                    //     }
-
-                    // }
                     gate_list.push(gate_store_entry.clone());
                 }
             }
@@ -264,32 +250,6 @@ impl<Lens> Store<GateState, Lens> {
         
         return Ok(());
     }
-
-    // fn get_boxed_gates_for_plot(
-    //     &self,
-    //     x_axis_title: Arc<str>,
-    //     y_axis_title: Arc<str>,
-    // ) -> Option<Vec<Box<dyn PlotDrawable>>> {
-    //     let key = GatesOnPlotKey::new(x_axis_title, y_axis_title, None);
-    //     let key_options = self.gate_ids_by_view().get(key);
-    //     let mut gate_list = vec![];
-    //     if let Some(key_store) = key_options {
-    //         let ids = key_store.read().clone();
-    //         let registry = self.gate_registry();
-    //         let registry_guard = registry.read();
-    //         for k in ids {
-    //             if let Some(gate_store_entry) = registry_guard.get(&k) {
-    //                 let gate_clone = gate_store_entry.clone();
-    //                 let gate: Box<dyn PlotDrawable> = Box::new(gate_clone);
-    //                 gate_list.push(gate);
-    //             }
-    //         }
-    //     } else {
-    //         println!("No gates for plot");
-    //         return None;
-    //     }
-    //     return Some(gate_list);
-    // }
 
     fn rescale_gates(
         &mut self,
