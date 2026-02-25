@@ -17,10 +17,10 @@ use std::sync::{Arc};
 
 #[component]
 pub fn GateLayer(
-    plot_map: ReadSignal<Option<PlotMapper>>,
     x_channel: ReadSignal<Arc<str>>,
     y_channel: ReadSignal<Arc<str>>,
 ) -> Element {
+    let plot_map = use_context::<Signal<Option<PlotMapper>>>();
     let mut gate_store: Store<GateState> = use_context::<Store<GateState>>();
     let mut draft_gate_coords = use_signal(|| Vec::<(f32, f32)>::new());
     let mut next_gate_id = use_signal(|| 0);
@@ -46,6 +46,7 @@ pub fn GateLayer(
 
     // for editing a gate's points
     let mut drag_data = use_signal(|| Option::<GateDragType>::None);
+    use_context_provider::<Signal<Option<GateDragType>>>(|| drag_data);
 
     use_effect(move || {
         let x_param = x_channel();
@@ -194,6 +195,7 @@ pub fn GateLayer(
 
                                     }
                                     GateDragType::Gate(gate_drag_data) => {
+                                        println!("moving gate");
                                         gate_store
                                             .move_gate(
                                                 gate_drag_data
@@ -263,7 +265,7 @@ pub fn GateLayer(
                                     false
                                 };
 
-                                let dd = if let Some(GateDragType::Point(dd)) = &*drag_data.read() {
+                                let dd = if let Some(dd) = &*drag_data.read() {
                                     if is_selected { Some(dd.clone()) } else { None }
                                 } else {
                                     None
@@ -275,8 +277,6 @@ pub fn GateLayer(
                                         gate_index,
                                         is_selected,
                                         drag_data: dd,
-                                        drag_data_setter: drag_data,
-                                        plot_map,
                                     }
                                 }
                             }
@@ -288,12 +288,7 @@ pub fn GateLayer(
                             let id = "draft".to_string();
                             rsx! {
 
-                                RenderDraftGate {
-                                    key: "{id}",
-                                    gate: draft.clone(),
-                                    drag_data,
-                                    plot_map,
-                                }
+                                RenderDraftGate { key: "{id}", gate: draft.clone() }
                             }
                         }
                         None => rsx! {},
@@ -310,9 +305,7 @@ pub struct GateWrapperProps {
     gate: Arc<dyn DrawableGate>,
     gate_index: usize,
     is_selected: bool,
-    drag_data: Option<PointDragData>,
-    drag_data_setter: Signal<Option<GateDragType>>,
-    plot_map: ReadSignal<Option<PlotMapper>>,
+    drag_data: Option<GateDragType>,
 }
 
 impl PartialEq for GateWrapperProps {
@@ -321,8 +314,6 @@ impl PartialEq for GateWrapperProps {
         && self.gate_index == other.gate_index
         && Arc::ptr_eq(&self.gate, &other.gate) 
         && self.drag_data == other.drag_data
-        && self.drag_data_setter == other.drag_data_setter
-        && self.plot_map == other.plot_map
     } 
 }
 
@@ -333,7 +324,7 @@ fn GateWrapper(props: GateWrapperProps) -> Element {
 
     let is_selected = props.is_selected;
     
-    let drag_data = if let Some(dd) = props.drag_data {
+    let drag_data = if let Some(GateDragType::Point(dd)) = &props.drag_data {
     
     if is_selected {
             Some(dd.clone())
@@ -345,16 +336,21 @@ fn GateWrapper(props: GateWrapperProps) -> Element {
     };
     println!("Only printing for gate: {}", gate_id);
 
+    let (is_point, idx) = if let Some(GateDragType::Point(dd)) = &props.drag_data {
+        (true, dd.point_index())
+    } else {
+        (false, 0)
+    };
+
     rsx! {
-        for (shape_index , shape) in g.draw_self(is_selected, drag_data).into_iter().enumerate() {
+        for (shape_index , shape) in g.draw_self(is_selected, drag_data.clone()).into_iter().enumerate() {
             RenderShape {
                 key: "{gate_id}-{shape_index}",
                 shape,
                 gate_id: gate_id.clone(),
                 gate_index: props.gate_index,
                 shape_index,
-                drag_data: props.drag_data_setter,
-                plot_map: props.plot_map,
+                drag_data: if is_point { if idx == shape_index { props.drag_data.clone() } else { None } } else { props.drag_data.clone() },
             }
         }
     }
@@ -388,8 +384,6 @@ fn was_gate_clicked(
 #[component]
 fn RenderDraftGate(
     gate: GateDraft,
-    drag_data: Signal<Option<GateDragType>>,
-    plot_map: ReadSignal<Option<PlotMapper>>,
 ) -> Element {
     rsx! {
         for (shape_index , shape) in gate.draw_self().into_iter().enumerate() {
@@ -398,8 +392,6 @@ fn RenderDraftGate(
                 gate_id: Arc::from("draft"),
                 gate_index: 0,
                 shape_index,
-                drag_data,
-                plot_map,
             }
         }
     }
@@ -411,12 +403,14 @@ fn RenderShape(
     gate_id: Arc<str>,
     gate_index: usize,
     shape_index: usize,
-    drag_data: Signal<Option<GateDragType>>,
-    plot_map: ReadSignal<Option<PlotMapper>>,
+    drag_data: Option<GateDragType>,
 ) -> Element {
+    let plot_map = use_context::<Signal<Option<PlotMapper>>>();
+    let mut drag_data_signal = use_context::<Signal<Option<GateDragType>>>();
     if let Some(mapper) = &*plot_map.read() {
+        println!("drawing shape {} {}", &gate_id, shape_index);
         let transform = {
-            match &*drag_data.read() {
+            match drag_data {
                 Some(GateDragType::Gate(data)) => {
                     if *gate_id == *data.gate_id() {
                         let offset = data.offset();
@@ -496,7 +490,7 @@ fn RenderShape(
                                                     .unwrap()
                                                     .pixel_to_data(px, py, None, None);
                                                 let point_drag_data = PointDragData::new(index, data_coords);
-                                                drag_data.set(Some(GateDragType::Point(point_drag_data)));
+                                                drag_data_signal.set(Some(GateDragType::Point(point_drag_data)));
                                             }
                                             Some(dioxus_elements::input_data::MouseButton::Secondary) => {
                                                 println!("make context menu to add or delete points");
@@ -584,7 +578,7 @@ fn RenderShape(
                 let handle_y = c.1 - (size + pixel_offset);
 
                 let translate = {
-                    if let Some(GateDragType::Gate(data)) = &&*drag_data.read() {
+                    if let Some(GateDragType::Gate(data)) = &&*drag_data_signal.read() {
                         if *gate_id == *data.gate_id() {
                             let offset = data.offset();
                             let p_start = mapper.data_to_pixel(0.0, 0.0, None, None);
@@ -600,7 +594,7 @@ fn RenderShape(
                     }
                 };
                 let rotate = {
-                    if let Some(GateDragType::Rotation(data)) = &*drag_data.read() {
+                    if let Some(GateDragType::Rotation(data)) = &*drag_data_signal.read() {
                         if let ShapeType::Rotation(handle_angle_rad) = shape_type {
                             let angle = -(handle_angle_rad.to_degrees()) + data.rotation_deg();
                             Some(format!("rotate({} {} {})", angle, cp.0, cp.1))
@@ -646,7 +640,7 @@ fn RenderShape(
                                 let data_coords = plot_map()
                                     .unwrap()
                                     .pixel_to_data(px, py, None, None);
-                                drag_data
+                                drag_data_signal
                                     .set(
                                         Some(
                                             GateDragType::Rotation(

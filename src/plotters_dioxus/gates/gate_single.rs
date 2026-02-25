@@ -340,7 +340,7 @@ impl super::gate_traits::DrawableGate for PolygonGate {
             name: self.inner.name.clone(),
             mode: self.inner.mode.clone(),
         };
-        Ok(Box::new(EllipseGate::try_new(new_gate)?))
+        Ok(Box::new(PolygonGate::try_new(new_gate)?))
     }
 
     fn rotate_gate(&self, _mouse_pos: (f32, f32)) -> anyhow::Result<Option<Box<dyn DrawableGate>>> {

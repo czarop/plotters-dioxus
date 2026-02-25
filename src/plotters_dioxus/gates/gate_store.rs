@@ -184,6 +184,7 @@ impl<Lens> Store<GateState, Lens> {
             .get_mut(&gate_drag_data.gate_id().into())
         {
             if let Ok(new_gate_box) = gate_ptr.replace_points(gate_drag_data) {
+                println!("Gate moved in store");
                 *gate_ptr = Arc::from(new_gate_box);
             }
         }

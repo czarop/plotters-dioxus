@@ -7,7 +7,6 @@ use plotters::coord::Shift;
 use plotters::prelude::*;
 use plotters_bitmap::BitMapBackend;
 
-use std::sync::Arc;
 
 use flow_plots::{
     BasePlotOptions, ColorMaps, DensityPlot, DensityPlotOptions, Plot, render::RenderConfig,
@@ -26,6 +25,8 @@ pub fn PseudoColourPlot(
 ) -> Element {
     let mut plot_image_src = use_signal(|| String::new());
     let mut plot_map = use_signal(|| None::<PlotMapper>);
+    use_context_provider::<Signal<Option<PlotMapper>>>(|| plot_map);
+
 
     use_effect(move || {
         let x_axis_info = x_axis_info();
@@ -79,6 +80,7 @@ pub fn PseudoColourPlot(
         plot_image_src.set(format!("data:image/jpeg;base64,{}", base64_str));
 
         plot_map.set(Some(mapper));
+
     });
 
     rsx! {
@@ -90,10 +92,9 @@ pub fn PseudoColourPlot(
                 height: "{size().1}",
             }
             GateLayer {
-                plot_map,
                 x_channel: x_axis_info().param.fluoro.clone(),
                 y_channel: y_axis_info().param.fluoro.clone(),
-
+            
             }
         }
     }
