@@ -66,7 +66,7 @@ fn draw_draft_polygon(points: &[(f32, f32)]) -> Vec<GateRenderShape> {
             }
 
             vec![GateRenderShape::Polygon {
-                points: points_local,
+                points: Arc::new(points_local),
                 style: &DRAFT_LINE,
                 shape_type: ShapeType::DraftGate,
             }]

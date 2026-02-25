@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::plotters_dioxus::gates::{
     gate_drag::PointDragData,
     gate_traits::DrawableGate,
@@ -10,7 +12,7 @@ pub fn draw_polygon(
     shape_type: ShapeType,
 ) -> Vec<GateRenderShape> {
     vec![GateRenderShape::Polygon {
-        points: points.to_vec(),
+        points: Arc::new(points.to_vec()),
         style: style,
         shape_type,
     }]

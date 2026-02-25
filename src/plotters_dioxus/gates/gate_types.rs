@@ -113,7 +113,7 @@ pub enum GateRenderShape {
         shape_type: ShapeType,
     },
     Polygon {
-        points: Vec<(f32, f32)>,
+        points: Arc<Vec<(f32, f32)>>,
         style: &'static DrawingStyle,
         shape_type: ShapeType,
     },
@@ -278,7 +278,7 @@ impl GateRenderShape {
                     .map(|(x, y)| (x - offset.0, y - offset.1))
                     .collect();
                 Self::Polygon {
-                    points: p,
+                    points: Arc::new(p),
                     style: style,
                     shape_type: shape_type.clone(),
                 }
