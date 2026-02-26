@@ -10,11 +10,8 @@ use std::{
 use crate::plotters_dioxus::{
     AxisInfo,
     gates::{
-        gate_drag::GateDragData,
-        gate_single::{EllipseGate, LineGate, PolygonGate, RectangleGate},
-        gate_traits::DrawableGate,
-        gate_types::GateType,
-    },
+        gate_composite::BisectorGate, gate_drag::GateDragData, gate_draw_helpers, gate_single::{EllipseGate, LineGate, PolygonGate, RectangleGate}, gate_traits::DrawableGate, gate_types::GateType
+    }, plot_helpers::PlotMapper,
 };
 
 pub type Id = std::sync::Arc<str>;
@@ -89,16 +86,122 @@ pub struct GateState {
 impl<Lens> Store<GateState, Lens> {
     fn add_gate(
         &mut self,
-        gate: Gate,
+        mapper: &PlotMapper,
+        click_x: f32,
+        click_y: f32,
+        x_param: Arc<str>,
+        y_param: Arc<str>,
+        points: Option<Vec<(f32, f32)>>,
+        id: String,
         parental_gate_id: Option<Id>,
         gate_type: GateType,
     ) -> Result<()> {
-        let (x_param, y_param) = &gate.parameters;
+
         let key = GatesOnPlotKey::new(x_param.clone(), y_param.clone(), parental_gate_id.clone());
 
+        
+        let parameters = (x_param.clone(), y_param.clone());
+
+        let g: Arc<dyn DrawableGate + 'static> = match gate_type{
+            GateType::Polygon => {
+                let geo = flow_gates::geometry::create_polygon_geometry(
+                                            points.ok_or(anyhow!("points not provided for polygon gate"))?,
+                                            &x_param,
+                                            &y_param,
+                                        )
+                                        .map_err(|_| anyhow!("failed to create polygon geometry"))?;
+                                    let gate = Gate{ 
+                                        id: Arc::from(id.as_str()), 
+                                        name: id, 
+                                        geometry: geo, 
+                                        mode: flow_gates::GateMode::Global, 
+                                        parameters, 
+                                        label_position: None 
+                                    };
+                                    Arc::new(PolygonGate::try_new(gate)?)
+                                    },
+            GateType::Ellipse => {
+                let geo = gate_draw_helpers::ellipse::create_default_ellipse(
+                                    &mapper,
+                                    click_x,
+                                    click_y,
+                                    50f32,
+                                    30f32,
+                                    &x_param,
+                                    &y_param,
+                                )?;
+                                let gate = Gate{ 
+                                        id: Arc::from(id.as_str()), 
+                                        name: id, 
+                                        geometry: geo, 
+                                        mode: flow_gates::GateMode::Global, 
+                                        parameters, 
+                                        label_position: None 
+                                    };
+                                Arc::new(EllipseGate::try_new(gate)?)
+            },
+            GateType::Rectangle => {
+                let geo = gate_draw_helpers::rectangle::create_default_rectangle(
+                                    &mapper,
+                                    click_x,
+                                    click_y,
+                                    50f32,
+                                    50f32,
+                                    &x_param,
+                                    &y_param,
+                                )?;
+                                let gate = Gate{ 
+                                        id: Arc::from(id.as_str()), 
+                                        name: id, 
+                                        geometry: geo, 
+                                        mode: flow_gates::GateMode::Global, 
+                                        parameters, 
+                                        label_position: None 
+                                    };
+                                Arc::new(RectangleGate::try_new(gate)?)
+            },
+            GateType::Line(y_coord) => {
+                let geo = gate_draw_helpers::line::create_default_line(
+                    &mapper,
+                    click_x,
+                    50f32,
+                    &x_param,
+                    &y_param,
+                )?;
+                if let Some(y_coord) = y_coord {
+                    let gate = Gate{ 
+                                        id: Arc::from(id.as_str()), 
+                                        name: id, 
+                                        geometry: geo, 
+                                        mode: flow_gates::GateMode::Global, 
+                                        parameters, 
+                                        label_position: None 
+                                    };
+                    Arc::new(LineGate::try_new(gate, y_coord)?)
+                } else {
+                    Err(anyhow!(
+                        "Line gate requires y coordinate for initialization"
+                    ))?
+                }
+            },
+
+        GateType::Bisector => {
+            Arc::new(BisectorGate::try_new(mapper, Arc::from(id.as_str()), (click_x, click_y), x_param, y_param)?)
+        },
+        GateType::Quadrant => todo!(),
+        GateType::FlexiQuadrant => todo!(),
+    };
+
+
+
+
+
+        
+
         let gate_key = GateKey {
-            gate_id: gate.id.clone(),
+            gate_id: g.get_id(),
         };
+
         self.gate_ids_by_view()
             .write()
             .entry(key)
@@ -107,26 +210,8 @@ impl<Lens> Store<GateState, Lens> {
 
         self.hierarchy().write().add_gate_child(
             parental_gate_id.unwrap_or(Arc::from("root")),
-            gate.id.clone(),
+            g.get_id(),
         )?;
-
-        let g: Arc<dyn DrawableGate + 'static> = match gate_type {
-            GateType::Polygon => Arc::new(PolygonGate::try_new(gate)?),
-            GateType::Ellipse => Arc::new(EllipseGate::try_new(gate)?),
-            GateType::Rectangle => Arc::new(RectangleGate::try_new(gate)?),
-            GateType::Line(y_coord) => {
-                if let Some(y_coord) = y_coord {
-                    Arc::new(LineGate::try_new(gate, y_coord)?)
-                } else {
-                    Err(anyhow!(
-                        "Line gate requires y coordinate for initialization"
-                    ))?
-                }
-            }
-            GateType::Bisector => todo!(),
-            GateType::Quadrant => todo!(),
-            GateType::FlexiQuadrant => todo!(),
-        };
 
         self.gate_registry().write().insert(gate_key, g);
 

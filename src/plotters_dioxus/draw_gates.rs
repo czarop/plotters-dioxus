@@ -12,7 +12,6 @@ use crate::plotters_dioxus::{
 };
 
 use dioxus::prelude::*;
-use flow_gates::Gate;
 use std::sync::{Arc};
 
 #[component]
@@ -138,31 +137,31 @@ pub fn GateLayer(
                             }
                         };
 
-                        let geometry_res = current_gate_type
-                            .peek()
-                            .to_gate_geometry(&mapper, px, py, x_param, y_param, points);
+                        let geometry_res = &*current_gate_type.peek();
 
                         let geo = if let GateType::Line(_) = &*current_gate_type.peek() {
                             GateType::Line(Some(dy))
                         } else {
                             current_gate_type.peek().cloned()
                         };
-                        match geometry_res {
-                            Ok(gate) => {
-                                let id = *next_gate_id.peek();
-                                let g = Gate::new(
-                                    id.to_string(),
-                                    id.to_string(),
-                                    gate,
-                                    x_channel(),
-                                    y_channel(),
-                                );
-                                gate_store
-                                    .add_gate(g, None, geo)
-                                    .expect("Failed to add gate to gate store");
-                                *next_gate_id.write() += 1;
-                            }
-                            Err(_) => {}
+
+                        let id = *next_gate_id.peek();
+
+                        match gate_store
+                            .add_gate(
+                                &mapper,
+                                px,
+                                py,
+                                x_param.clone(),
+                                y_param.clone(),
+                                points,
+                                format!("{id}"),
+                                None,
+                                geo,
+                            )
+                        {
+                            Ok(_) => *next_gate_id.write() += 1,
+                            Err(_) => todo!(),
                         };
                     },
                     onmousemove: move |evt| {

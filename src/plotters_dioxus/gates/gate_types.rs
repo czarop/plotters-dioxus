@@ -18,11 +18,6 @@ pub enum GateType {
     FlexiQuadrant,
 }
 
-// convert this to create GateFinal
-// GateFinal will store a GateClass containing it's gate(s)
-// GateFinal's drawself will return a composite list of shapes from the sub-gates
-// decide how to work with ID's - GateFinal should have its own ID so it can be retrieved from the store
-// when a sub-gate is clicked on it
 impl GateType {
     pub fn is_composite(&self) -> bool {
         matches!(
@@ -33,59 +28,6 @@ impl GateType {
 
     pub fn is_single(&self) -> bool {
         !self.is_composite()
-    }
-
-    pub fn to_gate_geometry(
-        &self,
-        mapper: &PlotMapper,
-        click_x: f32,
-        click_y: f32,
-        x_param: &str,
-        y_param: &str,
-        points: Option<Vec<(f32, f32)>>,
-    ) -> anyhow::Result<GateGeometry> {
-        match self {
-            GateType::Polygon => flow_gates::geometry::create_polygon_geometry(
-                                            points.ok_or(anyhow!("points not provided for polygon gate"))?,
-                                            x_param,
-                                            y_param,
-                                        )
-                                        .map_err(|_| anyhow!("failed to create polygon geometry")),
-            GateType::Ellipse => {
-                crate::plotters_dioxus::gates::gate_draw_helpers::ellipse::create_default_ellipse(
-                                    &mapper,
-                                    click_x,
-                                    click_y,
-                                    50f32,
-                                    30f32,
-                                    x_param,
-                                    y_param,
-                                )
-            },
-            GateType::Rectangle => {
-                crate::plotters_dioxus::gates::gate_draw_helpers::rectangle::create_default_rectangle(
-                                    &mapper,
-                                    click_x,
-                                    click_y,
-                                    50f32,
-                                    50f32,
-                                    x_param,
-                                    y_param,
-                                )
-            },
-            GateType::Line(_) => {
-                crate::plotters_dioxus::gates::gate_draw_helpers::line::create_default_line(
-                    &mapper,
-                    click_x,
-                    50f32,
-                    x_param,
-                    y_param,
-                )
-            },
-            GateType::Bisector => todo!(),
-            GateType::Quadrant => todo!(),
-            GateType::FlexiQuadrant => todo!(),
-        }
     }
 }
 

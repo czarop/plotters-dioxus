@@ -752,6 +752,34 @@ impl LineGate {
             axis_matched: true,
         })
     }
+
+    pub fn clone_line_for_rescaled_axis(
+        &self,
+        param: Arc<str>,
+        old: &TransformType,
+        new: &TransformType,
+    ) -> anyhow::Result<Self> {
+        let points = rescale_helper(
+            &self.get_points(),
+            &param,
+            &self.inner.parameters.0,
+            old,
+            new,
+        )?;
+        let new_geometry =
+            create_rectangle_geometry(points, &self.inner.parameters.0, &self.inner.parameters.1)?;
+        let new_gate = flow_gates::Gate {
+            id: self.inner.id.clone(),
+            parameters: self.inner.parameters.clone(),
+            geometry: new_geometry,
+            label_position: self.inner.label_position.clone(),
+            name: self.inner.name.clone(),
+            mode: self.inner.mode.clone(),
+        };
+        let mut line = LineGate::try_new(new_gate, self.height)?;
+        line.axis_matched = self.axis_matched;
+        Ok(line)
+    } 
 }
 
 impl super::gate_traits::DrawableGate for LineGate {
@@ -884,25 +912,26 @@ impl super::gate_traits::DrawableGate for LineGate {
         old: &TransformType,
         new: &TransformType,
     ) -> anyhow::Result<Box<dyn DrawableGate>> {
-        let points = rescale_helper(
-            &self.get_points(),
-            &param,
-            &self.inner.parameters.0,
-            old,
-            new,
-        )?;
-        let new_geometry =
-            create_rectangle_geometry(points, &self.inner.parameters.0, &self.inner.parameters.1)?;
-        let new_gate = flow_gates::Gate {
-            id: self.inner.id.clone(),
-            parameters: self.inner.parameters.clone(),
-            geometry: new_geometry,
-            label_position: self.inner.label_position.clone(),
-            name: self.inner.name.clone(),
-            mode: self.inner.mode.clone(),
-        };
-        let mut line = LineGate::try_new(new_gate, self.height)?;
-        line.axis_matched = self.axis_matched;
+        // let points = rescale_helper(
+        //     &self.get_points(),
+        //     &param,
+        //     &self.inner.parameters.0,
+        //     old,
+        //     new,
+        // )?;
+        // let new_geometry =
+        //     create_rectangle_geometry(points, &self.inner.parameters.0, &self.inner.parameters.1)?;
+        // let new_gate = flow_gates::Gate {
+        //     id: self.inner.id.clone(),
+        //     parameters: self.inner.parameters.clone(),
+        //     geometry: new_geometry,
+        //     label_position: self.inner.label_position.clone(),
+        //     name: self.inner.name.clone(),
+        //     mode: self.inner.mode.clone(),
+        // };
+        // let mut line = LineGate::try_new(new_gate, self.height)?;
+        // line.axis_matched = self.axis_matched;
+        let line = self.clone_line_for_rescaled_axis(param, old, new)?;
         Ok(Box::new(line))
     }
 

@@ -26,6 +26,33 @@ pub fn create_default_line(
         .map_err(|_| anyhow::anyhow!("failed to create rectangle geometry"))
 }
 
+pub fn create_default_bisector(
+    plot_map: &PlotMapper,
+    cx_raw: f32,
+    x_channel: &str,
+    y_channel: &str,
+) -> anyhow::Result<(GateGeometry, GateGeometry)> {
+
+
+    let (y_min, y_max) = plot_map.y_axis_min_max();
+    let (x_min, x_max) = plot_map.x_axis_min_max();
+
+    let max_left = plot_map.pixel_to_data(cx_raw, y_max, None, None);
+    let min_left = plot_map.pixel_to_data(x_min, y_min, None, None);
+    let coords = vec![min_left, max_left];
+    let g1 = flow_gates::geometry::create_rectangle_geometry(coords, x_channel, y_channel)
+        .map_err(|_| anyhow::anyhow!("failed to create rectangle geometry"))?;
+
+    let max_right = plot_map.pixel_to_data(x_max, y_max, None, None);
+    let min_right = plot_map.pixel_to_data(cx_raw, y_min, None, None);
+    let coords = vec![min_right, max_right];
+    let g2 = flow_gates::geometry::create_rectangle_geometry(coords, x_channel, y_channel)
+        .map_err(|_| anyhow::anyhow!("failed to create rectangle geometry"))?;
+
+    Ok((g1, g2))
+
+}
+
 pub fn bounds_to_svg_line(
     min: (f32, f32),
     max: (f32, f32),
