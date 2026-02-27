@@ -5,7 +5,7 @@ use flow_gates::transforms::{
 };
 use std::{collections::HashMap, ops::RangeInclusive, sync::Arc};
 
-use crate::plotters_dioxus::{AxisInfo, gates::Id};
+use crate::plotters_dioxus::{AxisInfo, gates::GateId};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct PlotMapper {
@@ -157,7 +157,7 @@ impl std::fmt::Display for Param {
 
 #[derive(Default, Store, Clone)]
 pub struct ParameterStore {
-    pub settings: HashMap<Id, AxisInfo>,
+    pub settings: HashMap<GateId, AxisInfo>,
 }
 
 #[store(pub name = ParameterStoreImplExt)]
@@ -191,7 +191,7 @@ impl<Lens> Store<ParameterStore, Lens> {
             });
     }
 
-    fn update_cofactor(&mut self, id: &Id, cofactor: f32) -> Option<(AxisInfo, AxisInfo)> {
+    fn update_cofactor(&mut self, id: &GateId, cofactor: f32) -> Option<(AxisInfo, AxisInfo)> {
         let mut old = None;
         let mut new = None;
         self.settings()
@@ -216,7 +216,7 @@ impl<Lens> Store<ParameterStore, Lens> {
         None
     }
 
-    fn update_lower(&mut self, id: &Id, lower: f32) {
+    fn update_lower(&mut self, id: &GateId, lower: f32) {
         self.settings()
             .write()
             .entry(id.clone())
@@ -225,7 +225,7 @@ impl<Lens> Store<ParameterStore, Lens> {
                 *axis = old_axis.into_new_lower(lower);
             });
     }
-    fn update_upper(&mut self, id: &Id, upper: f32) {
+    fn update_upper(&mut self, id: &GateId, upper: f32) {
         self.settings()
             .write()
             .entry(id.clone())

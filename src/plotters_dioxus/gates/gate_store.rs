@@ -1,9 +1,9 @@
 use anyhow::anyhow;
 use dioxus::prelude::*;
 use flow_gates::{Gate, GateHierarchy};
+use rustc_hash::FxHashMap;
 
 use std::{
-    collections::HashMap,
     sync::{Arc},
 };
 
@@ -14,17 +14,17 @@ use crate::plotters_dioxus::{
     }, plot_helpers::PlotMapper,
 };
 
-pub type Id = std::sync::Arc<str>;
+pub type GateId = std::sync::Arc<str>;
 
 #[derive(Hash, PartialEq, Eq, Clone)]
 pub struct GatesOnPlotKey {
-    param_1: Id,
-    param_2: Id,
-    parental_gate_id: Option<Id>,
+    param_1: GateId,
+    param_2: GateId,
+    parental_gate_id: Option<GateId>,
 }
 
 impl GatesOnPlotKey {
-    pub fn new(param_1: Arc<str>, param_2: Arc<str>, parental_gate_id: Option<Id>) -> Self {
+    pub fn new(param_1: Arc<str>, param_2: Arc<str>, parental_gate_id: Option<GateId>) -> Self {
         if param_1 <= param_2 {
             Self {
                 param_1: param_1,
@@ -43,26 +43,26 @@ impl GatesOnPlotKey {
 
 #[derive(Hash, PartialEq, Eq, Clone)]
 pub struct GatePositionKey {
-    gate_id: Id,
-    file_id: Id,
+    gate_id: GateId,
+    file_id: GateId,
 }
 
-#[derive(Hash, PartialEq, Eq, Clone)]
-pub struct GateKey {
-    gate_id: Id,
-}
+// #[derive(Hash, PartialEq, Eq, Clone)]
+// pub struct GateKey {
+//     gate_id: Id,
+// }
 
-impl GateKey {
-    pub fn new(id: Id) -> Self {
-        Self { gate_id: id }
-    }
-}
+// impl GateKey {
+//     pub fn new(id: Id) -> Self {
+//         Self { gate_id: id }
+//     }
+// }
 
-impl From<Arc<str>> for GateKey {
-    fn from(id: Arc<str>) -> Self {
-        Self { gate_id: id }
-    }
-}
+// impl From<Arc<str>> for GateKey {
+//     fn from(id: Arc<str>) -> Self {
+//         Self { gate_id: id }
+//     }
+// }
 
 /// a plot is selected for a file,
 /// The currently selected (parental) gate id is stored in a signal and accessed.
@@ -73,13 +73,15 @@ impl From<Arc<str>> for GateKey {
 #[derive(Default, Store)]
 pub struct GateState {
     // For the Renderer: "What gates do I draw on this Plot?"
-    pub gate_ids_by_view: HashMap<GatesOnPlotKey, Vec<GateKey>>,
+    pub gate_ids_by_view: FxHashMap<GatesOnPlotKey, Vec<GateId>>,
     // For the Logic: "What is the actual data for Gate X?"
-    pub gate_registry: HashMap<GateKey, Arc<dyn DrawableGate>>,
+    pub gate_registry: FxHashMap<GateId, Arc<dyn DrawableGate>>,
+
+    // composite_redirect: FxHashMap<GateId, GateId>,
     // For the Filtering: "How are these gates nested?"
     pub hierarchy: GateHierarchy,
     // are there file-specific overrides for gate positions
-    pub position_overrides: HashMap<GatePositionKey, flow_gates::GateGeometry>,
+    pub position_overrides: FxHashMap<GatePositionKey, flow_gates::GateGeometry>,
 }
 
 #[store(pub name = GateStateImplExt)]
@@ -93,14 +95,14 @@ impl<Lens> Store<GateState, Lens> {
         y_param: Arc<str>,
         points: Option<Vec<(f32, f32)>>,
         id: String,
-        parental_gate_id: Option<Id>,
+        parental_gate_id: Option<GateId>,
         gate_type: GateType,
     ) -> Result<()> {
 
-        let key = GatesOnPlotKey::new(x_param.clone(), y_param.clone(), parental_gate_id.clone());
-
-        
+        let key = GatesOnPlotKey::new(x_param.clone(), y_param.clone(), parental_gate_id.clone());        
         let parameters = (x_param.clone(), y_param.clone());
+
+        // let mut composite_subgate_ids = vec![];
 
         let g: Arc<dyn DrawableGate + 'static> = match gate_type{
             GateType::Polygon => {
@@ -185,7 +187,8 @@ impl<Lens> Store<GateState, Lens> {
                 }
             },
 
-        GateType::Bisector => {
+        GateType::Bisector => { 
+
             Arc::new(BisectorGate::try_new(mapper, Arc::from(id.as_str()), (click_x, click_y), x_param, y_param)?)
         },
         GateType::Quadrant => todo!(),
@@ -198,9 +201,7 @@ impl<Lens> Store<GateState, Lens> {
 
         
 
-        let gate_key = GateKey {
-            gate_id: g.get_id(),
-        };
+        let gate_key = g.get_id();
 
         self.gate_ids_by_view()
             .write()
@@ -213,38 +214,58 @@ impl<Lens> Store<GateState, Lens> {
             g.get_id(),
         )?;
 
+        // for subgate in composite_subgate_ids{
+        //     self.composite_redirect().insert(subgate.into(), g.get_id().into());
+        // }
+
         self.gate_registry().write().insert(gate_key, g);
+
 
         Ok(())
     }
 
-    fn remove_gate(&mut self, gate: Arc<Gate>, parental_gate_id: Option<Id>) -> Result<()> {
-        let (x_param, y_param) = &gate.parameters;
-        let key = GatesOnPlotKey::new(x_param.clone(), y_param.clone(), parental_gate_id.clone());
-        self.gate_ids_by_view()
-            .write()
-            .entry(key)
-            .and_modify(|l| l.retain(|name| &name.gate_id != &gate.id));
+    fn remove_gate(&mut self, gate_id: GateId, parental_gate_id: Option<GateId>) -> Result<()> {
 
-        let gate_key = GateKey {
-            gate_id: gate.id.clone(),
+        // redirect to parent
+        // let id = if let Some(id) = self.composite_redirect().peek().get(&gate_id) {
+        //     id.clone()
+        // } else {
+        //     gate_id.clone()
+        // };
+
+        if let Some((id, gate)) = self.gate_registry().write().remove_entry(&gate_id){
+            let (x_param, y_param) = gate.get_params();
+            let key = GatesOnPlotKey::new(x_param.clone(), y_param.clone(), parental_gate_id.clone());
+        
+            self.gate_ids_by_view()
+                .write()
+                .entry(key)
+                .and_modify(|l| l.retain(|name| name != &id));
+
         };
-        self.gate_registry().write().remove_entry(&gate_key);
 
-        self.hierarchy().write().add_gate_child(
-            parental_gate_id.unwrap_or(Arc::from("root")),
-            gate.id.clone(),
-        )?;
+        // iteratively do this for all child gates in the hierarchy!
+        todo!();
+        // let child_gates = self.hierarchy().write().delete_subtree(
+        //     id.clone(),
+        // );
 
         Ok(())
     }
 
     fn move_gate_point(
         &mut self,
-        gate_id: GateKey,
+        gate_id: GateId,
         point_idx: usize,
         new_point: (f32, f32),
     ) -> anyhow::Result<()> {
+
+        // redirect to parent
+        // let id = if let Some(id) = self.composite_redirect().peek().get(&gate_id) {
+        //     id.clone()
+        // } else {
+        //     gate_id.clone()
+        // };
 
         if let Some(mut gate_ptr) = self
             .gate_registry()
@@ -259,9 +280,17 @@ impl<Lens> Store<GateState, Lens> {
     }
 
     fn move_gate(&mut self, gate_drag_data: GateDragData) -> Result<()> {
+
+        // redirect to parent
+        // let id = if let Some(id) = self.composite_redirect().peek().get(&gate_drag_data.gate_id()) {
+        //     id.clone()
+        // } else {
+        //     gate_drag_data.gate_id()
+        // };
+
         if let Some(mut gate_ptr) = self
             .gate_registry()
-            .get_mut(&gate_drag_data.gate_id().into())
+            .get_mut(&gate_drag_data.gate_id())
         {
             if let Ok(new_gate_box) = gate_ptr.replace_points(gate_drag_data) {
                 *gate_ptr = Arc::from(new_gate_box);
@@ -272,9 +301,17 @@ impl<Lens> Store<GateState, Lens> {
 
     fn rotate_gate(
         &mut self,
-        gate_id: GateKey,
+        gate_id: GateId,
         current_position: (f32, f32),
     ) -> anyhow::Result<()> {
+
+        // redirect to parent
+        // let id = if let Some(id) = self.composite_redirect().peek().get(&gate_id) {
+        //     id.clone()
+        // } else {
+        //     gate_id.clone()
+        // };
+
         if let Some(mut gate_ptr) = self
             .gate_registry()
             .get_mut(&gate_id)

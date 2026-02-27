@@ -3,8 +3,7 @@ use std::sync::Arc;
 use flow_fcs::TransformType;
 
 use crate::plotters_dioxus::gates::{
-    gate_drag::{GateDragData, PointDragData},
-    gate_types::GateRenderShape,
+    GateId, gate_drag::{GateDragData, PointDragData}, gate_types::GateRenderShape
 };
 
 pub trait DrawableGate {

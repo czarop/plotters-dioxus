@@ -7,6 +7,7 @@ const GATE_CONFIG: &[(GateType, &str)] = &[
     (GateType::Ellipse, "E"),
     (GateType::Rectangle, "R"),
     (GateType::Line(None), "L"),
+    (GateType::Bisector, "B"),
 ];
 
 #[component]

@@ -9,8 +9,7 @@ use flow_gates::{
 use crate::plotters_dioxus::{
     axis_info::{asinh_reverse_f32, asinh_transform_f32},
     gates::{
-        gate_drag::{GateDragData, PointDragData},
-        gate_draw_helpers::{
+        gate_drag::{GateDragData, PointDragData}, gate_draw_helpers::{
             ellipse::{
                 calculate_ellipse_nodes, draw_elipse, draw_ghost_point_for_ellipse,
                 is_point_on_ellipse_perimeter, update_ellipse_geometry,
@@ -21,9 +20,7 @@ use crate::plotters_dioxus::{
                 draw_ghost_point_for_rectangle, draw_rectangle, is_point_on_rectangle_perimeter,
                 update_rectangle_geometry,
             },
-        },
-        gate_traits::DrawableGate,
-        gate_types::{DEFAULT_LINE, GateRenderShape, SELECTED_LINE, ShapeType},
+        }, gate_traits::DrawableGate, gate_types::{DEFAULT_LINE, GateRenderShape, SELECTED_LINE, ShapeType}
     },
 };
 
@@ -199,7 +196,6 @@ impl super::gate_traits::DrawableGate for RectangleGate {
         is_selected: bool,
         drag_point: Option<PointDragData>,
     ) -> Vec<GateRenderShape> {
-        println!("drawing rectangle gate: {}", self.inner.id);
         let style = if is_selected {
             &SELECTED_LINE
         } else {
@@ -779,7 +775,62 @@ impl LineGate {
         let mut line = LineGate::try_new(new_gate, self.height)?;
         line.axis_matched = self.axis_matched;
         Ok(line)
-    } 
+    }
+
+    pub fn clone_line_for_axis_swap(&self,
+        plot_x: &str,
+        plot_y: &str,
+    ) -> anyhow::Result<Option<Self>> {
+        let (x, y) = (&self.inner.parameters.0, &self.inner.parameters.1);
+        if plot_x == x.as_ref() && *plot_y == *y.as_ref() {
+            return Ok(None);
+        }
+
+        if plot_x == y.as_ref() && plot_y == x.as_ref() {
+            let pts: Vec<_> = self.get_points().into_iter().map(|(x, y)| (y, x)).collect();
+            let new_geometry = create_rectangle_geometry(pts, y, x)?;
+            let new_parameters = (y.clone(), x.clone());
+            let new_axis_matched = !self.axis_matched;
+            let new_gate = flow_gates::Gate {
+                id: self.inner.id.clone(),
+                parameters: new_parameters,
+                geometry: new_geometry,
+                label_position: self.inner.label_position.clone(),
+                name: self.inner.name.clone(),
+                mode: self.inner.mode.clone(),
+            };
+            let mut new_line = LineGate::try_new(new_gate, self.height)?;
+            new_line.axis_matched = new_axis_matched;
+            println!("axis not matched, rotating gate");
+            return Ok(Some(new_line));
+        }
+        Err(anyhow!("Axis mismatch for Line Gate"))
+    }
+
+    pub fn clone_line_for_new_point(&self,
+        new_point: (f32, f32),
+        point_index: usize,) -> anyhow::Result<Self> {
+        let p = self.get_points();
+        let new_geometry = update_line_geometry(
+            p,
+            new_point,
+            point_index,
+            &self.inner.parameters.0,
+            &self.inner.parameters.1,
+            self.axis_matched,
+        )?;
+        let new_gate = flow_gates::Gate {
+            id: self.inner.id.clone(),
+            parameters: self.get_params(),
+            geometry: new_geometry,
+            label_position: self.inner.label_position.clone(),
+            name: self.inner.name.clone(),
+            mode: self.inner.mode.clone(),
+        };
+        let mut new_line = LineGate::try_new(new_gate, self.height)?;
+        new_line.axis_matched = self.axis_matched;
+        return Ok(new_line);
+    }
 }
 
 impl super::gate_traits::DrawableGate for LineGate {
@@ -806,31 +857,11 @@ impl super::gate_traits::DrawableGate for LineGate {
         plot_x: &str,
         plot_y: &str,
     ) -> anyhow::Result<Option<Box<dyn DrawableGate>>> {
-        let (x, y) = (&self.inner.parameters.0, &self.inner.parameters.1);
-        if plot_x == x.as_ref() && *plot_y == *y.as_ref() {
-            println!("axis already matched for line");
-            return Ok(None);
+        let line = self.clone_line_for_axis_swap(plot_x, plot_y)?;
+        match line{
+            Some(l) => Ok(Some(Box::new(l))),
+            None => Ok(None),
         }
-
-        if plot_x == y.as_ref() && plot_y == x.as_ref() {
-            let pts: Vec<_> = self.get_points().into_iter().map(|(x, y)| (y, x)).collect();
-            let new_geometry = create_rectangle_geometry(pts, y, x)?;
-            let new_parameters = (y.clone(), x.clone());
-            let new_axis_matched = !self.axis_matched;
-            let new_gate = flow_gates::Gate {
-                id: self.inner.id.clone(),
-                parameters: new_parameters,
-                geometry: new_geometry,
-                label_position: self.inner.label_position.clone(),
-                name: self.inner.name.clone(),
-                mode: self.inner.mode.clone(),
-            };
-            let mut new_line = LineGate::try_new(new_gate, self.height)?;
-            new_line.axis_matched = new_axis_matched;
-            println!("axis not matched, rotating gate");
-            return Ok(Some(Box::new(new_line)));
-        }
-        Err(anyhow!("Axis mismatch for Line Gate"))
     }
 
     fn replace_point(
@@ -838,26 +869,8 @@ impl super::gate_traits::DrawableGate for LineGate {
         new_point: (f32, f32),
         point_index: usize,
     ) -> anyhow::Result<Box<dyn DrawableGate>> {
-        let p = self.get_points();
-        let new_geometry = update_line_geometry(
-            p,
-            new_point,
-            point_index,
-            &self.inner.parameters.0,
-            &self.inner.parameters.1,
-            self.axis_matched,
-        )?;
-        let new_gate = flow_gates::Gate {
-            id: self.inner.id.clone(),
-            parameters: self.get_params(),
-            geometry: new_geometry,
-            label_position: self.inner.label_position.clone(),
-            name: self.inner.name.clone(),
-            mode: self.inner.mode.clone(),
-        };
-        let mut new_line = LineGate::try_new(new_gate, self.height)?;
-        new_line.axis_matched = self.axis_matched;
-        return Ok(Box::new(new_line));
+        let line = self.clone_line_for_new_point(new_point, point_index)?;
+        return Ok(Box::new(line));
     }
 
     fn replace_points(
@@ -912,25 +925,6 @@ impl super::gate_traits::DrawableGate for LineGate {
         old: &TransformType,
         new: &TransformType,
     ) -> anyhow::Result<Box<dyn DrawableGate>> {
-        // let points = rescale_helper(
-        //     &self.get_points(),
-        //     &param,
-        //     &self.inner.parameters.0,
-        //     old,
-        //     new,
-        // )?;
-        // let new_geometry =
-        //     create_rectangle_geometry(points, &self.inner.parameters.0, &self.inner.parameters.1)?;
-        // let new_gate = flow_gates::Gate {
-        //     id: self.inner.id.clone(),
-        //     parameters: self.inner.parameters.clone(),
-        //     geometry: new_geometry,
-        //     label_position: self.inner.label_position.clone(),
-        //     name: self.inner.name.clone(),
-        //     mode: self.inner.mode.clone(),
-        // };
-        // let mut line = LineGate::try_new(new_gate, self.height)?;
-        // line.axis_matched = self.axis_matched;
         let line = self.clone_line_for_rescaled_axis(param, old, new)?;
         Ok(Box::new(line))
     }
@@ -959,7 +953,6 @@ impl super::gate_traits::DrawableGate for LineGate {
         is_selected: bool,
         drag_point: Option<PointDragData>,
     ) -> Vec<GateRenderShape> {
-        println!("drawing line gate: {}", self.inner.id);
         let style = if is_selected {
             &SELECTED_LINE
         } else {
@@ -990,7 +983,7 @@ impl super::gate_traits::DrawableGate for LineGate {
     }
 }
 
-fn draw_circles_for_selected_gate(
+pub fn draw_circles_for_selected_gate(
     points: &[(f32, f32)],
     index_offset: usize,
 ) -> Vec<GateRenderShape> {

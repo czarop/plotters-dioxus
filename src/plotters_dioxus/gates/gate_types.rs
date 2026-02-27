@@ -1,11 +1,6 @@
 use std::sync::Arc;
 
-use crate::plotters_dioxus::gates::gate_store::Id;
-
-use anyhow::anyhow;
-use flow_gates::GateGeometry;
-
-use crate::plotters_dioxus::plot_helpers::PlotMapper;
+use crate::plotters_dioxus::gates::gate_store::GateId;
 
 #[derive(Clone, PartialEq, Copy)]
 pub enum GateType {
@@ -33,7 +28,7 @@ impl GateType {
 
 #[derive(PartialEq, Clone)]
 pub enum ShapeType {
-    Gate(Id),
+    Gate(GateId),
     Point(usize),
     GhostGate((f32, f32)),
     GhostPoint,

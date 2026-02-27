@@ -103,7 +103,6 @@ pub fn draw_line(
     point_drag_data: &Option<PointDragData>,
     axis_matched: bool,
 ) -> Vec<GateRenderShape> {
-    println!("({}, {}), ({}, {})", min.0, min.1, max.0, max.1);
     let coords = bounds_to_svg_line(min, max, y_coord, axis_matched);
     if axis_matched {
         let mut x1 = coords.0;

@@ -137,8 +137,6 @@ pub fn GateLayer(
                             }
                         };
 
-                        let geometry_res = &*current_gate_type.peek();
-
                         let geo = if let GateType::Line(_) = &*current_gate_type.peek() {
                             GateType::Line(Some(dy))
                         } else {
@@ -281,7 +279,7 @@ pub fn GateLayer(
                                 };
 
                                 rsx! {
-                                    GateWrapper {
+                                    RenderGate {
                                         gate: gate.clone(),
                                         gate_index,
                                         is_selected,
@@ -310,14 +308,14 @@ pub fn GateLayer(
 }
 
 #[derive(Props, Clone)]
-pub struct GateWrapperProps {
+pub struct RenderGateProps {
     gate: Arc<dyn DrawableGate>,
     gate_index: usize,
     is_selected: bool,
     drag_data: Option<GateDragType>,
 }
 
-impl PartialEq for GateWrapperProps {
+impl PartialEq for RenderGateProps {
     fn eq(&self, other: &Self) -> bool {
         self.is_selected == other.is_selected 
         && self.gate_index == other.gate_index
@@ -327,7 +325,7 @@ impl PartialEq for GateWrapperProps {
 }
 
 #[component]
-fn GateWrapper(props: GateWrapperProps) -> Element {
+fn RenderGate(props: RenderGateProps) -> Element {
     let g = props.gate;
     let gate_id = g.get_id().clone();
 
@@ -418,7 +416,7 @@ fn RenderShape(
     let mut drag_data_signal = use_context::<Signal<Option<GateDragType>>>();
     if let Some(mapper) = &*plot_map.read() {
         let transform = {
-            match drag_data {
+            match &drag_data {
                 Some(GateDragType::Gate(data)) => {
                     if *gate_id == *data.gate_id() {
                         let offset = data.offset();
@@ -586,7 +584,7 @@ fn RenderShape(
                 let handle_y = c.1 - (size + pixel_offset);
 
                 let translate = {
-                    if let Some(GateDragType::Gate(data)) = &&*drag_data_signal.read() {
+                    if let Some(GateDragType::Gate(data)) = &drag_data {
                         if *gate_id == *data.gate_id() {
                             let offset = data.offset();
                             let p_start = mapper.data_to_pixel(0.0, 0.0, None, None);
@@ -602,7 +600,7 @@ fn RenderShape(
                     }
                 };
                 let rotate = {
-                    if let Some(GateDragType::Rotation(data)) = &*drag_data_signal.read() {
+                    if let Some(GateDragType::Rotation(data)) = &drag_data {
                         if let ShapeType::Rotation(handle_angle_rad) = shape_type {
                             let angle = -(handle_angle_rad.to_degrees()) + data.rotation_deg();
                             Some(format!("rotate({} {} {})", angle, cp.0, cp.1))
