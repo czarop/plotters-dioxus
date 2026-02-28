@@ -701,6 +701,7 @@ fn RenderShape(
             } => {
                 let p1 = mapper.data_to_pixel(x1, y1, None, None);
                 let p2 = mapper.data_to_pixel(x2, y2, None, None);
+                println!("{:?} {:?}", p1, p2);
                 rsx! {
                     g { transform,
                         line {

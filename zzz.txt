@@ -1,12 +1,9 @@
-Now can write a CompositeGate struct implementing the same traits as gate_single.
-Make GateFinal immutable, pass in is_slected and drag points to draw_self. Make moveGate etc return Self.
+For composite gates need to adjust max bounds whenever axis is rescaled.
 
 gating hierarchy
 Gating hierarchy panel
 Select gated events
 
-Line gates
-Bisect gates
 Quadrant gates
 Flexi-Quadrant Gates
 NOT gates

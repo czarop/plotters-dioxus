@@ -3,6 +3,7 @@ use flow_fcs::{TransformType, Transformable};
 use flow_gates::transforms::{
     get_plotting_area, pixel_to_raw, pixel_to_raw_y, raw_to_pixel, raw_to_pixel_y,
 };
+use core::f32;
 use std::{collections::HashMap, ops::RangeInclusive, sync::Arc};
 
 use crate::plotters_dioxus::{AxisInfo, gates::GateId};
@@ -133,8 +134,8 @@ impl PlotMapper {
             yt = y_t.unwrap();
         }
 
-        let px = raw_to_pixel(dx, &self.x_data_range, &self.x_pix_range, &xt);
-        let py = raw_to_pixel_y(dy, &self.y_data_range, &self.y_pix_range, &yt);
+        let mut px = raw_to_pixel(dx, &self.x_data_range, &self.x_pix_range, &xt);
+        let mut py = raw_to_pixel_y(dy, &self.y_data_range, &self.y_pix_range, &yt);
 
         (px, py)
     }
