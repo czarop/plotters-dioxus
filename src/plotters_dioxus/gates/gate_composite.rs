@@ -1,7 +1,7 @@
-use anyhow::anyhow;
+
 use flow_fcs::TransformType;
 
-use flow_gates::{Gate, GateGeometry};
+use flow_gates::{Gate};
 use indexmap::IndexMap;
 use rustc_hash::FxBuildHasher;
 use std::sync::Arc;
@@ -33,7 +33,6 @@ struct BisectorPoints {
 pub struct BisectorGate {
     gates: FxIndexMap<Arc<str>, LineGate>,
     id: Arc<str>,
-    // center_point: (f32, f32),
     points: BisectorPoints,
     axis_matched: bool,
     parameters: (Arc<str>, Arc<str>),
@@ -80,6 +79,9 @@ impl BisectorGate {
         };
         let lg_l = LineGate::try_new(gate_left, click_data.1)?;
         let lg_r = LineGate::try_new(gate_right, click_data.1)?;
+
+        // println!("{:?}", &lg_l.get_points());
+        // println!("{:?}", &lg_r.get_points());
         gate_map.insert(id_left_arc, lg_l);
         gate_map.insert(id_right_arc, lg_r);
 
@@ -101,15 +103,16 @@ impl BisectorGate {
         })
     }
 
-    fn clone_with_gates(&self, gates: FxIndexMap<Arc<str>, LineGate>) -> Box<dyn DrawableGate> {
-        self.clone_with_gates_and_height(gates, self.points.cx, self.points.cy)
+    fn clone_with_gates(&self, gates: FxIndexMap<Arc<str>, LineGate>, axis_matched: bool) -> Box<dyn DrawableGate> {
+        self.clone_with_gates_and_loc(gates, self.points.cx, self.points.cy, axis_matched)
     }
 
-    fn clone_with_gates_and_height(
+    fn clone_with_gates_and_loc(
         &self,
         gates: FxIndexMap<Arc<str>, LineGate>,
         cx: f32,
         cy: f32,
+        axis_matched: bool
     ) -> Box<dyn DrawableGate> {
         let (xmin, xmax, ymin, ymax) = {
             let min;
@@ -126,21 +129,21 @@ impl BisectorGate {
             }
             (min.0, max.0, min.1, max.1)
         };
-        println!("{} {} {} {} {} {}", xmin, ymin, xmax, ymax, cx, cy);
+
         let new_points = BisectorPoints {
             xmin,
             xmax,
             ymin,
             ymax,
-            cx,
-            cy,
+            cx: if axis_matched == self.axis_matched {cx} else {self.points.cy},
+            cy: if axis_matched == self.axis_matched {cy} else {self.points.cx},
         };
 
         Box::new(Self {
             gates,
             id: self.id.clone(),
             points: new_points,
-            axis_matched: self.axis_matched,
+            axis_matched,
             parameters: self.parameters.clone(),
         })
     }
@@ -153,7 +156,10 @@ impl BisectorGate {
 impl super::gate_traits::DrawableGate for BisectorGate {
     fn get_points(&self) -> Vec<(f32, f32)> {
         let p = &self.points;
+
         return vec![(p.xmin, p.ymin), (p.cx, p.cy), (p.xmax, p.ymax)];
+        
+        
     }
 
     fn is_finalised(&self) -> bool {
@@ -166,8 +172,24 @@ impl super::gate_traits::DrawableGate for BisectorGate {
         drag_point: Option<PointDragData>,
     ) -> Vec<GateRenderShape> {
         let points = self.get_points();
-        let (min, center, max) = (points[0], points[1], points[2]);
-        let center_tab_height = (max.1 - min.1) * 0.02;
+        let (min, mut center, max) = (points[0], points[1], points[2]);
+        
+        if let Some(dd) = drag_point {
+            if self.axis_matched{
+                center = (dd.loc().0, center.1);
+            } else {
+                center = (center.0, dd.loc().1);
+            }
+        };
+
+        let center_tab_height = {
+            if self.axis_matched{
+                (max.1 - min.1) * 0.02
+            } else {
+                (max.0 - min.0) * 0.02
+            }
+            
+        };
         let style = if is_selected {
             &SELECTED_LINE
         } else {
@@ -176,8 +198,8 @@ impl super::gate_traits::DrawableGate for BisectorGate {
 
         let main = {
             let left = GateRenderShape::Line {
-                x1: min.0,
-                y1: center.1,
+                x1: if self.axis_matched {min.0} else {center.0},
+                y1: if self.axis_matched {center.1} else {min.1},
                 x2: center.0,
                 y2: center.1,
                 style,
@@ -187,17 +209,17 @@ impl super::gate_traits::DrawableGate for BisectorGate {
             let right = GateRenderShape::Line {
                 x1: center.0,
                 y1: center.1,
-                x2: max.0,
-                y2: center.1,
+                x2: if self.axis_matched {max.0} else {center.0},
+                y2: if self.axis_matched {center.1} else {max.1},
                 style,
                 shape_type: ShapeType::Gate(self.id.clone()),
             };
 
             let center_tab = GateRenderShape::Line {
-                x1: center.0,
-                y1: center.1 - center_tab_height,
-                x2: center.0,
-                y2: center.1 + center_tab_height,
+                x1: if self.axis_matched {center.0} else {center.0 - center_tab_height},
+                y1: if self.axis_matched {center.1 - center_tab_height} else {center.1},
+                x2: if self.axis_matched {center.0} else {center.0 + center_tab_height},
+                y2: if self.axis_matched {center.1 + center_tab_height} else {center.1},
                 style,
                 shape_type: ShapeType::Gate(self.id.clone()),
             };
@@ -205,21 +227,19 @@ impl super::gate_traits::DrawableGate for BisectorGate {
             Some(vec![left, right, center_tab])
         };
 
-        let ghost = {};
+        
 
         let selected = if is_selected {
             let mut p = draw_circles_for_selected_gate(&[center], 0);
-            if drag_point.is_none() {
                 let line = GateRenderShape::Line {
-                    x1: center.0,
-                    y1: min.1,
-                    x2: center.0,
-                    y2: max.1,
+                    x1: if self.axis_matched{center.0} else {min.0},
+                    y1: if self.axis_matched {min.1} else {center.1},
+                    x2: if self.axis_matched {center.0} else {max.0},
+                    y2: if self.axis_matched {max.1} else {center.1},
                     style: &GREY_LINE_DASHED,
                     shape_type: ShapeType::Gate(self.id.clone()),
                 };
                 p.push(line);
-            }
             Some(p)
         } else {
             None
@@ -241,8 +261,8 @@ impl super::gate_traits::DrawableGate for BisectorGate {
     }
 
     fn is_point_on_perimeter(&self, point: (f32, f32), tolerance: (f32, f32)) -> Option<f32> {
-        let min = (self.points.xmin, self.points.cy);
-        let max = (self.points.xmax, self.points.cy);
+        let min = if self.axis_matched {(self.points.xmin, self.points.cy)} else {(self.points.cx, self.points.ymin)};
+        let max = if self.axis_matched {(self.points.xmax, self.points.cy)} else {(self.points.cx, self.points.ymax)};
         if let Some(dis) = self.is_near_segment(point, min, max, tolerance) {
             return Some(dis);
         }
@@ -255,11 +275,13 @@ impl super::gate_traits::DrawableGate for BisectorGate {
         plot_y_param: &str,
     ) -> anyhow::Result<Option<Box<dyn super::gate_traits::DrawableGate>>> {
         let mut new_gate_map = FxIndexMap::default();
-
+        let mut axis_matched= self.axis_matched;
         for gate in self.gates.values() {
             match gate.clone_line_for_axis_swap(plot_x_param, plot_y_param) {
                 Ok(Some(g)) => {
+                    axis_matched = g.axis_matched;
                     new_gate_map.insert(gate.get_id(), g);
+                    
                 }
                 Ok(None) => {
                     return Ok(None);
@@ -267,7 +289,7 @@ impl super::gate_traits::DrawableGate for BisectorGate {
                 Err(e) => return Err(e),
             }
         }
-        Ok(Some(self.clone_with_gates(new_gate_map)))
+        Ok(Some(self.clone_with_gates(new_gate_map, axis_matched)))
     }
 
     fn recalculate_gate_for_rescaled_axis(
@@ -286,7 +308,7 @@ impl super::gate_traits::DrawableGate for BisectorGate {
                 Err(e) => return Err(e),
             }
         }
-        Ok(self.clone_with_gates(new_gate_map))
+        Ok(self.clone_with_gates(new_gate_map, self.axis_matched))
     }
 
     fn rotate_gate(
@@ -302,46 +324,37 @@ impl super::gate_traits::DrawableGate for BisectorGate {
         _point_index: usize,
     ) -> anyhow::Result<Box<dyn super::gate_traits::DrawableGate>> {
         let mut new_gate_map = FxIndexMap::default();
-        // let delta = (new_point.0 - self.points.cx, new_point.1 - self.points.cy);
-
-        // for (i, (id, gate)) in self.gates.iter().enumerate(){
-        //     let p_index = if i == 0 {1} else if i == 1 {0} else {return Err(anyhow!("invalid point"))};
-        //     let old_point = gate.get_points()[p_index];
-        //     println!("{:?}", old_point);
-        //     let new_p = (old_point.0 - delta.0, old_point.1);
-        //     println!("{:?}", new_point);
-        //     let new_gate = gate.clone_line_for_new_point(new_p, p_index)?;
-        //     new_gate_map.insert(id.clone(), new_gate);
-        // }
-
         let new_cx = new_point.0;
+        let new_cy = new_point.1;
         for (i, (id, gate)) in self.gates.iter().enumerate() {
-            // Find which point of the sub-line connects to the center
             let p_index = if i == 0 { 1 } else { 0 };
-
-            // Instead of calculating a delta, just tell the sub-gate:
-            // "Your connecting point is now exactly at the center X"
             let old_p = gate.get_points()[p_index];
-            let target_p = (new_cx, old_p.1); // Keep the Y constant
-
+            let target_p = if self.axis_matched {(new_cx, old_p.1)} else {(old_p.0, new_cy)};
             let new_gate = gate.clone_line_for_new_point(target_p, p_index)?;
             new_gate_map.insert(id.clone(), new_gate);
         }
-
-        Ok(self.clone_with_gates_and_height(new_gate_map, new_point.0, self.points.cy))
+        if self.axis_matched{
+            Ok(self.clone_with_gates_and_loc(new_gate_map, new_point.0, self.points.cy, self.axis_matched))
+        } else {
+            Ok(self.clone_with_gates_and_loc(new_gate_map, self.points.cx, new_point.1, self.axis_matched))
+        }
+        
     }
 
     fn replace_points(
         &self,
         gate_drag_data: super::gate_drag::GateDragData,
     ) -> anyhow::Result<Box<dyn super::gate_traits::DrawableGate>> {
-        let (_, y_offset) = gate_drag_data.offset();
+        let (x_offset, y_offset) = gate_drag_data.offset();
         let mut new_self = self.clone();
         let mut new_points = self.points.clone();
-        println!("{:#?}", &new_points);
-        new_points.cy = self.points.cy - y_offset;
+        if self.axis_matched{
+            new_points.cy = self.points.cy - y_offset;
+        } else {
+            new_points.cx = self.points.cx - x_offset;
+        }
+        
         new_self.points = new_points;
-        println!("{:#?}", &new_self.points);
         Ok(Box::new(new_self))
     }
 

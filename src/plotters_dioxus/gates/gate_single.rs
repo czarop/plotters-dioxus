@@ -801,7 +801,6 @@ impl LineGate {
             };
             let mut new_line = LineGate::try_new(new_gate, self.height)?;
             new_line.axis_matched = new_axis_matched;
-            println!("axis not matched, rotating gate");
             return Ok(Some(new_line));
         }
         Err(anyhow!("Axis mismatch for Line Gate"))

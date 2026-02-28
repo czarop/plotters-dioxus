@@ -81,6 +81,38 @@ impl PlotMapper {
         (dx, dy)
     }
 
+    pub fn pixel_x_to_data(
+        &self,
+        x: f32,
+        t: Option<TransformType>,
+    ) -> f32 {
+        
+        let xt;
+        if t.is_none() {
+            xt = TransformType::Linear;
+        } else {
+            xt = t.unwrap();
+        }
+        let dx = pixel_to_raw(x, &self.x_data_range, &self.x_pix_range, &xt);
+        dx
+    }
+
+    pub fn pixel_y_to_data(
+        &self,
+        y: f32,
+        t: Option<TransformType>,
+    ) -> f32 {
+        
+        let yt;
+        if t.is_none() {
+            yt = TransformType::Linear;
+        } else {
+            yt = t.unwrap();
+        }
+        let dy = pixel_to_raw_y(y, &self.y_data_range, &self.y_pix_range, &yt);
+        dy
+    }
+
     pub fn data_to_pixel(
         &self,
         dx: f32,
@@ -122,15 +154,15 @@ impl PlotMapper {
         (*self.y_data_range.start(), *self.y_data_range.end())
     }
 
-    pub fn x_axis_range(&self) -> f32 {
-        let raw_x = self.x_data_range.end() - self.x_data_range.start();
-        self.x_transform.transform(&raw_x)
-    }
+    // pub fn x_axis_range(&self) -> f32 {
+    //     let raw_x = self.x_data_range.end() - self.x_data_range.start();
+    //     self.x_transform.transform(&raw_x)
+    // }
 
-    pub fn y_axis_range(&self) -> f32 {
-        let raw_y = self.y_data_range.end() - self.y_data_range.start();
-        self.y_transform.transform(&raw_y)
-    }
+    // pub fn y_axis_range(&self) -> f32 {
+    //     let raw_y = self.y_data_range.start() - self.y_data_range.end();
+    //     self.y_transform.transform(&raw_y)
+    // }
 }
 
 #[derive(Clone, PartialEq, Debug)]

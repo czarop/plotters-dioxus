@@ -15,12 +15,17 @@ pub fn create_default_line(
     x_channel: &str,
     y_channel: &str,
 ) -> anyhow::Result<GateGeometry> {
-    let half_width = width_raw / 2f32;
+    
 
-    let (y_min, y_max) = plot_map.y_axis_min_max();
+    // let cx = plot_map.pixel_x_to_data(cx_raw, None);
+    let xmax = plot_map.pixel_x_to_data(cx_raw + (width_raw / 2f32), None);
+    let xmin = plot_map.pixel_x_to_data(cx_raw - (width_raw / 2f32), None);
 
-    let max = plot_map.pixel_to_data(cx_raw + half_width, y_max, None, None);
-    let min = plot_map.pixel_to_data(cx_raw - half_width, y_min, None, None);
+    let (ymin, ymax) = plot_map.y_axis_min_max();
+    
+
+    let max = (xmax, ymax);
+    let min =  (xmin, ymin);
     let coords = vec![min, max];
     flow_gates::geometry::create_rectangle_geometry(coords, x_channel, y_channel)
         .map_err(|_| anyhow::anyhow!("failed to create rectangle geometry"))
@@ -33,19 +38,22 @@ pub fn create_default_bisector(
     y_channel: &str,
 ) -> anyhow::Result<(GateGeometry, GateGeometry)> {
 
+    let cx = plot_map.pixel_x_to_data(cx_raw, None);
 
     let (y_min, y_max) = plot_map.y_axis_min_max();
     let (x_min, x_max) = plot_map.x_axis_min_max();
 
-    let max_left = plot_map.pixel_to_data(cx_raw, y_max, None, None);
-    let min_left = plot_map.pixel_to_data(x_min, y_min, None, None);
+    let max_left = (cx, y_max);
+    let min_left = (x_min, y_min);
     let coords = vec![min_left, max_left];
+    println!("{:?}", coords);
     let g1 = flow_gates::geometry::create_rectangle_geometry(coords, x_channel, y_channel)
         .map_err(|_| anyhow::anyhow!("failed to create rectangle geometry"))?;
 
-    let max_right = plot_map.pixel_to_data(x_max, y_max, None, None);
-    let min_right = plot_map.pixel_to_data(cx_raw, y_min, None, None);
+    let max_right = (x_max, y_max);
+    let min_right = (cx, y_min);
     let coords = vec![min_right, max_right];
+    println!("{:?}", coords);
     let g2 = flow_gates::geometry::create_rectangle_geometry(coords, x_channel, y_channel)
         .map_err(|_| anyhow::anyhow!("failed to create rectangle geometry"))?;
 
@@ -292,15 +300,12 @@ pub fn update_line_geometry(
     axis_matched: bool,
 ) -> anyhow::Result<GateGeometry> {
     let n = current_rect_points.len();
-
     if point_index >= n {
         return Err(anyhow::anyhow!(
             "invalid point index for rectangle geometry"
         ));
     }
-
     let current = new_point;
-
     match axis_matched {
         true => {
             // [bottom-left, bottom-right, top-right, top-left]
