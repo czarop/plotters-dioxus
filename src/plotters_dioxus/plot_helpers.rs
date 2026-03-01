@@ -134,8 +134,19 @@ impl PlotMapper {
             yt = y_t.unwrap();
         }
 
-        let mut px = raw_to_pixel(dx, &self.x_data_range, &self.x_pix_range, &xt);
-        let mut py = raw_to_pixel_y(dy, &self.y_data_range, &self.y_pix_range, &yt);
+        let px = raw_to_pixel(dx, &self.x_data_range, &self.x_pix_range, &xt);
+        let py = raw_to_pixel_y(dy, &self.y_data_range, &self.y_pix_range, &yt);
+        
+        // if px > self.x_pix_range.end as f32 {
+        //     px = self.x_pix_range.end as f32
+        // } else if px < self.x_pix_range.start as f32 {
+        //     px = self.x_pix_range.start as f32
+        // }
+        // if py > self.y_pix_range.end as f32 {
+        //     py = self.y_pix_range.end as f32
+        // } else if py < self.y_pix_range.start as f32 {
+        //     py = self.y_pix_range.start as f32
+        // }
 
         (px, py)
     }

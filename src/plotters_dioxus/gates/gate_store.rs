@@ -10,7 +10,7 @@ use std::{
 use crate::plotters_dioxus::{
     AxisInfo,
     gates::{
-        gate_composite::BisectorGate, gate_drag::GateDragData, gate_draw_helpers, gate_single::{EllipseGate, LineGate, PolygonGate, RectangleGate}, gate_traits::DrawableGate, gate_types::GateType
+        gate_composite::bisector_gate::BisectorGate, gate_drag::GateDragData, gate_single::{ellipse_gate::{EllipseGate, create_default_ellipse}, line_gate::{LineGate, create_default_line}, polygon_gate::PolygonGate, rectangle_gate::{RectangleGate, create_default_rectangle}}, gate_traits::DrawableGate, gate_types::GateType
     }, plot_helpers::PlotMapper,
 };
 
@@ -123,7 +123,7 @@ impl<Lens> Store<GateState, Lens> {
                                     Arc::new(PolygonGate::try_new(gate)?)
                                     },
             GateType::Ellipse => {
-                let geo = gate_draw_helpers::ellipse::create_default_ellipse(
+                let geo = create_default_ellipse(
                                     &mapper,
                                     click_x,
                                     click_y,
@@ -143,7 +143,7 @@ impl<Lens> Store<GateState, Lens> {
                                 Arc::new(EllipseGate::try_new(gate)?)
             },
             GateType::Rectangle => {
-                let geo = gate_draw_helpers::rectangle::create_default_rectangle(
+                let geo = create_default_rectangle(
                                     &mapper,
                                     click_x,
                                     click_y,
@@ -163,7 +163,7 @@ impl<Lens> Store<GateState, Lens> {
                                 Arc::new(RectangleGate::try_new(gate)?)
             },
             GateType::Line(y_coord) => {
-                let geo = gate_draw_helpers::line::create_default_line(
+                let geo = create_default_line(
                     &mapper,
                     click_x,
                     50f32,
@@ -258,6 +258,7 @@ impl<Lens> Store<GateState, Lens> {
         gate_id: GateId,
         point_idx: usize,
         new_point: (f32, f32),
+        plot_map: &PlotMapper,
     ) -> anyhow::Result<()> {
 
         // redirect to parent
@@ -271,7 +272,7 @@ impl<Lens> Store<GateState, Lens> {
             .gate_registry()
             .get_mut(&gate_id)
         {
-            if let Ok(new_gate_box) = gate_ptr.replace_point(new_point, point_idx) {
+            if let Ok(new_gate_box) = gate_ptr.replace_point(new_point, point_idx, plot_map) {
                 *gate_ptr = Arc::from(new_gate_box);
             }
         }

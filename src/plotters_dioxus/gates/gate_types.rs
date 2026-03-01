@@ -29,11 +29,14 @@ impl GateType {
 #[derive(PartialEq, Clone)]
 pub enum ShapeType {
     Gate(GateId),
+    CompositeGate(GateId, bool),
     Point(usize),
+    CompositePoint(usize, bool),
     GhostGate((f32, f32)),
     GhostPoint,
     DraftGate,
     Rotation(f32),
+    LineGuide
 }
 
 #[derive(PartialEq, Clone)]
@@ -285,6 +288,48 @@ impl GateRenderShape {
                 shape_type: shape_type.clone(),
             },
         }
+    }
+
+    pub fn is_composite(&self) -> bool {
+        let st = match self {
+            GateRenderShape::PolyLine { shape_type, .. } |
+            GateRenderShape::Circle { shape_type, .. } |
+            GateRenderShape::Polygon { shape_type, .. } |
+            GateRenderShape::Ellipse { shape_type, .. } |
+            GateRenderShape::Handle { shape_type, .. } |
+            GateRenderShape::Rectangle { shape_type, .. } |
+            GateRenderShape::Line { shape_type, .. } => shape_type,
+        };
+
+        matches!(st, ShapeType::CompositeGate { .. } | ShapeType::CompositePoint(..))
+    }
+
+    pub fn is_line_guide(&self) -> bool {
+        let st = match self {
+            GateRenderShape::PolyLine { shape_type, .. } |
+            GateRenderShape::Circle { shape_type, .. } |
+            GateRenderShape::Polygon { shape_type, .. } |
+            GateRenderShape::Ellipse { shape_type, .. } |
+            GateRenderShape::Handle { shape_type, .. } |
+            GateRenderShape::Rectangle { shape_type, .. } |
+            GateRenderShape::Line { shape_type, .. } => shape_type,
+        };
+
+        matches!(st, ShapeType::LineGuide)
+    }
+
+    pub fn is_axis_matched(&self) -> bool {
+        let st = match self {
+            GateRenderShape::PolyLine { shape_type, .. } |
+            GateRenderShape::Circle { shape_type, .. } |
+            GateRenderShape::Polygon { shape_type, .. } |
+            GateRenderShape::Ellipse { shape_type, .. } |
+            GateRenderShape::Handle { shape_type, .. } |
+            GateRenderShape::Rectangle { shape_type, .. } |
+            GateRenderShape::Line { shape_type, .. } => shape_type,
+        };
+
+        matches!(st, ShapeType::CompositeGate(.. , true ) | ShapeType::CompositePoint(.., true))
     }
 }
 

@@ -1,0 +1,624 @@
+use std::sync::Arc;
+
+use anyhow::anyhow;
+use flow_fcs::TransformType;
+use flow_gates::{GateGeometry, create_rectangle_geometry};
+
+use crate::plotters_dioxus::{
+    gates::{
+        gate_drag::{GateDragData, PointDragData},
+        gate_single::rescale_helper,
+        gate_traits::DrawableGate,
+        gate_types::{DEFAULT_LINE, GateRenderShape, SELECTED_LINE, ShapeType},
+    },
+    plot_helpers::PlotMapper,
+};
+
+#[derive(PartialEq, Clone)]
+pub struct LineGate {
+    pub inner: flow_gates::Gate,
+    points: Vec<(f32, f32)>,
+    pub height: f32,
+    pub axis_matched: bool,
+}
+
+impl LineGate {
+    pub fn try_new(gate: flow_gates::Gate, height: f32) -> anyhow::Result<Self> {
+        let p = {
+            if let GateGeometry::Rectangle { min, max } = &gate.geometry {
+                let (x1, y1) = (
+                    min.get_coordinate(&gate.parameters.0),
+                    min.get_coordinate(&gate.parameters.1),
+                );
+                let (x2, y2) = (
+                    max.get_coordinate(&gate.parameters.0),
+                    max.get_coordinate(&gate.parameters.1),
+                );
+                if let (Some(x1), Some(y1), Some(x2), Some(y2)) = (x1, y1, x2, y2) {
+                    vec![(x1, y1), (x2, y1), (x2, y2), (x1, y2)]
+                } else {
+                    return Err(anyhow!("Invalid points for Line Gate"));
+                }
+            } else {
+                return Err(anyhow!("Invalid points for Line Gate"));
+            }
+        };
+
+        Ok(Self {
+            inner: gate,
+            points: p,
+            height: height,
+            axis_matched: true,
+        })
+    }
+
+    pub fn clone_line_for_rescaled_axis(
+        &self,
+        param: Arc<str>,
+        old: &TransformType,
+        new: &TransformType,
+    ) -> anyhow::Result<Self> {
+        let points = rescale_helper(
+            &self.get_points(),
+            &param,
+            &self.inner.parameters.0,
+            old,
+            new,
+        )?;
+        let new_geometry =
+            create_rectangle_geometry(points, &self.inner.parameters.0, &self.inner.parameters.1)?;
+        let new_gate = flow_gates::Gate {
+            id: self.inner.id.clone(),
+            parameters: self.inner.parameters.clone(),
+            geometry: new_geometry,
+            label_position: self.inner.label_position.clone(),
+            name: self.inner.name.clone(),
+            mode: self.inner.mode.clone(),
+        };
+        let mut line = LineGate::try_new(new_gate, self.height)?;
+        line.axis_matched = self.axis_matched;
+        Ok(line)
+    }
+
+    pub fn clone_line_for_axis_swap(
+        &self,
+        plot_x: &str,
+        plot_y: &str,
+    ) -> anyhow::Result<Option<Self>> {
+        let (x, y) = (&self.inner.parameters.0, &self.inner.parameters.1);
+        if plot_x == x.as_ref() && *plot_y == *y.as_ref() {
+            return Ok(None);
+        }
+
+        if plot_x == y.as_ref() && plot_y == x.as_ref() {
+            let pts: Vec<_> = self.get_points().into_iter().map(|(x, y)| (y, x)).collect();
+            let new_geometry = create_rectangle_geometry(pts, y, x)?;
+            let new_parameters = (y.clone(), x.clone());
+            let new_axis_matched = !self.axis_matched;
+            let new_gate = flow_gates::Gate {
+                id: self.inner.id.clone(),
+                parameters: new_parameters,
+                geometry: new_geometry,
+                label_position: self.inner.label_position.clone(),
+                name: self.inner.name.clone(),
+                mode: self.inner.mode.clone(),
+            };
+            let mut new_line = LineGate::try_new(new_gate, self.height)?;
+            new_line.axis_matched = new_axis_matched;
+            return Ok(Some(new_line));
+        }
+        Err(anyhow!("Axis mismatch for Line Gate"))
+    }
+
+    pub fn clone_line_for_new_point(
+        &self,
+        new_point: (f32, f32),
+        point_index: usize,
+    ) -> anyhow::Result<Self> {
+        let p = self.get_points();
+        let new_geometry = update_line_geometry(
+            p,
+            new_point,
+            point_index,
+            &self.inner.parameters.0,
+            &self.inner.parameters.1,
+            self.axis_matched,
+        )?;
+        let new_gate = flow_gates::Gate {
+            id: self.inner.id.clone(),
+            parameters: self.get_params(),
+            geometry: new_geometry,
+            label_position: self.inner.label_position.clone(),
+            name: self.inner.name.clone(),
+            mode: self.inner.mode.clone(),
+        };
+        let mut new_line = LineGate::try_new(new_gate, self.height)?;
+        new_line.axis_matched = self.axis_matched;
+        return Ok(new_line);
+    }
+}
+
+impl DrawableGate for LineGate {
+    fn clone_box(&self) -> Box<dyn DrawableGate> {
+        Box::new(self.clone())
+    }
+
+    fn get_id(&self) -> Arc<str> {
+        self.inner.id.clone()
+    }
+    fn is_composite(&self) -> bool {
+        false
+    }
+    fn get_params(&self) -> (Arc<str>, Arc<str>) {
+        self.inner.parameters.clone()
+    }
+
+    fn is_point_on_perimeter(
+        &self,
+        point: (f32, f32),
+        tolerance: (f32, f32),
+        _mapper: &PlotMapper,
+    ) -> Option<f32> {
+        is_point_on_line(self, point, tolerance, self.axis_matched)
+    }
+
+    fn match_to_plot_axis(
+        &self,
+        plot_x: &str,
+        plot_y: &str,
+    ) -> anyhow::Result<Option<Box<dyn DrawableGate>>> {
+        let line = self.clone_line_for_axis_swap(plot_x, plot_y)?;
+        match line {
+            Some(l) => Ok(Some(Box::new(l))),
+            None => Ok(None),
+        }
+    }
+
+    fn replace_point(
+        &self,
+        new_point: (f32, f32),
+        point_index: usize,
+        _mapper: &PlotMapper,
+    ) -> anyhow::Result<Box<dyn DrawableGate>> {
+        let line = self.clone_line_for_new_point(new_point, point_index)?;
+        return Ok(Box::new(line));
+    }
+
+    fn replace_points(
+        &self,
+        gate_drag_data: GateDragData,
+    ) -> anyhow::Result<Box<dyn DrawableGate>> {
+        let x_offset = gate_drag_data.offset().0;
+        let y_offset = gate_drag_data.offset().1;
+        let height;
+        let points: Vec<(f32, f32)> = match self.axis_matched {
+            true => {
+                height = gate_drag_data.current_loc().1;
+                self.get_points()
+                    .into_iter()
+                    .map(|(x, y)| (x - x_offset, y))
+                    .collect()
+            }
+            false => {
+                height = gate_drag_data.current_loc().0;
+                self.get_points()
+                    .into_iter()
+                    .map(|(x, y)| (x, y - y_offset))
+                    .collect()
+            }
+        };
+
+        if points.len() != 4 {
+            return Err(anyhow!("Line gate geometry must have exactly 4 points"));
+        }
+        let new_geometry =
+            create_rectangle_geometry(points, &self.inner.parameters.0, &self.inner.parameters.1)?;
+        let new_gate = flow_gates::Gate {
+            id: self.inner.id.clone(),
+            parameters: self.get_params(),
+            geometry: new_geometry,
+            label_position: self.inner.label_position.clone(),
+            name: self.inner.name.clone(),
+            mode: self.inner.mode.clone(),
+        };
+        let mut new_line = LineGate::try_new(new_gate, height)?;
+        new_line.axis_matched = self.axis_matched;
+        return Ok(Box::new(new_line));
+    }
+
+    fn rotate_gate(&self, _mouse_pos: (f32, f32)) -> anyhow::Result<Option<Box<dyn DrawableGate>>> {
+        Ok(None)
+    }
+
+    fn recalculate_gate_for_rescaled_axis(
+        &self,
+        param: Arc<str>,
+        old: &TransformType,
+        new: &TransformType,
+    ) -> anyhow::Result<Box<dyn DrawableGate>> {
+        let line = self.clone_line_for_rescaled_axis(param, old, new)?;
+        Ok(Box::new(line))
+    }
+
+    fn get_points(&self) -> Vec<(f32, f32)> {
+        if let GateGeometry::Rectangle { min, max } = &self.inner.geometry {
+            let (x1, y1) = (
+                min.get_coordinate(&self.inner.parameters.0),
+                min.get_coordinate(&self.inner.parameters.1),
+            );
+            let (x2, y2) = (
+                max.get_coordinate(&self.inner.parameters.0),
+                max.get_coordinate(&self.inner.parameters.1),
+            );
+            if let (Some(x1), Some(y1), Some(x2), Some(y2)) = (x1, y1, x2, y2) {
+                return vec![(x1, y1), (x2, y1), (x2, y2), (x1, y2)];
+            }
+        }
+        vec![]
+    }
+    fn is_finalised(&self) -> bool {
+        true
+    }
+    fn draw_self(
+        &self,
+        is_selected: bool,
+        drag_point: Option<PointDragData>,
+        _plot_map: &PlotMapper,
+    ) -> Vec<GateRenderShape> {
+        let style = if is_selected {
+            &SELECTED_LINE
+        } else {
+            &DEFAULT_LINE
+        };
+        let pts = self.get_points();
+        let main = draw_line(
+            pts[0],
+            pts[2],
+            self.height,
+            style,
+            ShapeType::Gate(self.inner.id.clone()),
+            &drag_point,
+            self.axis_matched,
+        );
+        let selected = if is_selected {
+            Some(draw_circles_for_line(
+                pts[0],
+                pts[2],
+                self.height,
+                &drag_point,
+                self.axis_matched,
+            ))
+        } else {
+            None
+        };
+        crate::collate_vecs!(main, selected)
+    }
+}
+
+use crate::plotters_dioxus::gates::gate_types::{DRAGGED_LINE, DrawingStyle, GREY_LINE_DASHED};
+
+pub fn create_default_line(
+    plot_map: &PlotMapper,
+    cx_raw: f32,
+    width_raw: f32,
+    x_channel: &str,
+    y_channel: &str,
+) -> anyhow::Result<GateGeometry> {
+    // let cx = plot_map.pixel_x_to_data(cx_raw, None);
+    let xmax = plot_map.pixel_x_to_data(cx_raw + (width_raw / 2f32), None);
+    let xmin = plot_map.pixel_x_to_data(cx_raw - (width_raw / 2f32), None);
+
+    // let (ymin, ymax) = plot_map.y_axis_min_max();
+
+    let max = (xmax, f32::MAX);
+    let min = (xmin, f32::MIN);
+    let coords = vec![min, max];
+    flow_gates::geometry::create_rectangle_geometry(coords, x_channel, y_channel)
+        .map_err(|_| anyhow::anyhow!("failed to create rectangle geometry"))
+}
+
+pub fn bounds_to_svg_line(
+    min: (f32, f32),
+    max: (f32, f32),
+    loc: f32,
+    axis_matched: bool,
+) -> (f32, f32, f32) {
+    if axis_matched {
+        let width = (max.0 - min.0).abs();
+        let x = min.0;
+        let y = loc;
+        (x, y, width)
+    } else {
+        let width = (max.1 - min.1).abs();
+        let x = loc;
+        let y = min.1;
+        (x, y, width)
+    }
+}
+
+pub fn bounds_to_line_coords(
+    min: (f32, f32),
+    max: (f32, f32),
+    loc: f32,
+    axis_matched: bool,
+) -> ((f32, f32), (f32, f32)) {
+    if axis_matched {
+        let width = (max.0 - min.0).abs();
+        let x1 = min.0;
+        let x2 = x1 + width;
+        let y = loc;
+        return ((x1, y), (x2, y));
+    } else {
+        let width = (max.1 - min.1).abs();
+        let x = loc;
+
+        let y1 = min.1;
+        let y2 = y1 + width;
+        return ((x, y1), (x, y2));
+    }
+}
+
+pub fn draw_line(
+    min: (f32, f32),
+    max: (f32, f32),
+    y_coord: f32,
+    style: &'static DrawingStyle,
+    shape_type: ShapeType,
+    point_drag_data: &Option<PointDragData>,
+    axis_matched: bool,
+) -> Vec<GateRenderShape> {
+    let coords = bounds_to_svg_line(min, max, y_coord, axis_matched);
+    if axis_matched {
+        let mut x1 = coords.0;
+        let mut x2 = coords.0 + coords.2;
+        let y = coords.1;
+
+        if let Some(pdd) = point_drag_data {
+            match pdd.point_index() {
+                0 => {
+                    x1 = pdd.loc().0;
+                }
+                1 => {
+                    x2 = pdd.loc().0;
+                }
+                _ => unreachable!(),
+            }
+        }
+
+        vec![GateRenderShape::Line {
+            x1: x1,
+            y1: y,
+            x2: x2,
+            y2: y,
+            style,
+            shape_type,
+        }]
+    } else {
+        let mut y1 = coords.1;
+        let mut y2 = y1 + coords.2;
+
+        if let Some(pdd) = point_drag_data {
+            match pdd.point_index() {
+                0 => {
+                    y1 = pdd.loc().1;
+                }
+                1 => {
+                    y2 = pdd.loc().1;
+                }
+                _ => unreachable!(),
+            }
+        }
+        vec![GateRenderShape::Line {
+            x1: y_coord,
+            y1: y1,
+            x2: y_coord,
+            y2: y2,
+            style,
+            shape_type,
+        }]
+    }
+}
+
+pub fn draw_circles_for_line(
+    min: (f32, f32),
+    max: (f32, f32),
+    loc: f32,
+    point_drag_data: &Option<PointDragData>,
+    axis_matched: bool,
+) -> Vec<GateRenderShape> {
+    let mut coords = bounds_to_line_coords(min, max, loc, axis_matched);
+    let style;
+    if let Some(pdd) = point_drag_data {
+        style = &DRAGGED_LINE;
+        match pdd.point_index() {
+            0 => match axis_matched {
+                true => coords.0.0 = pdd.loc().0,
+                false => coords.0.1 = pdd.loc().1,
+            },
+            1 => match axis_matched {
+                true => coords.1.0 = pdd.loc().0,
+                false => coords.1.1 = pdd.loc().1,
+            },
+            _ => unreachable!(),
+        }
+    } else {
+        style = &GREY_LINE_DASHED;
+    }
+
+    let mut x1 = coords.0.0;
+    let mut y1 = coords.0.1;
+    let mut x2 = coords.1.0;
+    let mut y2 = coords.1.1;
+
+    let (l1, l2, c1, c2) = match axis_matched {
+        true => {
+            y1 = min.1;
+            y2 = max.1;
+
+            (
+                GateRenderShape::Line {
+                    x1: x1,
+                    y1: y1,
+                    x2: x1,
+                    y2: y2,
+                    style,
+                    shape_type: ShapeType::GhostPoint,
+                },
+                GateRenderShape::Line {
+                    x1: x2,
+                    y1: y1,
+                    x2: x2,
+                    y2: y2,
+                    style,
+                    shape_type: ShapeType::GhostPoint,
+                },
+                GateRenderShape::Circle {
+                    center: (coords.0.0, coords.0.1),
+                    radius: 3.0,
+                    fill: "red",
+                    shape_type: ShapeType::Point(0),
+                },
+                GateRenderShape::Circle {
+                    center: (coords.1.0, coords.1.1),
+                    radius: 3.0,
+                    fill: "red",
+                    shape_type: ShapeType::Point(1),
+                },
+            )
+        }
+        false => {
+            x1 = min.0;
+            x2 = max.0;
+
+            (
+                GateRenderShape::Line {
+                    x1: x1,
+                    y1: y1,
+                    x2: x2,
+                    y2: y1,
+                    style,
+                    shape_type: ShapeType::GhostPoint,
+                },
+                GateRenderShape::Line {
+                    x1: x1,
+                    y1: y2,
+                    x2: x2,
+                    y2: y2,
+                    style,
+                    shape_type: ShapeType::GhostPoint,
+                },
+                GateRenderShape::Circle {
+                    center: (coords.0.0, coords.0.1),
+                    radius: 3.0,
+                    fill: "red",
+                    shape_type: ShapeType::Point(0),
+                },
+                GateRenderShape::Circle {
+                    center: (coords.1.0, coords.1.1),
+                    radius: 3.0,
+                    fill: "red",
+                    shape_type: ShapeType::Point(1),
+                },
+            )
+        }
+    };
+
+    vec![l1, l2, c1, c2]
+}
+
+pub fn is_point_on_line(
+    shape: &LineGate,
+    point: (f32, f32),
+    tolerance: (f32, f32),
+    axis_matched: bool,
+) -> Option<f32> {
+    let rect_bounds = shape.get_points();
+    if rect_bounds.len() != 4 {
+        return None;
+    }
+
+    let (min, max) = (rect_bounds[0], rect_bounds[2]);
+
+    let line_coords = bounds_to_line_coords(min, max, shape.height, axis_matched);
+
+    if let Some(dis) = shape.is_near_segment(point, line_coords.0, line_coords.1, tolerance) {
+        return Some(dis);
+    }
+    None
+}
+
+pub fn update_line_geometry(
+    mut current_rect_points: Vec<(f32, f32)>,
+    new_point: (f32, f32),
+    point_index: usize,
+    x_param: &str,
+    y_param: &str,
+    axis_matched: bool,
+) -> anyhow::Result<GateGeometry> {
+    let n = current_rect_points.len();
+    if point_index >= n {
+        return Err(anyhow::anyhow!(
+            "invalid point index for rectangle geometry"
+        ));
+    }
+    let current = new_point;
+    match axis_matched {
+        true => {
+            // [bottom-left, bottom-right, top-right, top-left]
+            let (idx_before, idx_after) = match point_index {
+                0 => {
+                    //left
+                    (0, 3)
+                }
+                1 => {
+                    //right
+                    (1, 2)
+                }
+                _ => {
+                    return Err(anyhow::anyhow!(
+                        "invalid point index for rectangle geometry"
+                    ));
+                }
+            };
+
+            let p_prev = current_rect_points[idx_before];
+            let p_next = current_rect_points[idx_after];
+
+            let prev = (current.0, p_prev.1);
+            let next = (current.0, p_next.1);
+
+            current_rect_points[idx_before] = prev;
+            current_rect_points[idx_after] = next;
+        }
+        false => {
+            // [bottom-left, bottom-right, top-right, top-left]
+            let (idx_before, idx_after) = match point_index {
+                0 => {
+                    //top - the rectangle is now rotated 90 degrees!
+                    (1, 0)
+                }
+                1 => {
+                    //bottom
+                    (2, 3)
+                }
+                _ => {
+                    return Err(anyhow::anyhow!(
+                        "invalid point index for rectangle geometry"
+                    ));
+                }
+            };
+
+            let p_prev = current_rect_points[idx_before];
+            let p_next = current_rect_points[idx_after];
+
+            let prev = (p_prev.0, current.1);
+            let next = (p_next.0, current.1);
+
+            current_rect_points[idx_before] = prev;
+            current_rect_points[idx_after] = next;
+        }
+    }
+
+    flow_gates::geometry::create_rectangle_geometry(current_rect_points, x_param, y_param)
+        .map_err(|_| anyhow::anyhow!("failed to update rectangle geometry"))
+}

@@ -1,12 +1,6 @@
 use crate::plotters_dioxus::{
     gates::{
-        GateState,
-        gate_draft::GateDraft,
-        gate_drag::{GateDragData, GateDragType, PointDragData, RotationData},
-        gate_draw_helpers::rectangle::map_rect_to_pixels,
-        gate_store::{GateStateImplExt},
-        gate_traits::DrawableGate,
-        gate_types::{GateRenderShape, GateType, ShapeType},
+        GateState, gate_draft::GateDraft, gate_drag::{GateDragData, GateDragType, PointDragData, RotationData}, gate_single::rectangle_gate, gate_store::GateStateImplExt, gate_traits::DrawableGate, gate_types::{GateRenderShape, GateType, ShapeType}
     },
     plot_helpers::PlotMapper,
 };
@@ -192,13 +186,16 @@ pub fn GateLayer(
                             if let Some(selected_gate_id) = &*selected_gate_id.peek() {
                                 match new_data {
                                     GateDragType::Point(point_drag_data) => {
-                                        gate_store
-                                            .move_gate_point(
-                                                selected_gate_id.clone().into(),
-                                                point_drag_data.point_index(),
-                                                data_coords,
-                                            )
-                                            .expect("Gate Move Failed");
+                                        if let Some(mapper) = &*plot_map.peek() {
+                                            gate_store
+                                                .move_gate_point(
+                                                    selected_gate_id.clone().into(),
+                                                    point_drag_data.point_index(),
+                                                    data_coords,
+                                                    mapper,
+                                                )
+                                                .expect("Gate Move Failed");
+                                        }
 
                                     }
                                     GateDragType::Gate(gate_drag_data) => {
@@ -284,6 +281,7 @@ pub fn GateLayer(
                                         gate_index,
                                         is_selected,
                                         drag_data: dd,
+                                        mapper: plot_map,
                                     }
                                 }
                             }
@@ -313,6 +311,7 @@ pub struct RenderGateProps {
     gate_index: usize,
     is_selected: bool,
     drag_data: Option<GateDragType>,
+    mapper: ReadSignal<Option<PlotMapper>>,
 }
 
 impl PartialEq for RenderGateProps {
@@ -321,6 +320,7 @@ impl PartialEq for RenderGateProps {
         && self.gate_index == other.gate_index
         && Arc::ptr_eq(&self.gate, &other.gate) 
         && self.drag_data == other.drag_data
+        && self.mapper == other.mapper
     } 
 }
 
@@ -350,17 +350,20 @@ fn RenderGate(props: RenderGateProps) -> Element {
     };
 
     rsx! {
-        for (shape_index , shape) in g.draw_self(is_selected, drag_data.clone()).into_iter().enumerate() {
-            RenderShape {
-                key: "{gate_id}-{shape_index}",
-                shape,
-                gate_id: gate_id.clone(),
-                gate_index: props.gate_index,
-                shape_index,
-                drag_data: if is_point { if idx == shape_index { props.drag_data.clone() } else { None } } else { props.drag_data.clone() },
+        if let Some(mapper) = &*props.mapper.read() {
+            for (shape_index , shape) in g.draw_self(is_selected, drag_data.clone(), mapper).into_iter().enumerate() {
+                RenderShape {
+                    key: "{gate_id}-{shape_index}",
+                    shape,
+                    gate_id: gate_id.clone(),
+                    gate_index: props.gate_index,
+                    shape_index,
+                    drag_data: if is_point { if idx == shape_index { props.drag_data.clone() } else { None } } else { props.drag_data.clone() },
+                }
             }
         }
     }
+     
 }
 
 fn was_gate_clicked(
@@ -376,7 +379,7 @@ fn was_gate_clicked(
     let mut closest_dist = std::f32::INFINITY;
     for gate in gates {
         if let Some(dist) = gate
-            .is_point_on_perimeter((data_x, data_y), tolerance)
+            .is_point_on_perimeter((data_x, data_y), tolerance, &mapper)
         {
             if dist < closest_dist {
                 closest_dist = dist;
@@ -424,7 +427,19 @@ fn RenderShape(
                         let p_current = mapper.data_to_pixel(offset.0, offset.1, None, None);
                         let dx = p_current.0 - p_start.0;
                         let dy = p_current.1 - p_start.1;
-                        format!("translate({} {})", -dx, -dy)
+                        if shape.is_composite() {
+                            if shape.is_axis_matched(){
+                                format!("translate({} {})", 0, -dy)
+                            } else {
+                                format!("translate({} {})", -dx, 0)
+                            }
+                            
+                        } else if shape.is_line_guide() {
+                            format!("translate({} {})", 0, 0)
+                        } else {
+                            format!("translate({} {})", -dx, -dy)
+                        }
+                        
                     } else {
                         format!("none")
                     }
@@ -486,7 +501,7 @@ fn RenderShape(
                             fill,
                             onmousedown: move |evt| {
                                 match shape_type {
-                                    ShapeType::Point(index) => {
+                                    ShapeType::Point(index) | ShapeType::CompositePoint(index, ..) => {
                                         match evt.trigger_button() {
                                             Some(dioxus_elements::input_data::MouseButton::Primary) => {
                                                 let local_coords = &evt.data.coordinates().element();
@@ -672,7 +687,7 @@ fn RenderShape(
                 style,
                 shape_type: _,
             } => {
-                let (mx, my, m_width, m_height) = map_rect_to_pixels(x, y, width, height, mapper);
+                let (mx, my, m_width, m_height) = rectangle_gate::map_rect_to_pixels(x, y, width, height, mapper);
 
                 rsx! {
                     g { transform,

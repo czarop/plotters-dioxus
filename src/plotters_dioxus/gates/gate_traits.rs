@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use flow_fcs::TransformType;
 
-use crate::plotters_dioxus::gates::{
-    GateId, gate_drag::{GateDragData, PointDragData}, gate_types::GateRenderShape
-};
+use crate::plotters_dioxus::{gates::{
+    gate_drag::{GateDragData, PointDragData}, gate_types::GateRenderShape
+}, plot_helpers::PlotMapper};
 
 pub trait DrawableGate {
     fn get_points(&self) -> Vec<(f32, f32)>;
@@ -14,6 +14,7 @@ pub trait DrawableGate {
         &self,
         is_selected: bool,
         drag_point: Option<PointDragData>,
+        plot_map: &PlotMapper,
     ) -> Vec<GateRenderShape>;
 
     fn is_near_segment(
@@ -65,7 +66,7 @@ pub trait DrawableGate {
 
     // fn set_drag_point(&mut self, drag_data: Option<PointDragData>);
 
-    fn is_point_on_perimeter(&self, point: (f32, f32), tolerance: (f32, f32)) -> Option<f32>;
+    fn is_point_on_perimeter(&self, point: (f32, f32), tolerance: (f32, f32), mapper: &PlotMapper,) -> Option<f32>;
 
     fn match_to_plot_axis(
         &self,
@@ -89,6 +90,7 @@ pub trait DrawableGate {
         &self,
         new_point: (f32, f32),
         point_index: usize,
+        plot_map: &PlotMapper,
     ) -> anyhow::Result<Box<dyn DrawableGate>>;
 
     fn replace_points(&self, gate_drag_data: GateDragData)
