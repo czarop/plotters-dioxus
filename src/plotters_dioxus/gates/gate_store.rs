@@ -10,7 +10,7 @@ use std::{
 use crate::plotters_dioxus::{
     AxisInfo,
     gates::{
-        gate_composite::bisector_gate::BisectorGate, gate_drag::GateDragData, gate_single::{ellipse_gate::{EllipseGate, create_default_ellipse}, line_gate::{LineGate, create_default_line}, polygon_gate::PolygonGate, rectangle_gate::{RectangleGate, create_default_rectangle}}, gate_traits::DrawableGate, gate_types::GateType
+        gate_composite::{bisector_gate::BisectorGate, quadrant_gate::QuadrantGate, skewed_quadrant_gate::SkewedQuadrantGate}, gate_drag::GateDragData, gate_single::{ellipse_gate::{EllipseGate, create_default_ellipse}, line_gate::{LineGate, create_default_line}, polygon_gate::PolygonGate, rectangle_gate::{RectangleGate, create_default_rectangle}}, gate_traits::DrawableGate, gate_types::GateType
     }, plot_helpers::PlotMapper,
 };
 
@@ -191,8 +191,10 @@ impl<Lens> Store<GateState, Lens> {
 
             Arc::new(BisectorGate::try_new(mapper, Arc::from(id.as_str()), (click_x, click_y), x_param, y_param)?)
         },
-        GateType::Quadrant => todo!(),
-        GateType::FlexiQuadrant => todo!(),
+        GateType::Quadrant => {
+            Arc::new(QuadrantGate::try_new_from_raw_coord(mapper, Arc::from(id.as_str()), (click_x, click_y), x_param, y_param)?)
+        },
+        GateType::SkewedQuadrant => Arc::new(SkewedQuadrantGate::try_new_from_raw_coord(mapper, Arc::from(id.as_str()), (click_x, click_y), x_param, y_param)?),
     };
 
 
@@ -293,7 +295,7 @@ impl<Lens> Store<GateState, Lens> {
             .gate_registry()
             .get_mut(&gate_drag_data.gate_id())
         {
-            if let Ok(new_gate_box) = gate_ptr.replace_points(gate_drag_data) {
+            if let Ok(Some(new_gate_box)) = gate_ptr.replace_points(gate_drag_data) {
                 *gate_ptr = Arc::from(new_gate_box);
             }
         }

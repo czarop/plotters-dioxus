@@ -7,10 +7,7 @@ use std::sync::Arc;
 
 use crate::plotters_dioxus::{
     gates::{
-        gate_drag::PointDragData,
-        gate_single::{polygon_gate::PolygonGate},
-        gate_traits::DrawableGate,
-        gate_types::{DEFAULT_LINE, GREY_LINE_DASHED, GateRenderShape, SELECTED_LINE, ShapeType},
+        gate_composite::bisector_gate::BisectorGate, gate_drag::PointDragData, gate_single::polygon_gate::PolygonGate, gate_traits::DrawableGate, gate_types::{DEFAULT_LINE, GREY_LINE_DASHED, GateRenderShape, SELECTED_LINE, ShapeType}
     },
     plot_helpers::PlotMapper,
 };
@@ -27,18 +24,28 @@ pub struct QuadrantGate {
 }
 
 impl QuadrantGate {
-    pub fn try_new(
+    pub fn try_new_from_raw_coord(
         plot_map: &PlotMapper,
         id: Arc<str>,
-        click_loc: (f32, f32),
+        click_loc_raw: (f32, f32),
         x_axis_param: Arc<str>,
         y_axis_param: Arc<str>,
     ) -> anyhow::Result<Self> {
+        let click_loc_data = plot_map.pixel_to_data(click_loc_raw.0, click_loc_raw.1, None, None);
+        QuadrantGate::try_new_from_data_coord(id, click_loc_data, x_axis_param, y_axis_param, true)
+    }
+
+    pub fn try_new_from_data_coord(
+        id: Arc<str>,
+        click_loc_data: (f32, f32),
+        x_axis_param: Arc<str>,
+        y_axis_param: Arc<str>,
+        axis_matched: bool,
+    ) -> anyhow::Result<Self> {
         let mut gate_map = FxIndexMap::default();
         let parameters = (x_axis_param.clone(), y_axis_param.clone());
-        let click_data = plot_map.pixel_to_data(click_loc.0, click_loc.1, None, None);
 
-        let geos = create_default_quadrant(plot_map, click_loc.0, click_loc.1, &x_axis_param, &y_axis_param)?;
+        let geos = create_quadrant_geos(click_loc_data.0, click_loc_data.1, &x_axis_param, &y_axis_param)?;
         let id_top_left = format!("{id}_TL");
         let id_top_right = format!("{id}_TR");
         let id_bottom_left = format!("{id}_BL");
@@ -92,13 +99,13 @@ impl QuadrantGate {
         gate_map.insert(id_top_right_arc, lg_tr);
         gate_map.insert(id_top_left_arc, lg_tl);
 
-        let points = click_data;
+        let points = click_loc_data;
 
         Ok(Self {
             gates: gate_map,
             id,
             points,
-            axis_matched: true,
+            axis_matched: axis_matched,
             parameters: (x_axis_param, y_axis_param),
         })
     }
@@ -145,15 +152,23 @@ impl QuadrantGate {
         })
     }
 
+    fn clone_with_point(
+        &self,
+        cx: f32,
+        cy: f32,
+    ) -> anyhow::Result<Self> {
+        let (x_axis_param, y_axis_param) = self.parameters.clone();
+        QuadrantGate::try_new_from_data_coord(self.id.clone(), (cx, cy), x_axis_param, y_axis_param, self.axis_matched)
+
+
+    }
+
     pub fn get_subgate_map(&self) -> &FxIndexMap<Arc<str>, PolygonGate> {
         &self.gates
     }
 }
 
 impl super::super::gate_traits::DrawableGate for QuadrantGate {
-    fn get_points(&self) -> Vec<(f32, f32)> {
-        return vec![self.points];
-    }
 
     fn is_finalised(&self) -> bool {
         true
@@ -173,20 +188,12 @@ impl super::super::gate_traits::DrawableGate for QuadrantGate {
         let mut center = self.points;
 
         if let Some(dd) = drag_point {
-            if self.axis_matched {
-                center = (dd.loc().0, center.1);
-            } else {
-                center = (center.0, dd.loc().1);
-            }
+
+            center = dd.loc();
+
+
         };
 
-        let center_tab_height = {
-            if self.axis_matched {
-                (max.1 - min.1) * 0.02
-            } else {
-                (max.0 - min.0) * 0.02
-            }
-        };
         let style = if is_selected {
             &SELECTED_LINE
         } else {
@@ -194,50 +201,29 @@ impl super::super::gate_traits::DrawableGate for QuadrantGate {
         };
 
         let main = {
-            let left = GateRenderShape::Line {
-                x1: if self.axis_matched { min.0 } else { center.0 },
-                y1: if self.axis_matched { center.1 } else { min.1 },
-                x2: center.0,
+
+            let horizontal = GateRenderShape::Line {
+                x1: min.0,
+                y1: center.1,
+                x2: max.0,
                 y2: center.1,
                 style,
-                shape_type: ShapeType::CompositeGate(self.id.clone(), self.axis_matched),
+                shape_type: ShapeType::UndraggableLine,
             };
 
-            let right = GateRenderShape::Line {
+            let vertical = GateRenderShape::Line {
                 x1: center.0,
-                y1: center.1,
-                x2: if self.axis_matched { max.0 } else { center.0 },
-                y2: if self.axis_matched { center.1 } else { max.1 },
+                y1: min.1,
+                x2: center.0,
+                y2: max.1,
                 style,
-                shape_type: ShapeType::CompositeGate(self.id.clone(), self.axis_matched),
+                shape_type: ShapeType::UndraggableLine,
             };
+            
+            
 
-            let center_tab = GateRenderShape::Line {
-                x1: if self.axis_matched {
-                    center.0
-                } else {
-                    center.0 - center_tab_height
-                },
-                y1: if self.axis_matched {
-                    center.1 - center_tab_height
-                } else {
-                    center.1
-                },
-                x2: if self.axis_matched {
-                    center.0
-                } else {
-                    center.0 + center_tab_height
-                },
-                y2: if self.axis_matched {
-                    center.1 + center_tab_height
-                } else {
-                    center.1
-                },
-                style,
-                shape_type: ShapeType::CompositeGate(self.id.clone(), self.axis_matched),
-            };
 
-            Some(vec![left, right, center_tab])
+            Some(vec![horizontal, vertical])
         };
 
         let selected = if is_selected {
@@ -245,18 +231,10 @@ impl super::super::gate_traits::DrawableGate for QuadrantGate {
                 center,
                 radius: 3.0,
                 fill: "red",
-                shape_type: ShapeType::CompositePoint(0, self.axis_matched),
-            };
-            let line = GateRenderShape::Line {
-                x1: if self.axis_matched { center.0 } else { min.0 },
-                y1: if self.axis_matched { min.1 } else { center.1 },
-                x2: if self.axis_matched { center.0 } else { max.0 },
-                y2: if self.axis_matched { max.1 } else { center.1 },
-                style: &GREY_LINE_DASHED,
-                shape_type: ShapeType::LineGuide,
+                shape_type: ShapeType::UndraggablePoint(0),
             };
 
-            Some(vec![line, p])
+            Some(vec![p])
         } else {
             None
         };
@@ -333,17 +311,9 @@ impl super::super::gate_traits::DrawableGate for QuadrantGate {
         old_transform: &TransformType,
         new_transform: &TransformType,
     ) -> anyhow::Result<Box<dyn super::super::gate_traits::DrawableGate>> {
-        let mut new_gate_map = FxIndexMap::default();
-
-        for gate in self.gates.values() {
-            match gate.clone_polygon_for_rescaled_axis(param.clone(), old_transform, new_transform) {
-                Ok(g) => {
-                    new_gate_map.insert(gate.get_id(), g);
-                }
-                Err(e) => return Err(e),
-            }
-        }
-        Ok(self.clone_with_gates(new_gate_map, false))
+        let(x_param, _) = &self.parameters;
+        let (cx, cy) = crate::plotters_dioxus::gates::gate_single::rescale_helper_point(self.points, &param, x_param, old_transform, new_transform)?;
+        Ok(Box::new(self.clone_with_point(cx, cy)?))
     }
 
     fn rotate_gate(
@@ -357,52 +327,16 @@ impl super::super::gate_traits::DrawableGate for QuadrantGate {
         &self,
         new_point: (f32, f32),
         _point_index: usize,
-        mapper: &PlotMapper,
+        _mapper: &PlotMapper,
     ) -> anyhow::Result<Box<dyn super::super::gate_traits::DrawableGate>> {
-        let mut new_gate_map = FxIndexMap::default();
-        let new_cx = new_point.0;
-        let new_cy = new_point.1;
-        for (i, (id, gate)) in self.gates.iter().enumerate() {
-            // let p_index = if i == 0 { 1 } else { 0 };
-            // let old_p = gate.get_points()[p_index];
-            let p_index = if i == 0 { 1 } else { 0 };
-            let old_p = gate.get_points()[p_index];
-            println!("old points: {:?}", gate.get_points());
-            let target_p = if self.axis_matched {
-                (new_cx, old_p.1)
-            } else {
-                (old_p.0, new_cy)
-            };
-            println!(
-                "old point {:?}, new point {:?} inserted at {}",
-                old_p, target_p, p_index
-            );
-            let new_gate = gate.clone_polygon_for_new_point(target_p, p_index, mapper)?;
-            println!("new points: {:?}", gate.get_points());
-            new_gate_map.insert(id.clone(), new_gate);
-        }
-        if self.axis_matched {
-            Ok(self.clone_with_gates_and_loc(new_gate_map, new_point.0, self.points.1))
-        } else {
-            Ok(self.clone_with_gates_and_loc(new_gate_map, self.points.0, new_point.1))
-        }
+        Ok(Box::new(self.clone_with_point(new_point.0, new_point.1)?))
     }
 
     fn replace_points(
         &self,
-        gate_drag_data: super::super::gate_drag::GateDragData,
-    ) -> anyhow::Result<Box<dyn super::super::gate_traits::DrawableGate>> {
-        let (x_offset, y_offset) = gate_drag_data.offset();
-        let mut new_self = self.clone();
-        let mut new_points = self.points.clone();
-        if self.axis_matched {
-            new_points.1 = self.points.1 - y_offset;
-        } else {
-            new_points.0 = self.points.0 - x_offset;
-        }
-
-        new_self.points = new_points;
-        Ok(Box::new(new_self))
+        _gate_drag_data: super::super::gate_drag::GateDragData,
+    ) -> anyhow::Result<Option<Box<dyn super::super::gate_traits::DrawableGate>>> {
+        Ok(None)
     }
 
     fn clone_box(&self) -> Box<dyn super::super::gate_traits::DrawableGate> {
@@ -410,14 +344,14 @@ impl super::super::gate_traits::DrawableGate for QuadrantGate {
     }
 }
 
-fn create_default_quadrant(
-    plot_map: &PlotMapper,
-    cx_raw: f32,
-    cy_raw: f32,
+
+fn create_quadrant_geos(
+    cx: f32,
+    cy: f32,
     x_channel: &str,
     y_channel: &str,
 ) -> anyhow::Result<(GateGeometry, GateGeometry, GateGeometry, GateGeometry)> {
-    let center = plot_map.pixel_to_data(cx_raw, cy_raw, None, None);
+    let center = (cx, cy);
     
     let bl1 = (f32::MIN, f32::MIN);
     let bl2 = (center.0, f32::MIN);

@@ -8,6 +8,8 @@ const GATE_CONFIG: &[(GateType, &str)] = &[
     (GateType::Rectangle, "R"),
     (GateType::Line(None), "L"),
     (GateType::Bisector, "B"),
+    (GateType::Quadrant, "Q"),
+    (GateType::SkewedQuadrant, "S"),
 ];
 
 #[component]

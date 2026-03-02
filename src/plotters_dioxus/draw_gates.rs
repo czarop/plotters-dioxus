@@ -427,15 +427,15 @@ fn RenderShape(
                         let p_current = mapper.data_to_pixel(offset.0, offset.1, None, None);
                         let dx = p_current.0 - p_start.0;
                         let dy = p_current.1 - p_start.1;
-                        if shape.is_composite() {
+                        if shape.is_undraggable() {
+                            format!("none")
+                        } else if shape.is_composite() {
                             if shape.is_axis_matched(){
                                 format!("translate({} {})", 0, -dy)
                             } else {
                                 format!("translate({} {})", -dx, 0)
                             }
                             
-                        } else if shape.is_line_guide() {
-                            format!("translate({} {})", 0, 0)
                         } else {
                             format!("translate({} {})", -dx, -dy)
                         }
@@ -501,7 +501,9 @@ fn RenderShape(
                             fill,
                             onmousedown: move |evt| {
                                 match shape_type {
-                                    ShapeType::Point(index) | ShapeType::CompositePoint(index, ..) => {
+                                    ShapeType::Point(index)
+                                    | ShapeType::CompositePoint(index, ..)
+                                    | ShapeType::UndraggablePoint(index) => {
                                         match evt.trigger_button() {
                                             Some(dioxus_elements::input_data::MouseButton::Primary) => {
                                                 let local_coords = &evt.data.coordinates().element();

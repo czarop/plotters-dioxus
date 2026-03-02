@@ -8,7 +8,7 @@ use std::{ops::Index, sync::Arc};
 use crate::plotters_dioxus::{
     gates::{
         gate_drag::PointDragData,
-        gate_single::{line_gate::LineGate, rescale_helper, rescale_helper_point},
+        gate_single::{line_gate::LineGate, rescale_helper_point},
         gate_traits::DrawableGate,
         gate_types::{DEFAULT_LINE, GREY_LINE_DASHED, GateRenderShape, SELECTED_LINE, ShapeType},
     },
@@ -184,9 +184,7 @@ impl BisectorGate {
 }
 
 impl super::super::gate_traits::DrawableGate for BisectorGate {
-    fn get_points(&self) -> Vec<(f32, f32)> {
-        return vec![self.points];
-    }
+
 
     fn is_finalised(&self) -> bool {
         true
@@ -227,50 +225,48 @@ impl super::super::gate_traits::DrawableGate for BisectorGate {
         };
 
         let main = {
-            let left = GateRenderShape::Line {
-                x1: if self.axis_matched { min.0 } else { center.0 },
-                y1: if self.axis_matched { center.1 } else { min.1 },
-                x2: center.0,
+            let l;
+            let center_tab;
+            if self.axis_matched{
+                l = GateRenderShape::Line {
+                x1: min.0,
+                y1: center.1,
+                x2: max.0,
                 y2: center.1,
                 style,
                 shape_type: ShapeType::CompositeGate(self.id.clone(), self.axis_matched),
             };
 
-            let right = GateRenderShape::Line {
+            center_tab = GateRenderShape::Line {
                 x1: center.0,
+                y1: center.1 - center_tab_height,
+                x2: center.0,
+                y2: center.1 + center_tab_height,
+                style,
+                shape_type: ShapeType::CompositeGate(self.id.clone(), self.axis_matched),
+            };
+            } else {
+                l = GateRenderShape::Line {
+                x1: center.0,
+                y1: min.1 ,
+                x2: center.0 ,
+                y2: max.1,
+                style,
+                shape_type: ShapeType::CompositeGate(self.id.clone(), self.axis_matched),
+            };
+
+            center_tab = GateRenderShape::Line {
+                x1: center.0 - center_tab_height,
                 y1: center.1,
-                x2: if self.axis_matched { max.0 } else { center.0 },
-                y2: if self.axis_matched { center.1 } else { max.1 },
+                x2: center.0 + center_tab_height,
+                y2: center.1,
                 style,
                 shape_type: ShapeType::CompositeGate(self.id.clone(), self.axis_matched),
             };
+            }
+            
 
-            let center_tab = GateRenderShape::Line {
-                x1: if self.axis_matched {
-                    center.0
-                } else {
-                    center.0 - center_tab_height
-                },
-                y1: if self.axis_matched {
-                    center.1 - center_tab_height
-                } else {
-                    center.1
-                },
-                x2: if self.axis_matched {
-                    center.0
-                } else {
-                    center.0 + center_tab_height
-                },
-                y2: if self.axis_matched {
-                    center.1 + center_tab_height
-                } else {
-                    center.1
-                },
-                style,
-                shape_type: ShapeType::CompositeGate(self.id.clone(), self.axis_matched),
-            };
-
-            Some(vec![left, right, center_tab])
+            Some(vec![l, center_tab])
         };
 
         let selected = if is_selected {
@@ -280,14 +276,28 @@ impl super::super::gate_traits::DrawableGate for BisectorGate {
                 fill: "red",
                 shape_type: ShapeType::CompositePoint(0, self.axis_matched),
             };
-            let line = GateRenderShape::Line {
-                x1: if self.axis_matched { center.0 } else { min.0 },
-                y1: if self.axis_matched { min.1 } else { center.1 },
-                x2: if self.axis_matched { center.0 } else { max.0 },
-                y2: if self.axis_matched { max.1 } else { center.1 },
+            let line = if self.axis_matched{
+                GateRenderShape::Line {
+                x1: center.0,
+                y1: min.1,
+                x2:center.0,
+                y2: max.1,
                 style: &GREY_LINE_DASHED,
-                shape_type: ShapeType::LineGuide,
+                shape_type: ShapeType::UndraggableLine,
+            }
+            } else {
+                GateRenderShape::Line {
+                x1: min.0 ,
+                y1: center.1,
+                x2: max.0,
+                y2: center.1,
+                style: &GREY_LINE_DASHED,
+                shape_type: ShapeType::UndraggableLine,
+            }
+            
             };
+
+            
 
             Some(vec![line, p])
         } else {
@@ -387,7 +397,7 @@ impl super::super::gate_traits::DrawableGate for BisectorGate {
         let new_cy = new_point.1;
         for (i, (id, gate)) in self.gates.iter().enumerate() {
             let p_index = if i == 0 { 1 } else { 0 };
-            let old_p = gate.get_points()[p_index];
+            let old_p = gate.points[p_index];
             let target_p = if self.axis_matched {
                 (new_cx, old_p.1)
             } else {
@@ -406,7 +416,7 @@ impl super::super::gate_traits::DrawableGate for BisectorGate {
     fn replace_points(
         &self,
         gate_drag_data: super::super::gate_drag::GateDragData,
-    ) -> anyhow::Result<Box<dyn super::super::gate_traits::DrawableGate>> {
+    ) -> anyhow::Result<Option<Box<dyn super::super::gate_traits::DrawableGate>>> {
         let (x_offset, y_offset) = gate_drag_data.offset();
         let mut new_self = self.clone();
         let mut new_points = self.points.clone();
@@ -417,7 +427,7 @@ impl super::super::gate_traits::DrawableGate for BisectorGate {
         }
 
         new_self.points = new_points;
-        Ok(Box::new(new_self))
+        Ok(Some(Box::new(new_self)))
     }
 
     fn clone_box(&self) -> Box<dyn super::super::gate_traits::DrawableGate> {

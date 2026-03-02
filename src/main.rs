@@ -1,10 +1,9 @@
 #![allow(non_snake_case)]
 
 use clingate::plotters_dioxus::route::Route;
-use dioxus::{
-    desktop::{Config, LogicalSize, WindowBuilder},
-    prelude::*,
-};
+use dioxus::prelude::*;
+#[cfg(feature = "desktop")]
+use dioxus::desktop::{Config, LogicalSize, WindowBuilder};
 
 static NAV_STYLE: Asset = asset!("assets/navbar.css");
 static COMPONENTS_STYLE: Asset = asset!("assets/dx-components-theme.css");
@@ -20,15 +19,24 @@ fn App() -> Element {
     }
 }
 
+#[cfg(feature = "desktop")]
 fn main() {
-    LaunchBuilder::new()
+    use dioxus::desktop::{Config, WindowBuilder, LogicalSize};
+
+    dioxus::LaunchBuilder::new()
         .with_cfg(
             Config::new().with_window(
                 WindowBuilder::new()
                     .with_title("FCS Plot Viewer")
-                    .with_always_on_top(false)
                     .with_inner_size(LogicalSize::new(1200.0, 900.0)),
             ),
         )
         .launch(App);
+}
+
+#[cfg(not(feature = "desktop"))]
+fn main() {
+    // For Web, we use the simple launch
+    // Dioxus handles the WASM panic hook and browser mounting automatically
+    dioxus::launch(App);
 }

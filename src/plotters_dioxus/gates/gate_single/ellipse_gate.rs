@@ -46,6 +46,23 @@ impl EllipseGate {
             points: p,
         })
     }
+
+    fn get_points(&self) -> Vec<(f32, f32)> {
+        if let GateGeometry::Ellipse {
+            center,
+            radius_x,
+            radius_y,
+            angle,
+        } = &self.inner.geometry
+        {
+            let cx = center.get_coordinate(&self.inner.parameters.0);
+            let cy = center.get_coordinate(&self.inner.parameters.1);
+            if let (Some(cx), Some(cy)) = (cx, cy) {
+                return calculate_ellipse_nodes(cx, cy, *radius_x, *radius_y, *angle);
+            }
+        }
+        vec![]
+    }
 }
 
 impl DrawableGate for EllipseGate {
@@ -169,7 +186,7 @@ impl DrawableGate for EllipseGate {
     fn replace_points(
         &self,
         gate_drag_data: GateDragData,
-    ) -> anyhow::Result<Box<dyn DrawableGate>> {
+    ) -> anyhow::Result<Option<Box<dyn DrawableGate>>> {
         let x_offset = gate_drag_data.offset().0;
         let y_offset = gate_drag_data.offset().1;
         let points = self
@@ -188,7 +205,7 @@ impl DrawableGate for EllipseGate {
             name: self.inner.name.clone(),
             mode: self.inner.mode.clone(),
         };
-        Ok(Box::new(EllipseGate::try_new(new_gate)?))
+        Ok(Some(Box::new(EllipseGate::try_new(new_gate)?)))
     }
 
     fn rotate_gate(&self, mouse_pos: (f32, f32)) -> anyhow::Result<Option<Box<dyn DrawableGate>>> {
@@ -250,22 +267,7 @@ impl DrawableGate for EllipseGate {
         Ok(Box::new(EllipseGate::try_new(new_gate)?))
     }
 
-    fn get_points(&self) -> Vec<(f32, f32)> {
-        if let GateGeometry::Ellipse {
-            center,
-            radius_x,
-            radius_y,
-            angle,
-        } = &self.inner.geometry
-        {
-            let cx = center.get_coordinate(&self.inner.parameters.0);
-            let cy = center.get_coordinate(&self.inner.parameters.1);
-            if let (Some(cx), Some(cy)) = (cx, cy) {
-                return calculate_ellipse_nodes(cx, cy, *radius_x, *radius_y, *angle);
-            }
-        }
-        vec![]
-    }
+    
     fn is_finalised(&self) -> bool {
         true
     }

@@ -60,7 +60,7 @@ impl RectangleGate {
             return Ok(None);
         }
         if plot_x == y.as_ref() && plot_y == x.as_ref() {
-            let pts: Vec<_> = self.get_points().into_iter().map(|(x, y)| (y, x)).collect();
+            let pts: Vec<_> = self.points.iter().map(|&(x, y)| (y, x)).collect();
             let new_geometry = create_rectangle_geometry(pts, y, x)?;
             let new_parameters = (y.clone(), x.clone());
             let new_gate = flow_gates::Gate {
@@ -83,7 +83,7 @@ impl RectangleGate {
         new: &TransformType,
     ) -> anyhow::Result<RectangleGate> {
         let points = rescale_helper(
-            &self.get_points(),
+            &self.points.to_vec(),
             &param,
             &self.inner.parameters.0,
             old,
@@ -108,9 +108,9 @@ impl RectangleGate {
         point_index: usize,
         _mapper: &PlotMapper,
     ) -> anyhow::Result<Self> {
-        let p = self.get_points();
+        let p = &self.points;
         let new_geometry = update_rectangle_geometry(
-            p,
+            p.to_vec(),
             new_point,
             point_index,
             &self.inner.parameters.0,
@@ -174,12 +174,12 @@ impl DrawableGate for RectangleGate {
     fn replace_points(
         &self,
         gate_drag_data: GateDragData,
-    ) -> anyhow::Result<Box<dyn DrawableGate>> {
+    ) -> anyhow::Result<Option<Box<dyn DrawableGate>>> {
         let x_offset = gate_drag_data.offset().0;
         let y_offset = gate_drag_data.offset().1;
         let points = self
-            .get_points()
-            .into_iter()
+            .points
+            .iter()
             .map(|(x, y)| (x - x_offset, y - y_offset))
             .collect();
         let new_geometry =
@@ -192,7 +192,7 @@ impl DrawableGate for RectangleGate {
             name: self.inner.name.clone(),
             mode: self.inner.mode.clone(),
         };
-        Ok(Box::new(RectangleGate::try_new(new_gate)?))
+        Ok(Some(Box::new(RectangleGate::try_new(new_gate)?)))
     }
 
     fn rotate_gate(&self, _mouse_pos: (f32, f32)) -> anyhow::Result<Option<Box<dyn DrawableGate>>> {
@@ -208,9 +208,7 @@ impl DrawableGate for RectangleGate {
         Ok(Box::new(self.clone_rectangle_for_rescaled_axis(param, old, new)?))
     }
 
-    fn get_points(&self) -> Vec<(f32, f32)> {
-        self.points.clone()
-    }
+
 
     fn is_finalised(&self) -> bool {
         true
@@ -325,7 +323,7 @@ pub fn is_point_on_rectangle_perimeter(
     point: (f32, f32),
     tolerance: (f32, f32),
 ) -> Option<f32> {
-    let points = shape.get_points();
+    let points = &shape.points;
     if points.len() < 2 {
         return None;
     }

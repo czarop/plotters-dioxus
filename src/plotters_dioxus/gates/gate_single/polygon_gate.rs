@@ -116,6 +116,21 @@ impl PolygonGate {
         };
         Ok(PolygonGate::try_new(new_gate)?)
     }
+
+    fn get_points(&self) -> Vec<(f32, f32)> {
+        if let GateGeometry::Polygon { nodes, .. } = &self.inner.geometry {
+            return nodes
+                .iter()
+                .filter_map(|n| {
+                    Some((
+                        n.get_coordinate(&self.inner.parameters.0)?,
+                        n.get_coordinate(&self.inner.parameters.1)?,
+                    ))
+                })
+                .collect();
+        }
+        vec![]
+    }
 }
 
 impl DrawableGate for PolygonGate {
@@ -164,7 +179,7 @@ impl DrawableGate for PolygonGate {
     fn replace_points(
         &self,
         gate_drag_data: GateDragData,
-    ) -> anyhow::Result<Box<dyn DrawableGate>> {
+    ) -> anyhow::Result<Option<Box<dyn DrawableGate>>> {
         let x_offset = gate_drag_data.offset().0;
         let y_offset = gate_drag_data.offset().1;
         let points = self
@@ -182,7 +197,7 @@ impl DrawableGate for PolygonGate {
             name: self.inner.name.clone(),
             mode: self.inner.mode.clone(),
         };
-        Ok(Box::new(PolygonGate::try_new(new_gate)?))
+        Ok(Some(Box::new(PolygonGate::try_new(new_gate)?)))
     }
 
     fn rotate_gate(&self, _mouse_pos: (f32, f32)) -> anyhow::Result<Option<Box<dyn DrawableGate>>> {
@@ -198,20 +213,7 @@ impl DrawableGate for PolygonGate {
         Ok(Box::new(self.clone_polygon_for_rescaled_axis(param, old, new)?))
     }
 
-    fn get_points(&self) -> Vec<(f32, f32)> {
-        if let GateGeometry::Polygon { nodes, .. } = &self.inner.geometry {
-            return nodes
-                .iter()
-                .filter_map(|n| {
-                    Some((
-                        n.get_coordinate(&self.inner.parameters.0)?,
-                        n.get_coordinate(&self.inner.parameters.1)?,
-                    ))
-                })
-                .collect();
-        }
-        vec![]
-    }
+    
     fn is_finalised(&self) -> bool {
         true
     }

@@ -10,14 +10,14 @@ pub enum GateType {
     Line(Option<f32>),
     Bisector,
     Quadrant,
-    FlexiQuadrant,
+    SkewedQuadrant,
 }
 
 impl GateType {
     pub fn is_composite(&self) -> bool {
         matches!(
             self,
-            GateType::Bisector | GateType::Quadrant | GateType::FlexiQuadrant
+            GateType::Bisector | GateType::Quadrant | GateType::SkewedQuadrant
         )
     }
 
@@ -36,7 +36,8 @@ pub enum ShapeType {
     GhostPoint,
     DraftGate,
     Rotation(f32),
-    LineGuide
+    UndraggableLine,
+    UndraggablePoint(usize),
 }
 
 #[derive(PartialEq, Clone)]
@@ -301,10 +302,10 @@ impl GateRenderShape {
             GateRenderShape::Line { shape_type, .. } => shape_type,
         };
 
-        matches!(st, ShapeType::CompositeGate { .. } | ShapeType::CompositePoint(..))
+        matches!(st, ShapeType::CompositeGate { .. } | ShapeType::CompositePoint(..) |  ShapeType::UndraggableLine | ShapeType::UndraggablePoint(..))
     }
 
-    pub fn is_line_guide(&self) -> bool {
+    pub fn is_undraggable(&self) -> bool {
         let st = match self {
             GateRenderShape::PolyLine { shape_type, .. } |
             GateRenderShape::Circle { shape_type, .. } |
@@ -315,7 +316,7 @@ impl GateRenderShape {
             GateRenderShape::Line { shape_type, .. } => shape_type,
         };
 
-        matches!(st, ShapeType::LineGuide)
+        matches!(st, ShapeType::UndraggableLine | ShapeType::UndraggablePoint(..))
     }
 
     pub fn is_axis_matched(&self) -> bool {

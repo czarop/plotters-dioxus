@@ -7,7 +7,7 @@ use crate::plotters_dioxus::{gates::{
 }, plot_helpers::PlotMapper};
 
 pub trait DrawableGate {
-    fn get_points(&self) -> Vec<(f32, f32)>;
+    // fn get_points(&self) -> Vec<(f32, f32)>;
     fn is_finalised(&self) -> bool;
 
     fn draw_self(
@@ -94,7 +94,7 @@ pub trait DrawableGate {
     ) -> anyhow::Result<Box<dyn DrawableGate>>;
 
     fn replace_points(&self, gate_drag_data: GateDragData)
-    -> anyhow::Result<Box<dyn DrawableGate>>;
+    -> anyhow::Result<Option<Box<dyn DrawableGate>>>;
 
     fn clone_box(&self) -> Box<dyn DrawableGate>;
 }
