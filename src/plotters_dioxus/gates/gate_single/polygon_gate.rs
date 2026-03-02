@@ -41,6 +41,81 @@ impl PolygonGate {
             points: p,
         })
     }
+
+    pub fn clone_polygon_for_axis_swap(
+        &self,
+        plot_x: &str,
+        plot_y: &str,
+    ) -> anyhow::Result<Option<Self>> {
+        let (x, y) = (&self.inner.parameters.0, &self.inner.parameters.1);
+        if plot_x == x.as_ref() && *plot_y == *y.as_ref() {
+            return Ok(None);
+        }
+        if plot_x == y.as_ref() && plot_y == x.as_ref() {
+            let pts: Vec<_> = self.get_points().into_iter().map(|(x, y)| (y, x)).collect();
+            let new_geometry = create_polygon_geometry(pts, y, x)?;
+            let new_parameters = (y.clone(), x.clone());
+            let new_gate = flow_gates::Gate {
+                id: self.inner.id.clone(),
+                parameters: new_parameters,
+                geometry: new_geometry,
+                label_position: self.inner.label_position.clone(),
+                name: self.inner.name.clone(),
+                mode: self.inner.mode.clone(),
+            };
+            return Ok(Some(PolygonGate::try_new(new_gate)?));
+        }
+        Err(anyhow!("Axis mismatch for Polygon Gate"))
+    }
+
+    pub fn clone_polygon_for_rescaled_axis(
+        &self,
+        param: Arc<str>,
+        old: &TransformType,
+        new: &TransformType,
+    ) -> anyhow::Result<Self> {
+        let points = rescale_helper(
+            &self.get_points(),
+            &param,
+            &self.inner.parameters.0,
+            old,
+            new,
+        )?;
+        let new_geometry =
+            create_polygon_geometry(points, &self.inner.parameters.0, &self.inner.parameters.1)?;
+        let new_gate = flow_gates::Gate {
+            id: self.inner.id.clone(),
+            parameters: self.inner.parameters.clone(),
+            geometry: new_geometry,
+            label_position: self.inner.label_position.clone(),
+            name: self.inner.name.clone(),
+            mode: self.inner.mode.clone(),
+        };
+        Ok(PolygonGate::try_new(new_gate)?)
+    }
+
+    pub fn clone_polygon_for_new_point(
+        &self,
+        new_point: (f32, f32),
+        point_index: usize,
+        _mapper: &PlotMapper,
+    ) -> anyhow::Result<Self> {
+        let mut p = self.get_points();
+        if point_index < p.len() {
+            p[point_index] = new_point;
+        }
+        let new_geometry =
+            create_polygon_geometry(p, &self.inner.parameters.0, &self.inner.parameters.1)?;
+        let new_gate = flow_gates::Gate {
+            id: self.inner.id.clone(),
+            parameters: self.inner.parameters.clone(),
+            geometry: new_geometry,
+            label_position: self.inner.label_position.clone(),
+            name: self.inner.name.clone(),
+            mode: self.inner.mode.clone(),
+        };
+        Ok(PolygonGate::try_new(new_gate)?)
+    }
 }
 
 impl DrawableGate for PolygonGate {
@@ -71,48 +146,19 @@ impl DrawableGate for PolygonGate {
         plot_x: &str,
         plot_y: &str,
     ) -> anyhow::Result<Option<Box<dyn DrawableGate>>> {
-        let (x, y) = (&self.inner.parameters.0, &self.inner.parameters.1);
-        if plot_x == x.as_ref() && *plot_y == *y.as_ref() {
-            return Ok(None);
+        match self.clone_polygon_for_axis_swap(plot_x, plot_y)?{
+            Some(p) => Ok(Some(Box::new(p))),
+            None => Ok(None),
         }
-        if plot_x == y.as_ref() && plot_y == x.as_ref() {
-            let pts: Vec<_> = self.get_points().into_iter().map(|(x, y)| (y, x)).collect();
-            let new_geometry = create_polygon_geometry(pts, y, x)?;
-            let new_parameters = (y.clone(), x.clone());
-            let new_gate = flow_gates::Gate {
-                id: self.inner.id.clone(),
-                parameters: new_parameters,
-                geometry: new_geometry,
-                label_position: self.inner.label_position.clone(),
-                name: self.inner.name.clone(),
-                mode: self.inner.mode.clone(),
-            };
-            return Ok(Some(Box::new(PolygonGate::try_new(new_gate)?)));
-        }
-        Err(anyhow!("Axis mismatch for Polygon Gate"))
     }
 
     fn replace_point(
         &self,
         new_point: (f32, f32),
         point_index: usize,
-        _mapper: &PlotMapper,
+        mapper: &PlotMapper,
     ) -> anyhow::Result<Box<dyn DrawableGate>> {
-        let mut p = self.get_points();
-        if point_index < p.len() {
-            p[point_index] = new_point;
-        }
-        let new_geometry =
-            create_polygon_geometry(p, &self.inner.parameters.0, &self.inner.parameters.1)?;
-        let new_gate = flow_gates::Gate {
-            id: self.inner.id.clone(),
-            parameters: self.inner.parameters.clone(),
-            geometry: new_geometry,
-            label_position: self.inner.label_position.clone(),
-            name: self.inner.name.clone(),
-            mode: self.inner.mode.clone(),
-        };
-        Ok(Box::new(PolygonGate::try_new(new_gate)?))
+        Ok(Box::new(self.clone_polygon_for_new_point(new_point, point_index, mapper)?))
     }
 
     fn replace_points(
@@ -149,24 +195,7 @@ impl DrawableGate for PolygonGate {
         old: &TransformType,
         new: &TransformType,
     ) -> anyhow::Result<Box<dyn DrawableGate>> {
-        let points = rescale_helper(
-            &self.get_points(),
-            &param,
-            &self.inner.parameters.0,
-            old,
-            new,
-        )?;
-        let new_geometry =
-            create_polygon_geometry(points, &self.inner.parameters.0, &self.inner.parameters.1)?;
-        let new_gate = flow_gates::Gate {
-            id: self.inner.id.clone(),
-            parameters: self.inner.parameters.clone(),
-            geometry: new_geometry,
-            label_position: self.inner.label_position.clone(),
-            name: self.inner.name.clone(),
-            mode: self.inner.mode.clone(),
-        };
-        Ok(Box::new(PolygonGate::try_new(new_gate)?))
+        Ok(Box::new(self.clone_polygon_for_rescaled_axis(param, old, new)?))
     }
 
     fn get_points(&self) -> Vec<(f32, f32)> {

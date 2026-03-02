@@ -3,12 +3,12 @@ use flow_fcs::TransformType;
 use flow_gates::{Gate, GateGeometry};
 use indexmap::IndexMap;
 use rustc_hash::FxBuildHasher;
-use std::sync::Arc;
+use std::{ops::Index, sync::Arc};
 
 use crate::plotters_dioxus::{
     gates::{
         gate_drag::PointDragData,
-        gate_single::line_gate::LineGate,
+        gate_single::{line_gate::LineGate, rescale_helper, rescale_helper_point},
         gate_traits::DrawableGate,
         gate_types::{DEFAULT_LINE, GREY_LINE_DASHED, GateRenderShape, SELECTED_LINE, ShapeType},
     },
@@ -34,7 +34,7 @@ impl BisectorGate {
         x_axis_param: Arc<str>,
         y_axis_param: Arc<str>,
     ) -> anyhow::Result<Self> {
-        let mut gate_map = FxIndexMap::default();
+        let mut gate_map  = FxIndexMap::default();
         let parameters = (x_axis_param.clone(), y_axis_param.clone());
         let click_data = plot_map.pixel_to_data(click_loc.0, click_loc.1, None, None);
 
@@ -116,6 +116,66 @@ impl BisectorGate {
             axis_matched: self.axis_matched,
             parameters: self.parameters.clone(),
         })
+    }
+
+    fn clone_with_point(
+        &self,
+        cx: f32,
+        cy: f32,
+    ) -> anyhow::Result<Self> {
+        let (x_channel, y_channel) = &self.parameters;
+        let mut gate_map  = FxIndexMap::default();
+        let max_left = (cx, f32::MAX);
+        let min_left = (f32::MIN, f32::MIN);
+        let coords = vec![min_left, max_left];
+        let g1 = flow_gates::geometry::create_rectangle_geometry(coords, x_channel, y_channel)
+            .map_err(|_| anyhow::anyhow!("failed to create rectangle geometry"))?;
+
+
+        let max_right = (f32::MAX, f32::MAX);
+        let min_right = (cx, f32::MIN);
+        let coords = vec![min_right, max_right];
+        let g2 = flow_gates::geometry::create_rectangle_geometry(coords, x_channel, y_channel)
+            .map_err(|_| anyhow::anyhow!("failed to create rectangle geometry"))?;
+
+        let curr_gate_1 = self.gates.index(0);
+        let curr_gate_2 = self.gates.index(1);
+        let new_gate_1 = Gate {
+            id: curr_gate_1.get_id(),
+            name: curr_gate_1.inner.name.clone(),
+            geometry: g1,
+            mode: curr_gate_1.inner.mode.clone(),
+            parameters: curr_gate_1.inner.parameters.clone(),
+            label_position: curr_gate_1.inner.label_position.clone(),
+        };
+        let new_gate_2 = Gate {
+            id: curr_gate_2.get_id(),
+            name: curr_gate_2.inner.name.clone(),
+            geometry: g2,
+            mode: curr_gate_2.inner.mode.clone(),
+            parameters: curr_gate_2.inner.parameters.clone(),
+            label_position: curr_gate_2.inner.label_position.clone(),
+        };
+        let mut lg_l = LineGate::try_new(new_gate_1, cy)?;
+        let mut lg_r = LineGate::try_new(new_gate_2, cy)?;
+
+        lg_l.axis_matched = self.axis_matched;
+        lg_r.axis_matched = self.axis_matched;
+
+        gate_map.insert(curr_gate_1.get_id(), lg_l);
+        gate_map.insert(curr_gate_2.get_id(), lg_r);
+
+        let points = (cx, cy);
+
+        Ok(Self {
+            gates: gate_map,
+            id: self.id.clone(),
+            points,
+            axis_matched: self.axis_matched,
+            parameters: self.parameters.clone(),
+        })
+
+
     }
 
     pub fn get_subgate_map(&self) -> &FxIndexMap<Arc<str>, LineGate> {
@@ -304,17 +364,9 @@ impl super::super::gate_traits::DrawableGate for BisectorGate {
         old_transform: &TransformType,
         new_transform: &TransformType,
     ) -> anyhow::Result<Box<dyn super::super::gate_traits::DrawableGate>> {
-        let mut new_gate_map = FxIndexMap::default();
-
-        for gate in self.gates.values() {
-            match gate.clone_line_for_rescaled_axis(param.clone(), old_transform, new_transform) {
-                Ok(g) => {
-                    new_gate_map.insert(gate.get_id(), g);
-                }
-                Err(e) => return Err(e),
-            }
-        }
-        Ok(self.clone_with_gates(new_gate_map, false))
+        let(x_param, _) = &self.parameters;
+        let (cx, cy) = rescale_helper_point(self.points, &param, x_param, old_transform, new_transform)?;
+        Ok(Box::new(self.clone_with_point(cx, cy)?))
     }
 
     fn rotate_gate(
@@ -334,22 +386,14 @@ impl super::super::gate_traits::DrawableGate for BisectorGate {
         let new_cx = new_point.0;
         let new_cy = new_point.1;
         for (i, (id, gate)) in self.gates.iter().enumerate() {
-            // let p_index = if i == 0 { 1 } else { 0 };
-            // let old_p = gate.get_points()[p_index];
             let p_index = if i == 0 { 1 } else { 0 };
             let old_p = gate.get_points()[p_index];
-            println!("old points: {:?}", gate.get_points());
             let target_p = if self.axis_matched {
                 (new_cx, old_p.1)
             } else {
                 (old_p.0, new_cy)
             };
-            println!(
-                "old point {:?}, new point {:?} inserted at {}",
-                old_p, target_p, p_index
-            );
             let new_gate = gate.clone_line_for_new_point(target_p, p_index)?;
-            println!("new points: {:?}", gate.get_points());
             new_gate_map.insert(id.clone(), new_gate);
         }
         if self.axis_matched {
@@ -397,9 +441,10 @@ fn create_default_bisector(
     let max_right = (f32::MAX, f32::MAX);
     let min_right = (cx, f32::MIN);
     let coords = vec![min_right, max_right];
-    println!("{:?}", coords);
     let g2 = flow_gates::geometry::create_rectangle_geometry(coords, x_channel, y_channel)
         .map_err(|_| anyhow::anyhow!("failed to create rectangle geometry"))?;
 
     Ok((g1, g2))
 }
+
+

@@ -58,6 +58,7 @@ impl LineGate {
         old: &TransformType,
         new: &TransformType,
     ) -> anyhow::Result<Self> {
+        println!("1");
         let points = rescale_helper(
             &self.get_points(),
             &param,
@@ -65,8 +66,10 @@ impl LineGate {
             old,
             new,
         )?;
+        println!("points: {:?}", points);
         let new_geometry =
             create_rectangle_geometry(points, &self.inner.parameters.0, &self.inner.parameters.1)?;
+        println!("3");
         let new_gate = flow_gates::Gate {
             id: self.inner.id.clone(),
             parameters: self.inner.parameters.clone(),
@@ -76,6 +79,7 @@ impl LineGate {
             mode: self.inner.mode.clone(),
         };
         let mut line = LineGate::try_new(new_gate, self.height)?;
+        println!("4");
         line.axis_matched = self.axis_matched;
         Ok(line)
     }
