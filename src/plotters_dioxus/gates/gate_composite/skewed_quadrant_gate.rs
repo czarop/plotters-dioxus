@@ -511,6 +511,19 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
     fn clone_box(&self) -> Box<dyn super::super::gate_traits::DrawableGate> {
         Box::new(self.clone())
     }
+
+    fn get_gate_ref(&self, id: Option<Arc<str>>) -> Option<&Gate> {
+
+        if let Some(id) = id {
+            if let Some(g) = self.gates.get(&id){
+                g.get_gate_ref(None)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
 }
 
 fn create_skewed_quadrant_geos(

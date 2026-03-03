@@ -8,3 +8,4 @@ pub mod plot_helpers;
 pub mod plot_window;
 pub mod route;
 pub use axis_info::AxisInfo;
+pub mod gate_sidebar;

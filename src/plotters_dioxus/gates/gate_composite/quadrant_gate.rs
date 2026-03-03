@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use crate::plotters_dioxus::{
     gates::{
-        gate_composite::bisector_gate::BisectorGate, gate_drag::PointDragData, gate_single::polygon_gate::PolygonGate, gate_traits::DrawableGate, gate_types::{DEFAULT_LINE, GREY_LINE_DASHED, GateRenderShape, SELECTED_LINE, ShapeType}
+        gate_drag::PointDragData, gate_single::polygon_gate::PolygonGate, gate_traits::DrawableGate, gate_types::{DEFAULT_LINE, GREY_LINE_DASHED, GateRenderShape, SELECTED_LINE, ShapeType}
     },
     plot_helpers::PlotMapper,
 };
@@ -341,6 +341,19 @@ impl super::super::gate_traits::DrawableGate for QuadrantGate {
 
     fn clone_box(&self) -> Box<dyn super::super::gate_traits::DrawableGate> {
         Box::new(self.clone())
+    }
+
+    fn get_gate_ref(&self, id: Option<Arc<str>>) -> Option<&Gate> {
+
+        if let Some(id) = id {
+            if let Some(g) = self.gates.get(&id){
+                g.get_gate_ref(None)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
     }
 }
 

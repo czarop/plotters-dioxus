@@ -12,6 +12,7 @@ use std::sync::{Arc};
 pub fn GateLayer(
     x_channel: ReadSignal<Arc<str>>,
     y_channel: ReadSignal<Arc<str>>,
+    parental_gate_id: ReadSignal<Option<Arc<str>>>
 ) -> Element {
     let plot_map = use_context::<Signal<Option<PlotMapper>>>();
     let mut gate_store: Store<GateState> = use_context::<Store<GateState>>();

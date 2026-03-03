@@ -1,4 +1,6 @@
 #![allow(non_snake_case)]
+use std::sync::Arc;
+
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use dioxus::prelude::*;
@@ -22,6 +24,7 @@ pub fn PseudoColourPlot(
     size: ReadSignal<(u32, u32)>,
     x_axis_info: ReadSignal<AxisInfo>,
     y_axis_info: ReadSignal<AxisInfo>,
+    parental_gate_id: ReadSignal<Option<Arc<str>>>
 ) -> Element {
     let mut plot_image_src = use_signal(|| String::new());
     let mut plot_map = use_signal(|| None::<PlotMapper>);
@@ -94,6 +97,7 @@ pub fn PseudoColourPlot(
             GateLayer {
                 x_channel: x_axis_info().param.fluoro.clone(),
                 y_channel: y_axis_info().param.fluoro.clone(),
+                parental_gate_id,
             
             }
         }

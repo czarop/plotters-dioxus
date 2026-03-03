@@ -6,8 +6,10 @@ use crate::plotters_dioxus::{gates::{
     gate_drag::{GateDragData, PointDragData}, gate_types::GateRenderShape
 }, plot_helpers::PlotMapper};
 
-pub trait DrawableGate {
-    // fn get_points(&self) -> Vec<(f32, f32)>;
+pub trait DrawableGate: Send + Sync {
+
+    fn get_gate_ref(&self, id: Option<Arc<str>>) -> Option<&flow_gates::Gate> ;
+
     fn is_finalised(&self) -> bool;
 
     fn draw_self(

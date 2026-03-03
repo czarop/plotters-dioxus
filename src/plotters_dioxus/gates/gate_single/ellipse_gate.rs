@@ -322,6 +322,10 @@ impl DrawableGate for EllipseGate {
         }
         vec![]
     }
+    
+    fn get_gate_ref(&self, id: Option<Arc<str>>) -> Option<&flow_gates::Gate>  {
+        Some(&self.inner)
+    }
 }
 
 use crate::plotters_dioxus::gates::gate_types::{DRAGGED_LINE, DrawingStyle};

@@ -134,6 +134,9 @@ impl PolygonGate {
 }
 
 impl DrawableGate for PolygonGate {
+    fn get_gate_ref(&self, id: Option<Arc<str>>) -> Option<&flow_gates::Gate>  {
+        Some(&self.inner)
+    }
     fn clone_box(&self) -> Box<dyn DrawableGate> {
         Box::new(self.clone())
     }

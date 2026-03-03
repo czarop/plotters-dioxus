@@ -1,22 +1,21 @@
 use dioxus::prelude::*;
+use flow_gates::Gate;
 
 use crate::{
     file_load::FcsFiles,
     plotters_dioxus::{
-        AxisInfo, PseudoColourPlot,
-        gates::{GateState, gate_store::GateStateImplExt, gate_types::GateType},
-        plot_helpers::{Param, ParameterStore, ParameterStoreImplExt, ParameterStoreStoreExt as _},
+        AxisInfo, PseudoColourPlot, gate_sidebar::GateSidebar, gates::{GateState, gate_store::{GateStateImplExt, GateStateStoreExt}, gate_traits::DrawableGate, gate_types::GateType}, plot_helpers::{Param, ParameterStore, ParameterStoreImplExt, ParameterStoreStoreExt as _}
     },
     searchable_select::SearchableSelect,
 };
 use flow_fcs::{Fcs, TransformType, Transformable};
-
+use crate::components::sidebar::*;
 use crate::plotters_dioxus::gates::gate_buttons::NewGateButtons;
 use std::sync::Arc;
 use tokio::task;
+use polars::datatypes::IdxCa;
 
 async fn get_flow_data(path: std::path::PathBuf) -> Result<Arc<Fcs>, Arc<anyhow::Error>> {
-    // println!("Loading FCS file: {:?}", path);
     task::spawn_blocking(move || {
         let fcs_file = Fcs::open(path.to_str().unwrap_or_default())?;
         Ok(Arc::new(fcs_file))
@@ -31,16 +30,52 @@ async fn get_scaled_data_to_display(
     col2_name: &str,
     transform_1: TransformType,
     transform_2: TransformType,
+    parental_gate_id: &Option<Arc<str>>
 ) -> Result<Vec<(f32, f32)>, anyhow::Error> {
     let fs_clone = fs.clone();
     let col1_name = col1_name.to_string();
     let col2_name = col2_name.to_string();
-    task::spawn_blocking(move || -> Result<Vec<(f32, f32)>, anyhow::Error> {
-        let cols = fs_clone.get_xy_pairs(&col1_name, &col2_name)?;
-        let zipped_cols = cols
-            .into_iter()
-            .map(|(x, y)| (transform_1.transform(&x), transform_2.transform(&y)))
+    let gate_store: Store<GateState> = use_context::<Store<GateState>>();
+    let gate_chain: Option<Vec<(Arc<str>, Arc<dyn DrawableGate>)>> = if let Some(parent) = parental_gate_id {
+        
+        let arcs: Vec<(Arc<str>, Arc<dyn DrawableGate>)> = gate_store.hierarchy().peek().get_chain_to_root(parent)
+            .iter()
+            .filter_map(|id| {
+                gate_store.gate_registry().peek().get(id).map(|g| (id.clone(), g.clone()))
+    })
             .collect();
+        
+        if arcs.is_empty() { None } else { Some(arcs) }
+    } else {
+        None
+    };
+
+    task::spawn_blocking(move || -> Result<Vec<(f32, f32)>, anyhow::Error> {
+        
+        let cols = fs_clone.get_xy_pairs(&col1_name, &col2_name)?;
+        let zipped_cols: Vec<(f32, f32)>;
+        
+        if let Some(chain) = gate_chain {
+            
+            let gate_refs: Vec<&Gate> = chain.iter()
+            .filter_map(|(id, gate)| gate.get_gate_ref(Some(id.clone()))) 
+            .collect();
+
+            let indices = flow_gates::filter_events_by_hierarchy(&fs_clone, &gate_refs, None, None)?;
+            zipped_cols = indices
+                .into_iter()
+                .map(|idx| {
+                    let x = cols[idx].0;
+                    let y = cols[idx].1;
+                    (transform_1.transform(&x), transform_2.transform(&y))
+                })
+                .collect();
+        } else {
+            zipped_cols = cols
+                .into_iter()
+                .map(|(x, y)| (transform_1.transform(&x), transform_2.transform(&y)))
+                .collect();
+        }
         Ok(zipped_cols)
     })
     .await?
@@ -167,12 +202,20 @@ pub fn PlotWindow() -> Element {
         }
     });
 
+    let parental_gate: Signal<Option<Arc<str>>> = use_signal(|| None);
+    // let gate_list = use_memo(move || {
+    //     let h = &*gate_store.hierarchy().read();
+        
+    // });
+
     let mut plot_data_signal = use_signal(|| vec![]);
     let processed_data_resource = use_resource(move || {
         let x_fluoro = x_axis_marker.read().fluoro.clone();
         let y_fluoro = y_axis_marker.read().fluoro.clone();
+        
 
         async move {
+            let parental_gate = &*parental_gate.read();
             let x_transform = parameter_settings
                 .settings()
                 .get(x_fluoro.clone())
@@ -193,6 +236,7 @@ pub fn PlotWindow() -> Element {
                     &y_fluoro,
                     x_transform,
                     y_transform,
+                    parental_gate
                 )
                 .await
                 {
@@ -216,6 +260,15 @@ pub fn PlotWindow() -> Element {
         document::Stylesheet { href: CSS_STYLE }
 
         div { class: "top-container",
+            SidebarProvider {
+                Sidebar {
+                    SidebarContent {
+                        // Your GateSidebar must be in here!
+                        GateSidebar { selected_id: parental_gate }
+                    }
+                }
+            }
+
             div { class: "axis-controls-grid", style: "width: 600px;",
                 div { class: "grid-label", "X-Axis" }
                 SearchableSelect {
@@ -393,7 +446,7 @@ pub fn PlotWindow() -> Element {
                     }
                     None => rsx! {},
                 }
-
+            
             }
         }
         div { class: "status-message",
@@ -428,6 +481,7 @@ pub fn PlotWindow() -> Element {
                             data: plot_data_signal,
                             x_axis_info: x_axis_limits.read().clone(),
                             y_axis_info: y_axis_limits.read().clone(),
+                            parental_gate_id: parental_gate,
                         }
                     }
                 }
