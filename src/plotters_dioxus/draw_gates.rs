@@ -149,7 +149,7 @@ pub fn GateLayer(
                                 y_param.clone(),
                                 points,
                                 format!("{id}"),
-                                None,
+                                parental_gate_id(),
                                 geo,
                             )
                         {

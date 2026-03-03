@@ -13,7 +13,6 @@ use crate::components::sidebar::*;
 use crate::plotters_dioxus::gates::gate_buttons::NewGateButtons;
 use std::sync::Arc;
 use tokio::task;
-use polars::datatypes::IdxCa;
 
 async fn get_flow_data(path: std::path::PathBuf) -> Result<Arc<Fcs>, Arc<anyhow::Error>> {
     task::spawn_blocking(move || {
@@ -23,6 +22,63 @@ async fn get_flow_data(path: std::path::PathBuf) -> Result<Arc<Fcs>, Arc<anyhow:
     .await
     .map_err(|e| Arc::new(e.into()))?
 }
+
+// async fn get_scaled_data_to_display(
+//     fs: Arc<Fcs>,
+//     col1_name: &str,
+//     col2_name: &str,
+//     transform_1: TransformType,
+//     transform_2: TransformType,
+//     parental_gate_id: &Option<Arc<str>>
+// ) -> Result<Vec<(f32, f32)>, anyhow::Error> {
+//     let fs_clone = fs.clone();
+//     let col1_name = col1_name.to_string();
+//     let col2_name = col2_name.to_string();
+//     let gate_store: Store<GateState> = use_context::<Store<GateState>>();
+//     let gate_chain: Option<Vec<(Arc<str>, Arc<dyn DrawableGate>)>> = if let Some(parent) = parental_gate_id {
+        
+//         let arcs: Vec<(Arc<str>, Arc<dyn DrawableGate>)> = gate_store.hierarchy().peek().get_chain_to_root(parent)
+//             .iter()
+//             .filter_map(|id| {
+//                 gate_store.gate_registry().peek().get(id).map(|g| (id.clone(), g.clone()))
+//     })
+//             .collect();
+        
+//         if arcs.is_empty() { None } else { Some(arcs) }
+//     } else {
+//         None
+//     };
+
+//     task::spawn_blocking(move || -> Result<Vec<(f32, f32)>, anyhow::Error> {
+        
+//         let cols = fs_clone.get_xy_pairs(&col1_name, &col2_name)?;
+//         let zipped_cols: Vec<(f32, f32)>;
+        
+//         if let Some(chain) = gate_chain {
+            
+//             let gate_refs: Vec<&Gate> = chain.iter()
+//             .filter_map(|(id, gate)| gate.get_gate_ref(Some(id.clone()))) 
+//             .collect();
+
+//             let indices = flow_gates::filter_events_by_hierarchy(&fs_clone, &gate_refs, None, None)?;
+//             zipped_cols = indices
+//                 .into_iter()
+//                 .map(|idx| {
+//                     let x = cols[idx].0;
+//                     let y = cols[idx].1;
+//                     (transform_1.transform(&x), transform_2.transform(&y))
+//                 })
+//                 .collect();
+//         } else {
+//             zipped_cols = cols
+//                 .into_iter()
+//                 .map(|(x, y)| (transform_1.transform(&x), transform_2.transform(&y)))
+//                 .collect();
+//         }
+//         Ok(zipped_cols)
+//     })
+//     .await?
+// }
 
 async fn get_scaled_data_to_display(
     fs: Arc<Fcs>,
@@ -37,7 +93,7 @@ async fn get_scaled_data_to_display(
     let col2_name = col2_name.to_string();
     let gate_store: Store<GateState> = use_context::<Store<GateState>>();
     let gate_chain: Option<Vec<(Arc<str>, Arc<dyn DrawableGate>)>> = if let Some(parent) = parental_gate_id {
-        
+        println!("parental gate id is {}", parent);
         let arcs: Vec<(Arc<str>, Arc<dyn DrawableGate>)> = gate_store.hierarchy().peek().get_chain_to_root(parent)
             .iter()
             .filter_map(|id| {
@@ -51,33 +107,36 @@ async fn get_scaled_data_to_display(
     };
 
     task::spawn_blocking(move || -> Result<Vec<(f32, f32)>, anyhow::Error> {
-        
-        let cols = fs_clone.get_xy_pairs(&col1_name, &col2_name)?;
-        let zipped_cols: Vec<(f32, f32)>;
-        
-        if let Some(chain) = gate_chain {
-            
-            let gate_refs: Vec<&Gate> = chain.iter()
+    let mut df = fs_clone.data_frame.as_ref().clone();
+
+    if let Some(chain) = gate_chain {
+        let gate_refs: Vec<&Gate> = chain.iter()
             .filter_map(|(id, gate)| gate.get_gate_ref(Some(id.clone()))) 
             .collect();
 
-            let indices = flow_gates::filter_events_by_hierarchy(&fs_clone, &gate_refs, None, None)?;
-            zipped_cols = indices
-                .into_iter()
-                .map(|idx| {
-                    let x = cols[idx].0;
-                    let y = cols[idx].1;
-                    (transform_1.transform(&x), transform_2.transform(&y))
-                })
-                .collect();
-        } else {
-            zipped_cols = cols
-                .into_iter()
-                .map(|(x, y)| (transform_1.transform(&x), transform_2.transform(&y)))
-                .collect();
-        }
-        Ok(zipped_cols)
-    })
+        // 1. Get the final narrowed mask for the whole hierarchy
+        let mask = super::gates::gate_filtering::filter_events_by_hierarchy_to_mask(&fs_clone, &gate_refs)?;
+
+        // 2. Filter the dataframe once at the end
+        df = df.filter(&mask)?;
+    }
+
+    // 3. Extract and Transform (The heavy math)
+    let x_series = df.column(&col1_name)?.f32()?;
+    let y_series = df.column(&col2_name)?.f32()?;
+
+    let zipped_cols: Vec<(f32, f32)> = x_series.into_iter()
+        .zip(y_series.into_iter())
+        .filter_map(|(x, y)| {
+            match (x, y) {
+                (Some(vx), Some(vy)) => Some((transform_1.transform(&vx), transform_2.transform(&vy))),
+                _ => None
+            }
+        })
+        .collect();
+
+    Ok(zipped_cols)
+})
     .await?
 }
 
@@ -202,11 +261,8 @@ pub fn PlotWindow() -> Element {
         }
     });
 
-    let parental_gate: Signal<Option<Arc<str>>> = use_signal(|| None);
-    // let gate_list = use_memo(move || {
-    //     let h = &*gate_store.hierarchy().read();
-        
-    // });
+    // this should be set when smth is selected in the sidebar
+    let mut parental_gate: Signal<Option<Arc<str>>> = use_signal(|| None);
 
     let mut plot_data_signal = use_signal(|| vec![]);
     let processed_data_resource = use_resource(move || {

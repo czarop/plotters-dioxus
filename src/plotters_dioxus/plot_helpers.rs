@@ -1,5 +1,5 @@
 use dioxus::prelude::*;
-use flow_fcs::{TransformType, Transformable};
+use flow_fcs::{TransformType};
 use flow_gates::transforms::{
     get_plotting_area, pixel_to_raw, pixel_to_raw_y, raw_to_pixel, raw_to_pixel_y,
 };

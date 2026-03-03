@@ -55,26 +55,26 @@ fn GateNode(gate_id: Arc<str>, selected_gate: Signal<Option<Arc<str>>>) -> Eleme
                                     // Inject the onclick handler into the attributes list
 
                                     rsx! {
-                                        SidebarMenuButton {
-                                            is_active,
-                                            attributes: trigger_attrs,
-                                            r#as: move |_| {
-                                                let click_id = click_id.clone();
-                                                rsx! {
-                                                    div {
-                                                        onclick: move |_| selected_gate.set(Some(click_id.clone())),
-                                                        style: "display: flex; width: 100%; align-items: center;",
-                                                        Icon {}
-                                                        span { "{click_id}" }
-                                                        ChevronIcon {}
-                                                    }
-                                                }
-                                            },
-                                        }
+                                        SidebarMenuItem { attributes,
 
+                                            button {
+                                                onclick: move |_| {
+                                                    println!("setting selected gate to... {click_id}");
+                                                    selected_gate.set(Some(click_id.clone()));
+                                                },
+                                                style: "display: flex; width: 100%; align-items: center;",
+                                                // Icon {}
+                                                // span { "{click_id}" }
+                                                // ChevronIcon {}
+                                                "{click_id}"
+
+                                            }
+                                        }
                                     }
+
                                 },
                             }
+
                             CollapsibleContent {
                                 SidebarMenuSub {
                                     for child_id in children {
@@ -129,6 +129,56 @@ fn ChevronIcon() -> Element {
             stroke_linecap: "round",
             stroke_linejoin: "round",
             path { d: "m9 18 6-6-6-6" }
+        }
+    }
+}
+
+#[component]
+fn GateGroup(title: Arc<str>, items: &'static [Arc<str>], selected: Signal<Option<Arc<str>>>) -> Element {
+    rsx! {
+        SidebarGroup {
+            SidebarGroupLabel { "Platform" }
+            SidebarMenu {
+                for item in items.iter() {
+                    {
+                        let title = title.clone();
+                        rsx! {
+                            Collapsible {
+                                default_open: true,
+                                r#as: move |attributes: Vec<Attribute>| {
+                                    let title = title.clone();
+                                    rsx! {
+                                        SidebarMenuItem { key: "{title}", attributes,
+                                            CollapsibleTrigger {
+                                                r#as: move |attributes: Vec<Attribute>| rsx! {
+                                                    SidebarMenuButton { attributes,
+                                                        Icon {}
+                                                        span { "{title}" }
+                                                        ChevronIcon {}
+                                                    }
+                                                },
+                                            }
+                                        }
+                                        CollapsibleContent {
+                                            SidebarMenuSub {
+                                                for sub_item in items {
+                                                    SidebarMenuSubItem { key: "{item}",
+                                                        SidebarMenuSubButton {
+                                                            r#as: move |attributes: Vec<Attribute>| rsx! {
+                                                                button { onclick: move |_| selected.set(Some(sub_item.clone())) }
+                                                            },
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
