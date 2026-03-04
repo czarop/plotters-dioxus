@@ -16,7 +16,8 @@ pub fn GateSidebar(selected_id: Signal<Option<Arc<str>>>) -> Element {
             SidebarGroupLabel { "Gate Hierarchy" }
             SidebarMenu {
                 for root_id in roots {
-                    GateNode { gate_id: root_id, selected_gate: selected_id }
+                    // GateNode { gate_id: root_id, selected_gate: selected_id }
+                    GateGroup { gate_id: root_id, selected: selected_id }
                 }
             }
         }
@@ -34,7 +35,7 @@ fn GateNode(gate_id: Arc<str>, selected_gate: Signal<Option<Arc<str>>>) -> Eleme
         .cloned()
         .collect();
     let has_children = !children.is_empty();
-    let is_active = selected_gate().as_ref() == Some(&gate_id);
+    // let is_active = selected_gate().as_ref() == Some(&gate_id);
 
     // We clone the ID for the closure
     let current_id = gate_id.clone();
@@ -55,7 +56,7 @@ fn GateNode(gate_id: Arc<str>, selected_gate: Signal<Option<Arc<str>>>) -> Eleme
                                     // Inject the onclick handler into the attributes list
 
                                     rsx! {
-                                        SidebarMenuItem { attributes,
+                                        SidebarMenuItem { attributes: trigger_attrs,
 
                                             button {
                                                 onclick: move |_| {
@@ -91,9 +92,16 @@ fn GateNode(gate_id: Arc<str>, selected_gate: Signal<Option<Arc<str>>>) -> Eleme
             }
         } else {
             // Leaf gate
-            SidebarMenuButton { is_active,
-                Icon {}
-                span { "{gate_id}" }
+            SidebarMenuSubItem { key: "{current_id}",
+                SidebarMenuSubButton {
+                    r#as: move |attributes: Vec<Attribute>| {
+                        let current_id = current_id.clone();
+                        rsx! {
+                            button { onclick: move |_| selected_gate.set(Some(current_id.clone())) }
+                        }
+                    },
+                }
+            
             }
         }
     }
@@ -134,51 +142,191 @@ fn ChevronIcon() -> Element {
 }
 
 #[component]
-fn GateGroup(title: Arc<str>, items: &'static [Arc<str>], selected: Signal<Option<Arc<str>>>) -> Element {
+fn GateGroup(gate_id: Arc<str>, selected: Signal<Option<Arc<str>>>) -> Element {
+    println!("generating gate group for {gate_id}");
+    let gate_store: Store<GateState> = use_context::<Store<GateState>>();
+    let has_children = !gate_store
+        .hierarchy()
+        .read()
+        .is_leaf(&gate_id);
+
+    let gid = gate_id.clone();
+    let children: Memo<Vec<Arc<str>>> = use_memo(move || { gate_store
+        .hierarchy()
+        .read()
+        .get_children(&gid)
+        .into_iter()
+        .cloned()
+        .collect()
+    });
+    
+    // let is_active = selected().as_ref() == Some(&gate_id);
+
+    // We clone the ID for the closure
+    // let current_id = gate_id.clone();
+
+
     rsx! {
-        SidebarGroup {
-            SidebarGroupLabel { "Platform" }
-            SidebarMenu {
-                for item in items.iter() {
-                    {
-                        let title = title.clone();
-                        rsx! {
-                            Collapsible {
-                                default_open: true,
-                                r#as: move |attributes: Vec<Attribute>| {
-                                    let title = title.clone();
-                                    rsx! {
-                                        SidebarMenuItem { key: "{title}", attributes,
-                                            CollapsibleTrigger {
-                                                r#as: move |attributes: Vec<Attribute>| rsx! {
-                                                    SidebarMenuButton { attributes,
-                                                        Icon {}
-                                                        span { "{title}" }
-                                                        ChevronIcon {}
-                                                    }
-                                                },
-                                            }
-                                        }
-                                        CollapsibleContent {
-                                            SidebarMenuSub {
-                                                for sub_item in items {
-                                                    SidebarMenuSubItem { key: "{item}",
-                                                        SidebarMenuSubButton {
-                                                            r#as: move |attributes: Vec<Attribute>| rsx! {
-                                                                button { onclick: move |_| selected.set(Some(sub_item.clone())) }
-                                                            },
-                                                        }
-                                                    }
+        if has_children {
+            // SidebarGroup {
+
+            //     SidebarMenu {
+            {
+                let title = gate_id.clone();
+                rsx! {
+                    Collapsible {
+                        default_open: true,
+                        r#as: move |attributes: Vec<Attribute>| {
+                            let title = title.clone();
+                            rsx! {
+                                SidebarMenuItem { key: "{title}", attributes,
+                                    CollapsibleTrigger {
+                                        r#as: move |attributes: Vec<Attribute>| {
+                                            let title = title.clone();
+                                            rsx! {
+                                                SidebarMenuButton { attributes,
+                                                    Icon {}
+                                                    button { onclick: move |_| selected.set(Some(title.clone())), "{title}" }
+                                                    ChevronIcon {}
                                                 }
                                             }
+                                        },
+                                    }
+                                }
+
+                                CollapsibleContent {
+                                    SidebarMenuSub {
+                                        for sub_item in children() {
+                                            // SidebarMenuSubItem { key: "{sub_item}",
+                                            //     SidebarMenuSubButton {
+                                            //         r#as: move |_| {
+                                            //             let sub_item = sub_item.clone();
+                                            //             rsx! {
+                                            //                 button { onclick: move |_| selected.set(Some(sub_item.clone())) }
+                                            //             }
+                                            //         },
+                                            //     }
+                                            // }
+                                            GateGroup { gate_id: sub_item, selected }
                                         }
                                     }
-                                },
+                                }
+
                             }
-                        }
+                        },
                     }
                 }
+
+            }
+        } else {
+            SidebarMenuSubItem { key: "{gate_id}",
+                SidebarMenuSubButton {
+                    r#as: move |_| {
+                        let gate_id = gate_id.clone();
+                        rsx! {
+                            button { onclick: move |_| selected.set(Some(gate_id.clone())) }
+                        }
+                    },
+                }
+            
             }
         }
     }
+
+
 }
+
+
+// #[component]
+// fn GateGroup(gate_id: Arc<str>, selected: Signal<Option<Arc<str>>>) -> Element {
+//     let gate_store: Store<GateState> = use_context::<Store<GateState>>();
+//     let has_children = !gate_store
+//         .hierarchy()
+//         .read()
+//         .is_leaf(&gate_id);
+
+//     let gid = gate_id.clone();
+//     let children: Memo<Vec<Arc<str>>> = use_memo(move || { gate_store
+//         .hierarchy()
+//         .read()
+//         .get_children(&gid)
+//         .into_iter()
+//         .cloned()
+//         .collect()
+//     });
+    
+//     // let is_active = selected().as_ref() == Some(&gate_id);
+
+//     // We clone the ID for the closure
+//     // let current_id = gate_id.clone();
+
+
+//     rsx! {
+//         if has_children {
+//             // SidebarGroup {
+
+//             //     SidebarMenu {
+//             {
+//                 let title = gate_id.clone();
+//                 rsx! {
+//                     Collapsible {
+//                         default_open: true,
+//                         r#as: move |attributes: Vec<Attribute>| {
+//                             let title = title.clone();
+//                             rsx! {
+//                                 SidebarMenuItem { key: "{title}", attributes,
+//                                     CollapsibleTrigger {
+//                                         r#as: move |attributes: Vec<Attribute>| {
+//                                             let title = title.clone();
+//                                             rsx! {
+//                                                 SidebarMenuItem { attributes,
+//                                                     Icon {}
+//                                                     button { onclick: move |_| selected.set(Some(title.clone())), "{title}" }
+//                                                     ChevronIcon {}
+//                                                 }
+//                                             }
+//                                         },
+//                                     }
+//                                 }
+
+//                                 CollapsibleContent {
+//                                     SidebarMenuSub {
+//                                         for sub_item in children() {
+//                                             // SidebarMenuSubItem { key: "{sub_item}",
+//                                             //     SidebarMenuSubButton {
+//                                             //         r#as: move |_| {
+//                                             //             let sub_item = sub_item.clone();
+//                                             //             rsx! {
+//                                             //                 button { onclick: move |_| selected.set(Some(sub_item.clone())) }
+//                                             //             }
+//                                             //         },
+//                                             //     }
+//                                             // }
+//                                             GateGroup { gate_id: sub_item, selected }
+//                                         }
+//                                     }
+//                                 }
+
+//                             }
+//                         },
+//                     }
+//                 }
+
+//             }
+//         } else {
+//             SidebarMenuSubItem { key: "{gate_id}",
+//                 SidebarMenuSubButton {
+//                     r#as: move |_| {
+//                         let gate_id = gate_id.clone();
+//                         rsx! {
+//                             button { onclick: move |_| selected.set(Some(gate_id.clone())) }
+//                         }
+//                     },
+//                 }
+            
+//             }
+//         }
+//     }
+
+
+// }

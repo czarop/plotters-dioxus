@@ -52,11 +52,11 @@ pub fn GateLayer(
 
     // the list of finalised gates
     use_effect(move || {
-        let g = match gate_store.get_gates_for_plot(x_channel(), y_channel()) {
+        let g = match gate_store.get_gates_for_plot(x_channel(), y_channel(), parental_gate_id()) {
             Some(g) => g,
             None => vec![],
         };
-        next_gate_id.set(g.len());
+        // next_gate_id.set(g.len());
         gates.set(g);
     });
 
@@ -260,7 +260,9 @@ pub fn GateLayer(
                             _ => {}
                         }
                     },
-                    if let Some(gates) = gate_store.get_gates_for_plot(x_channel(), y_channel()) {
+                    if let Some(gates) = gate_store
+                        .get_gates_for_plot(x_channel(), y_channel(), parental_gate_id())
+                    {
                         for (gate_index , gate) in gates.iter().enumerate() {
 
                             {

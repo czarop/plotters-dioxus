@@ -317,7 +317,7 @@ pub fn PlotWindow() -> Element {
 
         div { class: "top-container",
             SidebarProvider {
-                Sidebar {
+                Sidebar { variant: SidebarVariant::Floating,
                     SidebarContent {
                         // Your GateSidebar must be in here!
                         GateSidebar { selected_id: parental_gate }

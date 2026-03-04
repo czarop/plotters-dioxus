@@ -211,6 +211,7 @@ impl<Lens> Store<GateState, Lens> {
             .or_insert(vec![])
             .push(gate_key.clone());
 
+        println!("Adding gate {} with parent {}", g.get_id(), parental_gate_id.as_ref().unwrap_or(&Arc::from("default - root")));
         self.hierarchy().write().add_gate_child(
             parental_gate_id.unwrap_or(Arc::from("root")),
             g.get_id(),
@@ -327,12 +328,16 @@ impl<Lens> Store<GateState, Lens> {
         Ok(())
     }
 
-    fn get_gates_for_plot(
+    fn get_gates_for_plot<T>(
         &self,
-        x_axis_title: Arc<str>,
-        y_axis_title: Arc<str>,
-    ) -> Option<Vec<Arc<dyn DrawableGate>>> {
-        let key = GatesOnPlotKey::new(x_axis_title.clone(), y_axis_title.clone(), None);
+        x_axis_title: T,
+        y_axis_title: T,
+        parental_gate_id: Option<T>
+    ) -> Option<Vec<Arc<dyn DrawableGate>>> 
+    where 
+        T: Into<GateId>
+    {
+        let key = GatesOnPlotKey::new(x_axis_title.into(), y_axis_title.into(), parental_gate_id.map(|id| id.into()));
         let key_options = self.gate_ids_by_view().get(key);
         let mut gate_list = vec![];
         if let Some(key_store) = key_options {

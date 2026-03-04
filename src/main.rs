@@ -28,7 +28,7 @@ fn main() {
             Config::new().with_window(
                 WindowBuilder::new()
                     .with_title("FCS Plot Viewer")
-                    .with_inner_size(LogicalSize::new(1200.0, 900.0)),
+                    .with_inner_size(LogicalSize::new(1500.0, 900.0)),
             ),
         )
         .launch(App);
