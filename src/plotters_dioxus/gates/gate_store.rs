@@ -4,7 +4,7 @@ use flow_gates::{Gate, GateHierarchy};
 use rustc_hash::FxHashMap;
 
 use std::{
-    sync::{Arc, LazyLock},
+    f32::consts::E, sync::{Arc, LazyLock}
 };
 
 use crate::plotters_dioxus::{
@@ -213,11 +213,23 @@ impl<Lens> Store<GateState, Lens> {
             .or_insert(vec![])
             .push(gate_key.clone());
 
-        println!("Adding gate {} with parent {}", g.get_id(), parental_gate_id.as_ref().unwrap_or(&ROOTGATE));
-        self.hierarchy().write().add_gate_child(
-            parental_gate_id.unwrap_or(ROOTGATE.clone()),
-            g.get_id(),
-        )?;
+        if g.is_composite(){
+            let gates = g.get_inner_gate_ids();
+            for g in gates{
+                println!("Adding gate {} with parent {}", g, parental_gate_id.as_ref().unwrap_or(&ROOTGATE));
+                self.hierarchy().write().add_gate_child(
+                    parental_gate_id.clone().unwrap_or(ROOTGATE.clone()),
+                    g,
+                )?;
+            }
+        } else {
+            println!("Adding gate {} with parent {}", g.get_id(), parental_gate_id.as_ref().unwrap_or(&ROOTGATE));
+            self.hierarchy().write().add_gate_child(
+                parental_gate_id.unwrap_or(ROOTGATE.clone()),
+                g.get_id(),
+            )?;
+        }
+        
 
         // for subgate in composite_subgate_ids{
         //     self.composite_redirect().insert(subgate.into(), g.get_id().into());

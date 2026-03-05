@@ -8,7 +8,9 @@ use crate::plotters_dioxus::{gates::{
 
 pub trait DrawableGate: Send + Sync {
 
-    fn get_gate_ref(&self, id: Option<Arc<str>>) -> Option<&flow_gates::Gate> ;
+    fn get_gate_ref(&self, id: Option<Arc<str>>) -> Option<&flow_gates::Gate>;
+
+    fn get_inner_gate_ids(&self) -> Vec<Arc<str>>;
 
     fn is_finalised(&self) -> bool;
 

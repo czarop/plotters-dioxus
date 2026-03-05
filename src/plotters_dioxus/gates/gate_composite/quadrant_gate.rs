@@ -355,6 +355,9 @@ impl super::super::gate_traits::DrawableGate for QuadrantGate {
             None
         }
     }
+    fn get_inner_gate_ids(&self) -> Vec<Arc<str>>{
+        self.gates.keys().map(|k|k.clone()).collect()
+    }
 }
 
 

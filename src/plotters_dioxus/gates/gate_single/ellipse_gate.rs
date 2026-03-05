@@ -323,8 +323,11 @@ impl DrawableGate for EllipseGate {
         vec![]
     }
     
-    fn get_gate_ref(&self, id: Option<Arc<str>>) -> Option<&flow_gates::Gate>  {
+    fn get_gate_ref(&self, _id: Option<Arc<str>>) -> Option<&flow_gates::Gate>  {
         Some(&self.inner)
+    }
+    fn get_inner_gate_ids(&self) -> Vec<Arc<str>>{
+        vec![self.inner.id.clone()]
     }
 }
 

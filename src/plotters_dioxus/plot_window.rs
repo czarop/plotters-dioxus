@@ -4,7 +4,7 @@ use flow_gates::Gate;
 use crate::{
     file_load::FcsFiles,
     plotters_dioxus::{
-        AxisInfo, PseudoColourPlot, gate_sidebar::GateSidebar, gates::{GateState, gate_store::{GateStateImplExt, GateStateStoreExt}, gate_traits::DrawableGate, gate_types::GateType}, plot_helpers::{Param, ParameterStore, ParameterStoreImplExt, ParameterStoreStoreExt as _}
+        AxisInfo, PseudoColourPlot, gate_sidebar::GateSidebar, gates::{GateState, gate_store::{GateStateImplExt, GateStateStoreExt, ROOTGATE}, gate_traits::DrawableGate, gate_types::GateType}, plot_helpers::{Param, ParameterStore, ParameterStoreImplExt, ParameterStoreStoreExt as _}
     },
     searchable_select::SearchableSelect,
 };
@@ -262,7 +262,7 @@ pub fn PlotWindow() -> Element {
     });
 
     // this should be set when smth is selected in the sidebar
-    let mut parental_gate: Signal<Option<Arc<str>>> = use_signal(|| None);
+    let parental_gate: Signal<Option<Arc<str>>> = use_signal(|| Some(ROOTGATE.clone()));
 
     let mut plot_data_signal = use_signal(|| vec![]);
     let processed_data_resource = use_resource(move || {

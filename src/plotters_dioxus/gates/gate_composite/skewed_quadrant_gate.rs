@@ -524,6 +524,9 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
             None
         }
     }
+    fn get_inner_gate_ids(&self) -> Vec<Arc<str>>{
+        self.gates.keys().map(|k|k.clone()).collect()
+    }
 }
 
 fn create_skewed_quadrant_geos(
