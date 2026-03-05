@@ -262,6 +262,7 @@ pub fn create_default_rectangle(
     x_channel: &str,
     y_channel: &str,
 ) -> anyhow::Result<GateGeometry> {
+
     let half_width = width_raw / 2f32;
     let half_height = height_raw / 2f32;
 

@@ -57,6 +57,15 @@ pub fn PseudoColourPlot(
             .label(y_axis_info.param.to_string())
             .build()
             .expect("axis options failed");
+
+        let m = flow_plots::create_axis_specs(
+            &x_axis_options.range, 
+        &y_axis_options.range, &x_axis_info.transform, &y_axis_info.transform);
+
+        match m{
+            Ok((r, m)) => println!("{} {}", r.start, r.end),
+            Err(_) => todo!(),
+        }
         let mapper = PlotMapper::new(
             width as f32,
             height as f32,
@@ -72,6 +81,8 @@ pub fn PseudoColourPlot(
             .y_axis(y_axis_options)
             .build()
             .expect("shouldn't fail");
+
+
 
         let mut render_config = RenderConfig::default();
 

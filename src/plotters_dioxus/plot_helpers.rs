@@ -16,8 +16,8 @@ pub struct PlotMapper {
     y_data_range: RangeInclusive<f32>,
     x_transform: TransformType,
     y_transform: TransformType,
-    x_pix_range: std::ops::Range<u32>,
-    y_pix_range: std::ops::Range<u32>,
+    pub x_pix_range: std::ops::Range<u32>,
+    pub y_pix_range: std::ops::Range<u32>,
 }
 
 impl PlotMapper {
@@ -76,6 +76,7 @@ impl PlotMapper {
             yt = y_t.unwrap();
         }
 
+        // println!("x pixel {} data range start {} end {}, x pixel range start {}, end {}", px, self.x_data_range.start(), self.x_data_range.end(), self.x_pix_range.start, self.x_pix_range.end);
         let dx = pixel_to_raw(px, &self.x_data_range, &self.x_pix_range, &xt);
         let dy = pixel_to_raw_y(py, &self.y_data_range, &self.y_pix_range, &yt);
 
@@ -137,17 +138,6 @@ impl PlotMapper {
         let px = raw_to_pixel(dx, &self.x_data_range, &self.x_pix_range, &xt);
         let py = raw_to_pixel_y(dy, &self.y_data_range, &self.y_pix_range, &yt);
         
-        // if px > self.x_pix_range.end as f32 {
-        //     px = self.x_pix_range.end as f32
-        // } else if px < self.x_pix_range.start as f32 {
-        //     px = self.x_pix_range.start as f32
-        // }
-        // if py > self.y_pix_range.end as f32 {
-        //     py = self.y_pix_range.end as f32
-        // } else if py < self.y_pix_range.start as f32 {
-        //     py = self.y_pix_range.start as f32
-        // }
-
         (px, py)
     }
 
@@ -166,15 +156,6 @@ impl PlotMapper {
         (*self.y_data_range.start(), *self.y_data_range.end())
     }
 
-    // pub fn x_axis_range(&self) -> f32 {
-    //     let raw_x = self.x_data_range.end() - self.x_data_range.start();
-    //     self.x_transform.transform(&raw_x)
-    // }
-
-    // pub fn y_axis_range(&self) -> f32 {
-    //     let raw_y = self.y_data_range.start() - self.y_data_range.end();
-    //     self.y_transform.transform(&raw_y)
-    // }
 }
 
 #[derive(Clone, PartialEq, Debug)]
