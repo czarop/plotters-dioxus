@@ -1,0 +1,86 @@
+/* Sidebar Container */
+.custom-sidebar {
+    width: 250px;
+    height: 100%;
+    background-color: #f8f9fa;
+    border-right: 1px solid #e2e8f0;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.sidebar-title {
+    font-size: 1rem;
+    padding: 1rem;
+    margin: 0;
+    border-bottom: 1px solid #e2e8f0;
+    color: #333;
+}
+
+.sidebar-tree {
+    padding-top: 8px;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Individual Node Row */
+.gate-node-row {
+    display: flex;
+    align-items: center;
+    padding: 6px 8px;
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.15s ease;
+    color: #4a5568;
+}
+
+.gate-node-row:hover {
+    background-color: #e2e8f0;
+}
+
+/* Selected State */
+.gate-node-row.selected {
+    background-color: #cbd5e1;
+    color: #0f172a;
+    font-weight: 600;
+}
+
+/* The Chevron Container */
+.toggle-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    margin-right: 6px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.toggle-icon:hover {
+    background-color: #cbd5e1;
+}
+
+/* Default Chevron (pointing right) */
+.toggle-icon svg {
+    width: 14px;
+    height: 14px;
+    transition: transform 0.2s ease;
+}
+
+/* Expanded Chevron (rotated down) */
+.toggle-icon.expanded svg {
+    transform: rotate(90deg);
+}
+
+/* Keeps text aligned if there is no chevron */
+.toggle-icon-placeholder {
+    width: 20px;
+    margin-right: 6px;
+}
+
+.gate-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}

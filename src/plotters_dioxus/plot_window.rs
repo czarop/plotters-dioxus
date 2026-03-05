@@ -314,249 +314,252 @@ pub fn PlotWindow() -> Element {
 
     rsx! {
         document::Stylesheet { href: CSS_STYLE }
+        div { class: "sidebar-local",
+            // SidebarProvider {
+            //     Sidebar { variant: SidebarVariant::Sidebar,
+            //         SidebarContent {
+            GateSidebar { selected_id: parental_gate }
+            //     }
+            // }
+            main { class: "main-content",
 
-        div { class: "top-container",
-            SidebarProvider {
-                Sidebar { variant: SidebarVariant::Floating,
-                    SidebarContent {
-                        // Your GateSidebar must be in here!
-                        GateSidebar { selected_id: parental_gate }
-                    }
-                }
-            }
+                div { class: "gate-window",
 
-            div { class: "axis-controls-grid", style: "width: 600px;",
-                div { class: "grid-label", "X-Axis" }
-                SearchableSelect {
-                    items: sorted_params(),
-                    on_select: move |(_, v)| { x_axis_marker.set(v) },
-                    placeholder: x_axis_marker.peek().to_string(),
-                }
+                    div { class: "axis-controls-grid", style: "width: 600px;",
+                        div { class: "grid-label", "X-Axis" }
+                        SearchableSelect {
+                            items: sorted_params(),
+                            on_select: move |(_, v)| { x_axis_marker.set(v) },
+                            placeholder: x_axis_marker.peek().to_string(),
+                        }
 
-                div { class: "input-unit",
-                    label { "Cofactor" }
-                    input {
-                        r#type: "number",
-                        value: "{x_axis_limits.read().get_cofactor().unwrap_or_default().round()}",
-                        disabled: if x_axis_limits.read().is_linear() { true } else { false },
-                        oninput: move |evt| {
-                            if let Ok(val) = evt.value().parse::<i32>() {
-                                if val >= 1 {
-                                    let param = x_axis_marker.peek();
-                                    let res = parameter_settings.update_cofactor(&param.fluoro, val as f32);
-                                    match res {
-                                        Some((old, new)) => {
-                                            match gate_store.rescale_gates(&param.fluoro, &old, &new) {
-                                                Ok(_) => message.set(None),
-                                                Err(e) => {
-                                                    message.set(Some(e.join("\n")));
+                        div { class: "input-unit",
+                            label { "Cofactor" }
+                            input {
+                                r#type: "number",
+                                value: "{x_axis_limits.read().get_cofactor().unwrap_or_default().round()}",
+                                disabled: if x_axis_limits.read().is_linear() { true } else { false },
+                                oninput: move |evt| {
+                                    if let Ok(val) = evt.value().parse::<i32>() {
+                                        if val >= 1 {
+                                            let param = x_axis_marker.peek();
+                                            let res = parameter_settings.update_cofactor(&param.fluoro, val as f32);
+                                            match res {
+                                                Some((old, new)) => {
+                                                    match gate_store.rescale_gates(&param.fluoro, &old, &new) {
+                                                        Ok(_) => message.set(None),
+                                                        Err(e) => {
+                                                            message.set(Some(e.join("\n")));
+                                                        }
+                                                    };
                                                 }
-                                            };
+                                                None => {}
+                                            }
+
+                                        } else {
+                                            message
+                                                .set(
+                                                    Some("Arcsinh cofactor should be a positive integer".to_string()),
+                                                );
                                         }
-                                        None => {}
                                     }
-
-                                } else {
-                                    message
-                                        .set(
-                                            Some("Arcsinh cofactor should be a positive integer".to_string()),
-                                        );
-                                }
+                                },
+                                step: "any",
                             }
-                        },
-                        step: "any",
-                    }
-                }
-                div { class: "input-unit",
-                    label { "Lower" }
-                    input {
-                        r#type: "number",
-                        value: "{x_axis_limits.read().get_untransformed_lower().round()}",
-                        disabled: if x_axis_limits.read().is_linear() { true } else { false },
-                        oninput: move |e| {
-                            if let Ok(lower) = e.value().parse::<i32>() {
-                                let param = x_axis_marker.peek();
-                                parameter_settings.update_lower(&param.fluoro, lower as f32);
+                        }
+                        div { class: "input-unit",
+                            label { "Lower" }
+                            input {
+                                r#type: "number",
+                                value: "{x_axis_limits.read().get_untransformed_lower().round()}",
+                                disabled: if x_axis_limits.read().is_linear() { true } else { false },
+                                oninput: move |e| {
+                                    if let Ok(lower) = e.value().parse::<i32>() {
+                                        let param = x_axis_marker.peek();
+                                        parameter_settings.update_lower(&param.fluoro, lower as f32);
+                                    }
+                                },
                             }
-                        },
-                    }
-                }
-                div { class: "input-unit",
-                    label { "Upper" }
-                    input {
-                        r#type: "number",
-                        value: "{x_axis_limits.read().get_untransformed_upper().round()}",
-                        oninput: move |e| {
-                            if let Ok(upper) = e.value().parse::<i32>() {
-                                let param = x_axis_marker.peek();
-                                parameter_settings.update_upper(&param.fluoro, upper as f32);
+                        }
+                        div { class: "input-unit",
+                            label { "Upper" }
+                            input {
+                                r#type: "number",
+                                value: "{x_axis_limits.read().get_untransformed_upper().round()}",
+                                oninput: move |e| {
+                                    if let Ok(upper) = e.value().parse::<i32>() {
+                                        let param = x_axis_marker.peek();
+                                        parameter_settings.update_upper(&param.fluoro, upper as f32);
+                                    }
+                                },
                             }
-                        },
-                    }
-                }
+                        }
 
-                div { class: "grid-label", "Y-Axis" }
-                SearchableSelect {
-                    items: sorted_params(),
-                    on_select: move |(_, v)| { y_axis_marker.set(v) },
-                    placeholder: y_axis_marker.peek().to_string(),
-                }
+                        div { class: "grid-label", "Y-Axis" }
+                        SearchableSelect {
+                            items: sorted_params(),
+                            on_select: move |(_, v)| { y_axis_marker.set(v) },
+                            placeholder: y_axis_marker.peek().to_string(),
+                        }
 
-                div { class: "input-unit",
-                    label { "Cofactor" }
-                    input {
-                        r#type: "number",
-                        value: "{y_axis_limits.read().get_cofactor().unwrap_or_default().round()}",
-                        disabled: if y_axis_limits.read().is_linear() { true } else { false },
-                        oninput: move |evt| {
-                            if let Ok(val) = evt.value().parse::<i32>() {
-                                if val >= 1 {
-                                    message.set(None);
-                                    let param = y_axis_marker.peek();
-                                    let res = parameter_settings.update_cofactor(&param.fluoro, val as f32);
-                                    match res {
-                                        Some((old, new)) => {
-                                            match gate_store.rescale_gates(&param.fluoro, &old, &new) {
-                                                Ok(_) => message.set(None),
-                                                Err(e) => {
-                                                    message.set(Some(e.join("\n")));
+                        div { class: "input-unit",
+                            label { "Cofactor" }
+                            input {
+                                r#type: "number",
+                                value: "{y_axis_limits.read().get_cofactor().unwrap_or_default().round()}",
+                                disabled: if y_axis_limits.read().is_linear() { true } else { false },
+                                oninput: move |evt| {
+                                    if let Ok(val) = evt.value().parse::<i32>() {
+                                        if val >= 1 {
+                                            message.set(None);
+                                            let param = y_axis_marker.peek();
+                                            let res = parameter_settings.update_cofactor(&param.fluoro, val as f32);
+                                            match res {
+                                                Some((old, new)) => {
+                                                    match gate_store.rescale_gates(&param.fluoro, &old, &new) {
+                                                        Ok(_) => message.set(None),
+                                                        Err(e) => {
+                                                            message.set(Some(e.join("\n")));
+                                                        }
+                                                    };
                                                 }
-                                            };
+                                                None => {}
+                                            }
+                                        } else {
+                                            message
+                                                .set(
+                                                    Some("Arcsinh cofactor should be a positive integer".to_string()),
+                                                );
                                         }
-                                        None => {}
                                     }
-                                } else {
-                                    message
-                                        .set(
-                                            Some("Arcsinh cofactor should be a positive integer".to_string()),
-                                        );
-                                }
+                                },
+                                step: "any",
                             }
-                        },
-                        step: "any",
-                    }
-                }
-                div { class: "input-unit",
-                    label { "Lower" }
-                    input {
-                        r#type: "number",
-                        value: "{y_axis_limits.read().get_untransformed_lower().round()}",
-                        disabled: if y_axis_limits.read().is_linear() { true } else { false },
-                        oninput: move |e| {
-                            if let Ok(lower) = e.value().parse::<i32>() {
-                                let param = y_axis_marker.peek();
-                                parameter_settings.update_lower(&param.fluoro, lower as f32);
+                        }
+                        div { class: "input-unit",
+                            label { "Lower" }
+                            input {
+                                r#type: "number",
+                                value: "{y_axis_limits.read().get_untransformed_lower().round()}",
+                                disabled: if y_axis_limits.read().is_linear() { true } else { false },
+                                oninput: move |e| {
+                                    if let Ok(lower) = e.value().parse::<i32>() {
+                                        let param = y_axis_marker.peek();
+                                        parameter_settings.update_lower(&param.fluoro, lower as f32);
+                                    }
+                                },
                             }
-                        },
-                    }
-                }
-                div { class: "input-unit",
-                    label { "Upper" }
-                    input {
-                        r#type: "number",
-                        value: "{y_axis_limits.read().get_untransformed_upper().round()}",
-                        oninput: move |e| {
-                            if let Ok(upper) = e.value().parse::<i32>() {
-                                let param = y_axis_marker.peek();
-                                parameter_settings.update_upper(&param.fluoro, upper as f32);
-                            }
-                        },
-                    }
-                }
-            }
-            div { class: "file-info",
-                div { class: "file-info_button-panel",
-                    button {
-                        onclick: move |_| {
-                            if let Some(fcsfiles) = &*filehandler.read() {
-                                let count = fcsfiles.sample_count();
-                                let prev_index = (*sample_index.read() + count - 1) % count;
-                                sample_index.set(prev_index);
-                            }
-
-                        },
-                        "Prev"
-                    }
-                    button {
-                        onclick: move |_| {
-                            if let Some(fcsfiles) = &*filehandler.read() {
-                                let next_index = (*sample_index.read() + 1) % fcsfiles.sample_count();
-                                sample_index.set(next_index);
-                            }
-
-                        },
-                        "Next"
-                    }
-                }
-                match &*filehandler.read() {
-                    Some(fh) => {
-                        let list = fh.get_file_names();
-                        rsx! {
-                            SearchableSelect {
-                                items: list,
-                                on_select: move |(i, _)| { sample_index.set(i) },
-                                placeholder: "Select a file".to_string(),
-                                selected_index: Some(sample_index.into()),
+                        }
+                        div { class: "input-unit",
+                            label { "Upper" }
+                            input {
+                                r#type: "number",
+                                value: "{y_axis_limits.read().get_untransformed_upper().round()}",
+                                oninput: move |e| {
+                                    if let Ok(upper) = e.value().parse::<i32>() {
+                                        let param = y_axis_marker.peek();
+                                        parameter_settings.update_upper(&param.fluoro, upper as f32);
+                                    }
+                                },
                             }
                         }
                     }
-                    None => rsx! {},
+                    div { class: "file-info",
+                        div { class: "file-info_button-panel",
+                            button {
+                                onclick: move |_| {
+                                    if let Some(fcsfiles) = &*filehandler.read() {
+                                        let count = fcsfiles.sample_count();
+                                        let prev_index = (*sample_index.read() + count - 1) % count;
+                                        sample_index.set(prev_index);
+                                    }
+
+                                },
+                                "Prev"
+                            }
+                            button {
+                                onclick: move |_| {
+                                    if let Some(fcsfiles) = &*filehandler.read() {
+                                        let next_index = (*sample_index.read() + 1) % fcsfiles.sample_count();
+                                        sample_index.set(next_index);
+                                    }
+
+                                },
+                                "Next"
+                            }
+                        }
+                        match &*filehandler.read() {
+                            Some(fh) => {
+                                let list = fh.get_file_names();
+                                rsx! {
+                                    SearchableSelect {
+                                        items: list,
+                                        on_select: move |(i, _)| { sample_index.set(i) },
+                                        placeholder: "Select a file".to_string(),
+                                        selected_index: Some(sample_index.into()),
+                                    }
+                                }
+                            }
+                            None => rsx! {},
+                        }
+                    
+                    }
+                }
+                div { class: "status-message",
+                    {
+                        match &*processed_data_resource.read() {
+                            Some(Ok(_)) => {
+                                rsx! {}
+                            }
+                            Some(Err(e)) => {
+                                rsx! {
+                                    p { class: "error-message", "Error: {e}" }
+                                }
+                            }
+                            None => {
+                                rsx! {
+                                    p { class: "loading-message", "Loading and processing data..." }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                {
+
+                    if !plot_data_signal.read().is_empty() {
+
+                        rsx! {
+                            div {
+                                NewGateButtons { callback: move |gate_type| current_gate_type.set(gate_type) }
+                                PseudoColourPlot {
+                                    size: (600, 600),
+                                    data: plot_data_signal,
+                                    x_axis_info: x_axis_limits.read().clone(),
+                                    y_axis_info: y_axis_limits.read().clone(),
+                                    parental_gate_id: parental_gate,
+                                }
+                            }
+                        }
+                    } else {
+                        rsx! {
+                            div {
+                                border: "1px solid #ddd",
+                                width: "600px",
+                                height: "600px",
+                                display: "flex",
+                                align_items: "center",
+                                justify_content: "center",
+                                background_color: "#f9f9f9",
+                                color: "#888",
+                                "Plot area (waiting for data)"
+                            }
+                        }
+                    }
                 }
             
             }
         }
-        div { class: "status-message",
-            {
-                match &*processed_data_resource.read() {
-                    Some(Ok(_)) => {
-                        rsx! {}
-                    }
-                    Some(Err(e)) => {
-                        rsx! {
-                            p { class: "error-message", "Error: {e}" }
-                        }
-                    }
-                    None => {
-                        rsx! {
-                            p { class: "loading-message", "Loading and processing data..." }
-                        }
-                    }
-                }
-            }
-        }
-
-        {
-
-            if !plot_data_signal.read().is_empty() {
-
-                rsx! {
-                    div {
-                        NewGateButtons { callback: move |gate_type| current_gate_type.set(gate_type) }
-                        PseudoColourPlot {
-                            size: (600, 600),
-                            data: plot_data_signal,
-                            x_axis_info: x_axis_limits.read().clone(),
-                            y_axis_info: y_axis_limits.read().clone(),
-                            parental_gate_id: parental_gate,
-                        }
-                    }
-                }
-            } else {
-                rsx! {
-                    div {
-                        border: "1px solid #ddd",
-                        width: "600px",
-                        height: "600px",
-                        display: "flex",
-                        align_items: "center",
-                        justify_content: "center",
-                        background_color: "#f9f9f9",
-                        color: "#888",
-                        "Plot area (waiting for data)"
-                    }
-                }
-            }
-        }
-
     }
-}
+    }
+

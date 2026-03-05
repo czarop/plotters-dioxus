@@ -4,7 +4,7 @@ use flow_gates::{Gate, GateHierarchy};
 use rustc_hash::FxHashMap;
 
 use std::{
-    sync::{Arc},
+    sync::{Arc, LazyLock},
 };
 
 use crate::plotters_dioxus::{
@@ -15,6 +15,8 @@ use crate::plotters_dioxus::{
 };
 
 pub type GateId = std::sync::Arc<str>;
+
+pub static ROOTGATE:LazyLock<Arc<str>> = LazyLock::new(|| Arc::from("root"));
 
 #[derive(Hash, PartialEq, Eq, Clone)]
 pub struct GatesOnPlotKey {
@@ -211,9 +213,9 @@ impl<Lens> Store<GateState, Lens> {
             .or_insert(vec![])
             .push(gate_key.clone());
 
-        println!("Adding gate {} with parent {}", g.get_id(), parental_gate_id.as_ref().unwrap_or(&Arc::from("default - root")));
+        println!("Adding gate {} with parent {}", g.get_id(), parental_gate_id.as_ref().unwrap_or(&ROOTGATE));
         self.hierarchy().write().add_gate_child(
-            parental_gate_id.unwrap_or(Arc::from("root")),
+            parental_gate_id.unwrap_or(ROOTGATE.clone()),
             g.get_id(),
         )?;
 

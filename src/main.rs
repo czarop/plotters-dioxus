@@ -2,12 +2,15 @@
 
 use clingate::plotters_dioxus::route::Route;
 use dioxus::prelude::*;
+
 #[cfg(feature = "desktop")]
 use dioxus::desktop::{Config, LogicalSize, WindowBuilder};
 
 static NAV_STYLE: Asset = asset!("assets/navbar.css");
 static COMPONENTS_STYLE: Asset = asset!("assets/dx-components-theme.css");
 static COMPONENTS_STYLE_2: Asset = asset!("assets/searchable_select.css");
+
+
 
 #[component]
 fn App() -> Element {
@@ -19,7 +22,7 @@ fn App() -> Element {
     }
 }
 
-#[cfg(feature = "desktop")]
+// #[cfg(feature = "desktop")]
 fn main() {
     use dioxus::desktop::{Config, WindowBuilder, LogicalSize};
 
