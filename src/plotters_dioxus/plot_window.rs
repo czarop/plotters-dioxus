@@ -11,7 +11,7 @@ use crate::{
 };
 use flow_fcs::{Fcs, TransformType, Transformable};
 use crate::plotters_dioxus::gates::gate_buttons::NewGateButtons;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use tokio::task;
 
 async fn get_flow_data(path: std::path::PathBuf) -> Result<Arc<Fcs>, Arc<anyhow::Error>> {
@@ -49,7 +49,7 @@ async fn get_scaled_data_to_display(
         None
     };
     let store = use_context::<Store<ParameterStore>>();
-    let settings=store().settings; // this clones - could be behind arc mutex
+    let settings= store().settings;
 
     task::spawn_blocking(move || -> Result<Vec<(f32, f32)>, anyhow::Error> {
     let mut df = fs_clone.data_frame.as_ref().clone();
@@ -60,7 +60,7 @@ async fn get_scaled_data_to_display(
             .collect();
 
         // 1. Get the final narrowed mask for the whole hierarchy
-        let mask = super::gates::gate_filtering::filter_events_by_hierarchy_to_mask(&fs_clone, &gate_refs, &settings)?;
+        let mask = super::gates::gate_filtering::filter_events_by_hierarchy_to_mask(&fs_clone, &gate_refs, settings)?;
 
         // 2. Filter the dataframe once at the end
         df = df.filter(&mask)?;
@@ -192,16 +192,16 @@ pub fn PlotWindow() -> Element {
     // fetch the axis limits from the settings dict when axis changed
     let x_axis_limits = use_memo(move || {
         let param = x_axis_marker.read();
-        match parameter_settings.settings().get(param.fluoro.clone()) {
-            Some(d) => d().clone(),
+        match parameter_settings.settings().read().read().expect("lock poisoned").get(&param.fluoro) {
+            Some(d) => d.clone(),
             None => AxisInfo::default(),
         }
     });
 
     let y_axis_limits = use_memo(move || {
         let param = y_axis_marker();
-        match parameter_settings.settings().get(param.fluoro.clone()) {
-            Some(d) => d().clone(),
+        match parameter_settings.settings().read().read().expect("lock poisoned").get(&param.fluoro) {
+            Some(d) => d.clone(),
             None => AxisInfo::default(),
         }
     });
@@ -219,14 +219,16 @@ pub fn PlotWindow() -> Element {
             let parental_gate = &*parental_gate.read();
             let x_transform = parameter_settings
                 .settings()
-                .get(x_fluoro.clone())
-                .ok_or_else(|| anyhow::anyhow!("No data yet"))?()
+                .read().read().expect("lock poisoned")
+                .get(&x_fluoro)
+                .ok_or_else(|| anyhow::anyhow!("No data yet"))?
             .transform
             .clone();
             let y_transform = parameter_settings
                 .settings()
-                .get(y_fluoro.clone())
-                .ok_or_else(|| anyhow::anyhow!("No data yet"))?()
+                .read().read().expect("lock poisoned")
+                .get(&y_fluoro)
+                .ok_or_else(|| anyhow::anyhow!("No data yet"))?
             .transform
             .clone();
 
@@ -290,7 +292,7 @@ pub fn PlotWindow() -> Element {
                                             let param = x_axis_marker.peek();
                                             let res = parameter_settings.update_cofactor(&param.fluoro, val as f32);
                                             match res {
-                                                Some((old, new)) => {
+                                                Ok((old, new)) => {
                                                     match gate_store.rescale_gates(&param.fluoro, &old, &new) {
                                                         Ok(_) => message.set(None),
                                                         Err(e) => {
@@ -298,9 +300,9 @@ pub fn PlotWindow() -> Element {
                                                         }
                                                     };
                                                 }
-                                                None => {}
-                                            }
+                                                Err(e) => println!("{e}"),
 
+                                            }
                                         } else {
                                             message
                                                 .set(
@@ -360,7 +362,7 @@ pub fn PlotWindow() -> Element {
                                             let param = y_axis_marker.peek();
                                             let res = parameter_settings.update_cofactor(&param.fluoro, val as f32);
                                             match res {
-                                                Some((old, new)) => {
+                                                Ok((old, new)) => {
                                                     match gate_store.rescale_gates(&param.fluoro, &old, &new) {
                                                         Ok(_) => message.set(None),
                                                         Err(e) => {
@@ -368,7 +370,7 @@ pub fn PlotWindow() -> Element {
                                                         }
                                                     };
                                                 }
-                                                None => {}
+                                                Err(e) => println!("{e}"),
                                             }
                                         } else {
                                             message

@@ -185,42 +185,42 @@ impl AxisInfo {
         }
     }
 
-    pub fn into_new_lower(self, lower_raw: f32) -> Self {
+    pub fn into_new_lower(&self, lower_raw: f32) -> Self {
         match self.transform {
             TransformType::Linear => Self {
-                param: self.param,
+                param: self.param.clone(),
                 lower: lower_raw,
                 upper: self.upper,
-                transform: self.transform,
+                transform: self.transform.clone(),
             },
             TransformType::Arcsinh { cofactor } => {
                 let new_lower = asinh_transform_f32(lower_raw, cofactor).unwrap_or(self.lower);
                 Self {
-                    param: self.param,
+                    param: self.param.clone(),
                     lower: new_lower,
                     upper: self.upper,
-                    transform: self.transform,
+                    transform: self.transform.clone(),
                 }
             }
             TransformType::Biexponential { .. } => todo!(),
         }
     }
 
-    pub fn into_new_upper(self, upper_raw: f32) -> Self {
+    pub fn into_new_upper(&self, upper_raw: f32) -> Self {
         match self.transform {
             TransformType::Linear => Self {
-                param: self.param,
+                param: self.param.clone(),
                 lower: self.lower,
                 upper: upper_raw,
-                transform: self.transform,
+                transform: self.transform.clone(),
             },
             TransformType::Arcsinh { cofactor } => {
                 let new_upper = asinh_transform_f32(upper_raw, cofactor).unwrap_or(self.upper);
                 Self {
-                    param: self.param,
+                    param: self.param.clone(),
                     lower: self.lower,
                     upper: new_upper,
-                    transform: self.transform,
+                    transform: self.transform.clone(),
                 }
             }
             TransformType::Biexponential { .. } => todo!(),

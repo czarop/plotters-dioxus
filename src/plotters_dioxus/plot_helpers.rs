@@ -1,11 +1,12 @@
+use anyhow::anyhow;
 use dioxus::prelude::*;
 use flow_fcs::{TransformType};
 use flow_gates::transforms::{
-    get_plotting_area, pixel_to_raw, pixel_to_raw_y, raw_to_pixel, raw_to_pixel_y, raw_to_transformed, transformed_to_raw,
+    get_plotting_area, pixel_to_raw, pixel_to_raw_y, raw_to_pixel, raw_to_pixel_y
 };
 use rustc_hash::FxHashMap;
 use core::f32;
-use std::{collections::HashMap, ops::RangeInclusive, sync::Arc};
+use std::{ops::RangeInclusive, sync::{Arc, RwLock}};
 
 use crate::plotters_dioxus::{AxisInfo, gates::GateId};
 
@@ -187,7 +188,7 @@ impl std::fmt::Display for Param {
 
 #[derive(Default, Store, Clone)]
 pub struct ParameterStore {
-    pub settings: FxHashMap<Arc<str>, AxisInfo>,
+    pub settings: Arc<RwLock<FxHashMap<Arc<str>, AxisInfo>>>,
 }
 
 #[store(pub name = ParameterStoreImplExt)]
@@ -195,6 +196,8 @@ impl<Lens> Store<ParameterStore, Lens> {
     fn add_new_axis_settings(&mut self, p: &Param, fcs_file: &flow_fcs::Fcs) {
         self.settings()
             .write()
+            .write()
+            .expect("Lock poisoned")
             .entry(p.fluoro.clone())
             .or_insert_with(|| {
                 // Determine transform based on channel metadata
@@ -221,47 +224,58 @@ impl<Lens> Store<ParameterStore, Lens> {
             });
     }
 
-    fn update_cofactor(&mut self, id: &GateId, cofactor: f32) -> Option<(AxisInfo, AxisInfo)> {
+    fn update_cofactor(&mut self, id: &Arc<str>, cofactor: f32) -> anyhow::Result<(AxisInfo, AxisInfo)> {
         let mut old = None;
         let mut new = None;
-        self.settings()
+
+        match self.settings()
             .write()
-            .entry(id.clone())
-            .and_modify(|axis| {
-                if let TransformType::Arcsinh { .. } = axis.transform {
-                    let old_axis = std::mem::take(axis);
-                    let new_axis = (&old_axis)
-                        .into_archsinh(cofactor)
-                        .unwrap_or(old_axis.clone());
-                    new = Some(new_axis.clone());
-                    old = Some(old_axis);
-                    *axis = new_axis;
-                }
-            });
+            .write(){
+                Ok(mut w) => {
+                    w.entry(id.clone())
+                        .and_modify(|axis| {
+                            if let TransformType::Arcsinh { .. } = axis.transform {
+                                let old_axis = std::mem::take(axis);
+                                let new_axis = (&old_axis)
+                                    .into_archsinh(cofactor)
+                                    .unwrap_or(old_axis.clone());
+                                new = Some(new_axis.clone());
+                                old = Some(old_axis);
+                                *axis = new_axis;
+                            }
+                        });
+                },
+                Err(_) => return Err(anyhow!("Could not get write lock")),
+            }
+        
 
         if new.is_some() && old.is_some() {
-            return Some((old.unwrap(), new.unwrap()));
+            return Ok((old.unwrap(), new.unwrap()));
         }
 
-        None
+        Err(anyhow!("Could not find axis"))
     }
 
     fn update_lower(&mut self, id: &GateId, lower: f32) {
         self.settings()
-            .write()
-            .entry(id.clone())
-            .and_modify(|axis| {
-                let old_axis = std::mem::take(axis);
-                *axis = old_axis.into_new_lower(lower);
-            });
+        .write()
+        .write()
+        .expect("lock poisoned")
+        .entry(id.clone())
+        .and_modify(|axis_arc| {
+            let new_axis_data = axis_arc.into_new_lower(lower);
+            *axis_arc = new_axis_data;
+        });
     }
     fn update_upper(&mut self, id: &GateId, upper: f32) {
         self.settings()
-            .write()
-            .entry(id.clone())
-            .and_modify(|axis| {
-                let old_axis = std::mem::take(axis);
-                *axis = old_axis.into_new_upper(upper);
-            });
+        .write()
+        .write()
+        .expect("lock poisoned")
+        .entry(id.clone())
+        .and_modify(|axis_arc| {
+            let new_axis_data = axis_arc.into_new_upper(upper);
+            *axis_arc = new_axis_data;
+        });
     }
 }

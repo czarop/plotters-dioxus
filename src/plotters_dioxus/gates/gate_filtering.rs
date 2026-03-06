@@ -1,3 +1,5 @@
+use std::sync::RwLock;
+
 use flow_fcs::{Fcs, Transformable};
 use flow_gates::{Gate, GateGeometry};
 use polars::prelude::*;
@@ -5,7 +7,7 @@ use dioxus::prelude::*;
 
 
 pub fn filter_events_to_mask(fcs: &Fcs, gate: &Gate, 
-    axis_settings: &rustc_hash::FxHashMap<Arc<str>, crate::plotters_dioxus::AxisInfo>
+    axis_settings: Arc<RwLock<rustc_hash::FxHashMap<Arc<str>, crate::plotters_dioxus::AxisInfo>>>
     // axis_settings: Store<crate::plotters_dioxus::plot_helpers::ParameterStore>,
 
 ) -> anyhow::Result<BooleanChunked> {
@@ -14,8 +16,9 @@ pub fn filter_events_to_mask(fcs: &Fcs, gate: &Gate,
     let (x_param, y_param) = gate.parameters.clone();
     // let x_transform = axis_settings.settings().get(x_param.clone()).ok_or_else(|| anyhow::anyhow!("axis info not found for {}", x_param.clone()))?().transform;
     // let y_transform = axis_settings.settings().get(y_param.clone()).ok_or_else(|| anyhow::anyhow!("axis info not found for {}", y_param.clone()))?().transform;
-    let x_transform = axis_settings.get(&x_param).ok_or_else(|| anyhow::anyhow!("axis info not found for {}", x_param.clone()))?.transform.clone();
-    let y_transform = axis_settings.get(&y_param).ok_or_else(|| anyhow::anyhow!("axis info not found for {}", y_param.clone()))?.transform.clone();
+    
+    let x_transform = axis_settings.read().expect("lock poisoned").get(&x_param).ok_or_else(|| anyhow::anyhow!("axis info not found for {}", x_param.clone()))?.transform.clone();
+    let y_transform = axis_settings.read().expect("lock poisoned").get(&y_param).ok_or_else(|| anyhow::anyhow!("axis info not found for {}", y_param.clone()))?.transform.clone();
 
     let df = &fcs.data_frame;
     
@@ -194,7 +197,7 @@ pub fn filter_events_to_mask(fcs: &Fcs, gate: &Gate,
 pub fn filter_events_by_hierarchy_to_mask(
     fcs: &Fcs,
     gate_chain: &[&Gate],
-    axis_settings: &rustc_hash::FxHashMap<Arc<str>, crate::plotters_dioxus::AxisInfo>
+    axis_settings: Arc<RwLock<rustc_hash::FxHashMap<Arc<str>, crate::plotters_dioxus::AxisInfo>>>
     // axis_settings: Store<crate::plotters_dioxus::plot_helpers::ParameterStore>,
 ) -> Result<BooleanChunked, anyhow::Error> {
     let event_count = fcs.data_frame.height();
@@ -204,7 +207,7 @@ pub fn filter_events_by_hierarchy_to_mask(
 
     for gate in gate_chain {
         // Generate the mask for the current gate ONLY
-        let gate_mask = filter_events_to_mask(fcs, gate, axis_settings)?;
+        let gate_mask = filter_events_to_mask(fcs, gate, axis_settings.clone())?;
 
         // Bitwise AND: narrow the population
         final_mask = final_mask & gate_mask;
