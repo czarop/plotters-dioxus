@@ -52,12 +52,15 @@ pub fn filter_events_to_mask(fcs: &Fcs, gate: &Gate,
             angle,
         } => {
             // 1. EXTRACTION: Get coordinates from the HashMap once
-            let h = center
+            let h = x_transform.inverse_transform(&center
                 .get_coordinate(&x_param)
-                .ok_or_else(|| anyhow::anyhow!("Missing X"))?;
-            let k = center
+                .ok_or_else(|| anyhow::anyhow!("Missing X"))?);
+            let k = y_transform.inverse_transform(&center
                 .get_coordinate(&y_param)
-                .ok_or_else(|| anyhow::anyhow!("Missing Y"))?;
+                .ok_or_else(|| anyhow::anyhow!("Missing Y"))?);
+
+            let radius_x = x_transform.inverse_transform(&radius_x);
+            let radius_y = y_transform.inverse_transform(&radius_y);
 
             // 2. PRE-CALCULATION: Trig and Bounding Box
             let cos_a = angle.cos();
@@ -107,8 +110,8 @@ pub fn filter_events_to_mask(fcs: &Fcs, gate: &Gate,
             let coords: Vec<(f32, f32)> = nodes
                 .iter()
                 .filter_map(|node| {
-                    let x = node.get_coordinate(&x_param)?;
-                    let y = node.get_coordinate(&y_param)?;
+                    let x = x_transform.inverse_transform(&node.get_coordinate(&x_param)?);
+                    let y = y_transform.inverse_transform(&node.get_coordinate(&y_param)?);
                     Some((x, y))
                 })
                 .collect();
