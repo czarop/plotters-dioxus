@@ -1,6 +1,5 @@
 use dioxus::prelude::*;
 use flow_gates::Gate;
-use rustc_hash::FxHashMap;
 
 use crate::{
     file_load::FcsFiles,
@@ -11,7 +10,7 @@ use crate::{
 };
 use flow_fcs::{Fcs, TransformType, Transformable};
 use crate::plotters_dioxus::gates::gate_buttons::NewGateButtons;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc};
 use tokio::task;
 
 async fn get_flow_data(path: std::path::PathBuf) -> Result<Arc<Fcs>, Arc<anyhow::Error>> {

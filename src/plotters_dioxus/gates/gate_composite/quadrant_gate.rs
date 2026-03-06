@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use crate::plotters_dioxus::{
     gates::{
-        gate_drag::PointDragData, gate_single::polygon_gate::PolygonGate, gate_traits::DrawableGate, gate_types::{DEFAULT_LINE, GREY_LINE_DASHED, GateRenderShape, SELECTED_LINE, ShapeType}
+        gate_drag::PointDragData, gate_single::polygon_gate::PolygonGate, gate_traits::DrawableGate, gate_types::{DEFAULT_LINE, GateRenderShape, SELECTED_LINE, ShapeType}
     },
     plot_helpers::PlotMapper,
 };
@@ -136,21 +136,6 @@ impl QuadrantGate {
         }
     }
 
-    fn clone_with_gates_and_loc(
-        &self,
-        gates: FxIndexMap<Arc<str>, PolygonGate>,
-        cx: f32,
-        cy: f32,
-    ) -> Box<dyn DrawableGate> {
-        let new_points = (cx, cy);
-        Box::new(Self {
-            gates,
-            id: self.id.clone(),
-            points: new_points,
-            axis_matched: self.axis_matched,
-            parameters: self.parameters.clone(),
-        })
-    }
 
     fn clone_with_point(
         &self,

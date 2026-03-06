@@ -4,7 +4,7 @@ use flow_gates::{Gate, GateHierarchy};
 use rustc_hash::FxHashMap;
 
 use std::{
-    f32::consts::E, sync::{Arc, LazyLock}
+    sync::{Arc, LazyLock}
 };
 
 use crate::plotters_dioxus::{

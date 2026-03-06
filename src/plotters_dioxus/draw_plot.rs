@@ -14,7 +14,7 @@ use flow_plots::{
     BasePlotOptions, ColorMaps, DensityPlot, DensityPlotOptions, Plot, render::RenderConfig,
 };
 
-use crate::plotters_dioxus::{AxisInfo, axis_info::asinh_reverse_f32, draw_gates::GateLayer, plot_helpers::PlotMapper};
+use crate::plotters_dioxus::{AxisInfo, draw_gates::GateLayer, plot_helpers::PlotMapper};
 
 pub type DioxusDrawingArea<'a> = DrawingArea<BitMapBackend<'a>, Shift>;
 
