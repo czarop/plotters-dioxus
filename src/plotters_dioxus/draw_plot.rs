@@ -14,7 +14,7 @@ use flow_plots::{
     BasePlotOptions, ColorMaps, DensityPlot, DensityPlotOptions, Plot, render::RenderConfig,
 };
 
-use crate::plotters_dioxus::{AxisInfo, draw_gates::GateLayer, plot_helpers::PlotMapper};
+use crate::plotters_dioxus::{AxisInfo, axis_info::asinh_reverse_f32, draw_gates::GateLayer, plot_helpers::PlotMapper};
 
 pub type DioxusDrawingArea<'a> = DrawingArea<BitMapBackend<'a>, Shift>;
 
@@ -48,29 +48,62 @@ pub fn PseudoColourPlot(
         let x_axis_options = flow_plots::AxisOptions::new()
             .range(x_axis_info.lower..=x_axis_info.upper)
             .transform(x_axis_info.transform.clone())
+            // .transform(flow_fcs::TransformType::Linear)
             .label(&x_axis_info.param.to_string())
             .build()
             .expect("axis options failed");
         let y_axis_options = flow_plots::AxisOptions::new()
             .range(y_axis_info.lower..=y_axis_info.upper)
             .transform(y_axis_info.transform.clone())
+            // .transform(flow_fcs::TransformType::Linear)
             .label(y_axis_info.param.to_string())
             .build()
             .expect("axis options failed");
 
-        let m = flow_plots::create_axis_specs(
+        let actual_ranges = flow_plots::create_axis_specs(
             &x_axis_options.range, 
-        &y_axis_options.range, &x_axis_info.transform, &y_axis_info.transform);
+        &y_axis_options.range, &x_axis_info.transform, &y_axis_info.transform).expect("should not fail");
 
-        match m{
-            Ok((r, m)) => println!("{} {}", r.start, r.end),
-            Err(_) => todo!(),
-        }
+        let(inc_x, inc_y) = {
+            (actual_ranges.0.start..=actual_ranges.0.end, actual_ranges.1.start..=actual_ranges.1.end)
+                // let inc_x = match x_axis_info.transform{
+                //     flow_fcs::TransformType::Linear => actual_ranges.0.start..=actual_ranges.0.end,
+                //     flow_fcs::TransformType::Arcsinh { cofactor } => {
+                //         // let s = asinh_reverse_f32(actual_ranges.0.start, cofactor).expect("should not fail");
+                //         // let e = asinh_reverse_f32(actual_ranges.0.end, cofactor).expect("should not fail");
+                //         let s = actual_ranges.0.start;
+                //         let e = actual_ranges.0.end;
+                //         s..=e
+                //     },
+                //     flow_fcs::TransformType::Biexponential { .. } => todo!(),
+                // };
+                
+                
+                // let inc_y = match y_axis_info.transform{
+                //     flow_fcs::TransformType::Linear => actual_ranges.1.start..=actual_ranges.1.end,
+                //     flow_fcs::TransformType::Arcsinh { cofactor } => {
+                //         // let s = asinh_reverse_f32(actual_ranges.1.start, cofactor).expect("should not fail");
+                //         // let e = asinh_reverse_f32(actual_ranges.1.end, cofactor).expect("should not fail");
+                //         let s = actual_ranges.1.start;
+                //         let e = actual_ranges.1.end;
+                //         s..=e
+                //     },
+                //     flow_fcs::TransformType::Biexponential { .. } => todo!(),
+                // };
+
+                // (inc_x, inc_y)
+            
+        };
+
+        println!("X Bounds are: {}, {}", inc_x.start(), inc_x.end());
+        
         let mapper = PlotMapper::new(
             width as f32,
             height as f32,
-            x_axis_options.range.clone(),
-            y_axis_options.range.clone(),
+            // x_axis_options.range.clone(),
+            // y_axis_options.range.clone(),
+            inc_x,
+            inc_y,
             x_axis_info.transform.clone(),
             y_axis_info.transform.clone(),
         );

@@ -1,5 +1,6 @@
 use dioxus::prelude::*;
 use flow_gates::Gate;
+use rustc_hash::FxHashMap;
 
 use crate::{
     file_load::FcsFiles,
@@ -9,7 +10,6 @@ use crate::{
     searchable_select::SearchableSelect,
 };
 use flow_fcs::{Fcs, TransformType, Transformable};
-use crate::components::sidebar::*;
 use crate::plotters_dioxus::gates::gate_buttons::NewGateButtons;
 use std::sync::Arc;
 use tokio::task;
@@ -23,62 +23,6 @@ async fn get_flow_data(path: std::path::PathBuf) -> Result<Arc<Fcs>, Arc<anyhow:
     .map_err(|e| Arc::new(e.into()))?
 }
 
-// async fn get_scaled_data_to_display(
-//     fs: Arc<Fcs>,
-//     col1_name: &str,
-//     col2_name: &str,
-//     transform_1: TransformType,
-//     transform_2: TransformType,
-//     parental_gate_id: &Option<Arc<str>>
-// ) -> Result<Vec<(f32, f32)>, anyhow::Error> {
-//     let fs_clone = fs.clone();
-//     let col1_name = col1_name.to_string();
-//     let col2_name = col2_name.to_string();
-//     let gate_store: Store<GateState> = use_context::<Store<GateState>>();
-//     let gate_chain: Option<Vec<(Arc<str>, Arc<dyn DrawableGate>)>> = if let Some(parent) = parental_gate_id {
-        
-//         let arcs: Vec<(Arc<str>, Arc<dyn DrawableGate>)> = gate_store.hierarchy().peek().get_chain_to_root(parent)
-//             .iter()
-//             .filter_map(|id| {
-//                 gate_store.gate_registry().peek().get(id).map(|g| (id.clone(), g.clone()))
-//     })
-//             .collect();
-        
-//         if arcs.is_empty() { None } else { Some(arcs) }
-//     } else {
-//         None
-//     };
-
-//     task::spawn_blocking(move || -> Result<Vec<(f32, f32)>, anyhow::Error> {
-        
-//         let cols = fs_clone.get_xy_pairs(&col1_name, &col2_name)?;
-//         let zipped_cols: Vec<(f32, f32)>;
-        
-//         if let Some(chain) = gate_chain {
-            
-//             let gate_refs: Vec<&Gate> = chain.iter()
-//             .filter_map(|(id, gate)| gate.get_gate_ref(Some(id.clone()))) 
-//             .collect();
-
-//             let indices = flow_gates::filter_events_by_hierarchy(&fs_clone, &gate_refs, None, None)?;
-//             zipped_cols = indices
-//                 .into_iter()
-//                 .map(|idx| {
-//                     let x = cols[idx].0;
-//                     let y = cols[idx].1;
-//                     (transform_1.transform(&x), transform_2.transform(&y))
-//                 })
-//                 .collect();
-//         } else {
-//             zipped_cols = cols
-//                 .into_iter()
-//                 .map(|(x, y)| (transform_1.transform(&x), transform_2.transform(&y)))
-//                 .collect();
-//         }
-//         Ok(zipped_cols)
-//     })
-//     .await?
-// }
 
 async fn get_scaled_data_to_display(
     fs: Arc<Fcs>,
@@ -93,7 +37,6 @@ async fn get_scaled_data_to_display(
     let col2_name = col2_name.to_string();
     let gate_store: Store<GateState> = use_context::<Store<GateState>>();
     let gate_chain: Option<Vec<(Arc<str>, Arc<dyn DrawableGate>)>> = if let Some(parent) = parental_gate_id {
-        println!("parental gate id is {}", parent);
         let arcs: Vec<(Arc<str>, Arc<dyn DrawableGate>)> = gate_store.hierarchy().peek().get_chain_to_root(parent)
             .iter()
             .filter_map(|id| {
@@ -105,6 +48,8 @@ async fn get_scaled_data_to_display(
     } else {
         None
     };
+    let store = use_context::<Store<ParameterStore>>();
+    let settings=store().settings; // this clones - could be behind arc mutex
 
     task::spawn_blocking(move || -> Result<Vec<(f32, f32)>, anyhow::Error> {
     let mut df = fs_clone.data_frame.as_ref().clone();
@@ -115,7 +60,7 @@ async fn get_scaled_data_to_display(
             .collect();
 
         // 1. Get the final narrowed mask for the whole hierarchy
-        let mask = super::gates::gate_filtering::filter_events_by_hierarchy_to_mask(&fs_clone, &gate_refs)?;
+        let mask = super::gates::gate_filtering::filter_events_by_hierarchy_to_mask(&fs_clone, &gate_refs, &settings)?;
 
         // 2. Filter the dataframe once at the end
         df = df.filter(&mask)?;

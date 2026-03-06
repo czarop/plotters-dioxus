@@ -1,28 +1,41 @@
-use flow_fcs::Fcs;
+use flow_fcs::{Fcs, Transformable};
 use flow_gates::{Gate, GateGeometry};
 use polars::prelude::*;
+use dioxus::prelude::*;
 
-pub fn filter_events_to_mask(fcs: &Fcs, gate: &Gate) -> anyhow::Result<BooleanChunked> {
+
+pub fn filter_events_to_mask(fcs: &Fcs, gate: &Gate, 
+    axis_settings: &rustc_hash::FxHashMap<Arc<str>, crate::plotters_dioxus::AxisInfo>
+    // axis_settings: Store<crate::plotters_dioxus::plot_helpers::ParameterStore>,
+
+) -> anyhow::Result<BooleanChunked> {
+    
+    
+    let (x_param, y_param) = gate.parameters.clone();
+    // let x_transform = axis_settings.settings().get(x_param.clone()).ok_or_else(|| anyhow::anyhow!("axis info not found for {}", x_param.clone()))?().transform;
+    // let y_transform = axis_settings.settings().get(y_param.clone()).ok_or_else(|| anyhow::anyhow!("axis info not found for {}", y_param.clone()))?().transform;
+    let x_transform = axis_settings.get(&x_param).ok_or_else(|| anyhow::anyhow!("axis info not found for {}", x_param.clone()))?.transform.clone();
+    let y_transform = axis_settings.get(&y_param).ok_or_else(|| anyhow::anyhow!("axis info not found for {}", y_param.clone()))?.transform.clone();
+
     let df = &fcs.data_frame;
-    let x_param = gate.x_parameter_channel_name();
-    let y_param = gate.y_parameter_channel_name();
+    
 
     match &gate.geometry {
         GateGeometry::Rectangle { min, max } => {
             // Polars native SIMD comparison - Extremely Fast
-            let x_series = df.column(x_param)?.f32()?;
-            let y_series = df.column(y_param)?.f32()?;
+            let x_series = df.column(&x_param)?.f32()?;
+            let y_series = df.column(&y_param)?.f32()?;
 
             let (minx, miny, maxx, maxy) = {
                 (
-                    min.get_coordinate(x_param)
-                        .ok_or(anyhow::anyhow!("x_coord not found"))?,
-                    min.get_coordinate(y_param)
-                        .ok_or(anyhow::anyhow!("y_coord not found"))?,
-                    max.get_coordinate(x_param)
-                        .ok_or(anyhow::anyhow!("x_coord not found"))?,
-                    max.get_coordinate(y_param)
-                        .ok_or(anyhow::anyhow!("y_coord not found"))?,
+                    x_transform.inverse_transform(&min.get_coordinate(&x_param)
+                        .ok_or(anyhow::anyhow!("x_coord not found"))?),
+                    y_transform.inverse_transform(&min.get_coordinate(&y_param)
+                        .ok_or(anyhow::anyhow!("y_coord not found"))?),
+                    x_transform.inverse_transform(&max.get_coordinate(&x_param)
+                        .ok_or(anyhow::anyhow!("x_coord not found"))?),
+                    y_transform.inverse_transform(&max.get_coordinate(&y_param)
+                        .ok_or(anyhow::anyhow!("y_coord not found"))?),
                 )
             };
 
@@ -67,8 +80,8 @@ pub fn filter_events_to_mask(fcs: &Fcs, gate: &Gate) -> anyhow::Result<BooleanCh
             let c_coeff = sin_a.powi(2) / r_x2 + cos_a.powi(2) / r_y2;
 
             // 3. SCAN: 10 Million Rows
-            let x_series = df.column(x_param)?.f32()?;
-            let y_series = df.column(y_param)?.f32()?;
+            let x_series = df.column(&x_param)?.f32()?;
+            let y_series = df.column(&y_param)?.f32()?;
             let xs = x_series.cont_slice()?;
             let ys = y_series.cont_slice()?;
 
@@ -126,8 +139,8 @@ pub fn filter_events_to_mask(fcs: &Fcs, gate: &Gate) -> anyhow::Result<BooleanCh
             }
 
             // 3. Get raw data slices
-            let x_series = df.column(x_param)?.f32()?;
-            let y_series = df.column(y_param)?.f32()?;
+            let x_series = df.column(&x_param)?.f32()?;
+            let y_series = df.column(&y_param)?.f32()?;
             let xs = x_series.cont_slice()?;
             let ys = y_series.cont_slice()?;
 
@@ -178,6 +191,8 @@ pub fn filter_events_to_mask(fcs: &Fcs, gate: &Gate) -> anyhow::Result<BooleanCh
 pub fn filter_events_by_hierarchy_to_mask(
     fcs: &Fcs,
     gate_chain: &[&Gate],
+    axis_settings: &rustc_hash::FxHashMap<Arc<str>, crate::plotters_dioxus::AxisInfo>
+    // axis_settings: Store<crate::plotters_dioxus::plot_helpers::ParameterStore>,
 ) -> Result<BooleanChunked, anyhow::Error> {
     let event_count = fcs.data_frame.height();
 
@@ -186,7 +201,7 @@ pub fn filter_events_by_hierarchy_to_mask(
 
     for gate in gate_chain {
         // Generate the mask for the current gate ONLY
-        let gate_mask = filter_events_to_mask(fcs, gate)?;
+        let gate_mask = filter_events_to_mask(fcs, gate, axis_settings)?;
 
         // Bitwise AND: narrow the population
         final_mask = final_mask & gate_mask;

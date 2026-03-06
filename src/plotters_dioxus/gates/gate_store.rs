@@ -373,10 +373,11 @@ impl<Lens> Store<GateState, Lens> {
         &mut self,
         x_axis_title: Arc<str>,
         y_axis_title: Arc<str>,
+        parental_gate_id: Option<Arc<str>>,
     ) -> anyhow::Result<()> {
         let x: &str = &x_axis_title;
         let y: &str = &y_axis_title;
-        let key = GatesOnPlotKey::new(x_axis_title.clone(), y_axis_title.clone(), None);
+        let key = GatesOnPlotKey::new(x_axis_title.clone(), y_axis_title.clone(), parental_gate_id);
         let key_options = self.gate_ids_by_view().get(key);
 
         if let Some(key_store) = key_options {

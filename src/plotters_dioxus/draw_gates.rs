@@ -46,7 +46,7 @@ pub fn GateLayer(
         let x_param = x_channel();
         let y_param = y_channel();
         let _ = gate_store
-            .match_gates_to_plot(x_param, y_param)
+            .match_gates_to_plot(x_param, y_param, parental_gate_id.peek().clone())
             .inspect_err(|e| println!("{}", e.to_string()));
     });
 

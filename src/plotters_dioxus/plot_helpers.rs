@@ -1,8 +1,9 @@
 use dioxus::prelude::*;
 use flow_fcs::{TransformType};
 use flow_gates::transforms::{
-    get_plotting_area, pixel_to_raw, pixel_to_raw_y, raw_to_pixel, raw_to_pixel_y,
+    get_plotting_area, pixel_to_raw, pixel_to_raw_y, raw_to_pixel, raw_to_pixel_y, raw_to_transformed, transformed_to_raw,
 };
+use rustc_hash::FxHashMap;
 use core::f32;
 use std::{collections::HashMap, ops::RangeInclusive, sync::Arc};
 
@@ -75,11 +76,15 @@ impl PlotMapper {
         } else {
             yt = y_t.unwrap();
         }
-
         // println!("x pixel {} data range start {} end {}, x pixel range start {}, end {}", px, self.x_data_range.start(), self.x_data_range.end(), self.x_pix_range.start, self.x_pix_range.end);
-        let dx = pixel_to_raw(px, &self.x_data_range, &self.x_pix_range, &xt);
-        let dy = pixel_to_raw_y(py, &self.y_data_range, &self.y_pix_range, &yt);
-
+        // let xt = TransformType::Arcsinh { cofactor: 6000f32 };
+        let dx_raw = pixel_to_raw(px, &self.x_data_range, &self.x_pix_range, &xt);
+        // let dx = raw_to_transformed(dx_raw, &xt);
+        let dy_raw = pixel_to_raw_y(py, &self.y_data_range, &self.y_pix_range, &yt);
+        // let dy = raw_to_transformed(dy_raw, &yt);
+        let (dx, dy) = (dx_raw, dy_raw);
+        println!("raw: {dx_raw}, {dy_raw} transformed: {dx}, {dy}");
+        println!("raw: {dx_raw}, {dy_raw} transformed: {dx}, {dy}");
         (dx, dy)
     }
 
@@ -182,7 +187,7 @@ impl std::fmt::Display for Param {
 
 #[derive(Default, Store, Clone)]
 pub struct ParameterStore {
-    pub settings: HashMap<GateId, AxisInfo>,
+    pub settings: FxHashMap<Arc<str>, AxisInfo>,
 }
 
 #[store(pub name = ParameterStoreImplExt)]

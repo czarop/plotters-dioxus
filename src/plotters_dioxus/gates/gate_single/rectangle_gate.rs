@@ -269,6 +269,8 @@ pub fn create_default_rectangle(
     let max = plot_map.pixel_to_data(cx_raw + half_width, cy_raw + half_height, None, None);
     let min = plot_map.pixel_to_data(cx_raw - half_width, cy_raw - half_height, None, None);
     let coords = vec![min, max];
+
+    println!("creating rectangle with min {:?}, max {:?}", min, max);
     flow_gates::geometry::create_rectangle_geometry(coords, x_channel, y_channel)
         .map_err(|_| anyhow::anyhow!("failed to create rectangle geometry"))
 }
