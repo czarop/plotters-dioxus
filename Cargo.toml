@@ -12,9 +12,14 @@ thiserror = "2.0.12"
 # tokio = { version = "1", default-features = false, features = ["macros", "rt-multi-thread"] }
 tokio = { version = "1", default-features = false, features = ["macros", "sync", "rt-multi-thread"] }
 anyhow = "1"
-flow-fcs = {git="https://github.com/jrmoynihan/flow", rev="cea03b0"}
-flow-plots = {git="https://github.com/jrmoynihan/flow", rev="cea03b0"}
-flow-gates = {git="https://github.com/jrmoynihan/flow", rev="cea03b0"}
+# flow-fcs = {git="https://github.com/jrmoynihan/flow", rev="cea03b0"}
+# flow-plots = {git="https://github.com/jrmoynihan/flow", rev="cea03b0"}
+# flow-gates = {git="https://github.com/jrmoynihan/flow", rev="cea03b0"}
+flow-fcs = {git="https://github.com/jrmoynihan/flow", rev="44a0537"}
+flow-plots = {git="https://github.com/jrmoynihan/flow", rev="44a0537"}
+flow-gates = {git="https://github.com/jrmoynihan/flow", rev="44a0537"}
+
+
 base64 = "0.22.1"
 plotters-bitmap = "0.3.3"
 dioxus-primitives = { git = "https://github.com/DioxusLabs/components", version = "0.0.1", default-features = false }

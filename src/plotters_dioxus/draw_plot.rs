@@ -48,14 +48,12 @@ pub fn PseudoColourPlot(
         let x_axis_options = flow_plots::AxisOptions::new()
             .range(x_axis_info.lower..=x_axis_info.upper)
             .transform(x_axis_info.transform.clone())
-            // .transform(flow_fcs::TransformType::Linear)
             .label(&x_axis_info.param.to_string())
             .build()
             .expect("axis options failed");
         let y_axis_options = flow_plots::AxisOptions::new()
             .range(y_axis_info.lower..=y_axis_info.upper)
             .transform(y_axis_info.transform.clone())
-            // .transform(flow_fcs::TransformType::Linear)
             .label(y_axis_info.param.to_string())
             .build()
             .expect("axis options failed");
@@ -65,34 +63,7 @@ pub fn PseudoColourPlot(
         &y_axis_options.range, &x_axis_info.transform, &y_axis_info.transform).expect("should not fail");
 
         let(inc_x, inc_y) = {
-            (actual_ranges.0.start..=actual_ranges.0.end, actual_ranges.1.start..=actual_ranges.1.end)
-                // let inc_x = match x_axis_info.transform{
-                //     flow_fcs::TransformType::Linear => actual_ranges.0.start..=actual_ranges.0.end,
-                //     flow_fcs::TransformType::Arcsinh { cofactor } => {
-                //         // let s = asinh_reverse_f32(actual_ranges.0.start, cofactor).expect("should not fail");
-                //         // let e = asinh_reverse_f32(actual_ranges.0.end, cofactor).expect("should not fail");
-                //         let s = actual_ranges.0.start;
-                //         let e = actual_ranges.0.end;
-                //         s..=e
-                //     },
-                //     flow_fcs::TransformType::Biexponential { .. } => todo!(),
-                // };
-                
-                
-                // let inc_y = match y_axis_info.transform{
-                //     flow_fcs::TransformType::Linear => actual_ranges.1.start..=actual_ranges.1.end,
-                //     flow_fcs::TransformType::Arcsinh { cofactor } => {
-                //         // let s = asinh_reverse_f32(actual_ranges.1.start, cofactor).expect("should not fail");
-                //         // let e = asinh_reverse_f32(actual_ranges.1.end, cofactor).expect("should not fail");
-                //         let s = actual_ranges.1.start;
-                //         let e = actual_ranges.1.end;
-                //         s..=e
-                //     },
-                //     flow_fcs::TransformType::Biexponential { .. } => todo!(),
-                // };
-
-                // (inc_x, inc_y)
-            
+            (actual_ranges.0.start..=actual_ranges.0.end, actual_ranges.1.start..=actual_ranges.1.end)           
         };
 
         println!("X Bounds are: {}, {}", inc_x.start(), inc_x.end());
@@ -100,8 +71,6 @@ pub fn PseudoColourPlot(
         let mapper = PlotMapper::new(
             width as f32,
             height as f32,
-            // x_axis_options.range.clone(),
-            // y_axis_options.range.clone(),
             inc_x,
             inc_y,
             x_axis_info.transform.clone(),
@@ -112,6 +81,7 @@ pub fn PseudoColourPlot(
             .colormap(ColorMaps::Jet)
             .x_axis(x_axis_options)
             .y_axis(y_axis_options)
+            .point_size(0.35)
             .build()
             .expect("shouldn't fail");
 
@@ -120,7 +90,7 @@ pub fn PseudoColourPlot(
         let mut render_config = RenderConfig::default();
 
         let plot_data = plot
-            .render(data(), &options, &mut render_config)
+            .render(data().into(), &options, &mut render_config)
             .expect("failed to render plot");
 
         let base64_str = BASE64_STANDARD.encode(&plot_data);
