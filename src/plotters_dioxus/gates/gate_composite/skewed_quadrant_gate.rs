@@ -121,9 +121,9 @@ impl SkewedQuadrantGate {
         } else {
             let (a, b, c, d) = (
                 format!("{id}_BL"),
-            format!("{id}_BR"),
-            format!("{id}_TR"),
-            format!("{id}_TL"),
+                format!("{id}_BR"),
+                format!("{id}_TR"),
+                format!("{id}_TL"),
         );
 
             let (astr, bstr, cstr, dstr) = (
@@ -505,6 +505,12 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
             self.points.bottom,
         );
 
+
+
+        println!("{point_index}");
+
+        println!("Old Geos: Center={:?}, L={}, R={}, T={}, B={}", c, l, r, t, b);
+
         let new = match point_index {
             0 => DataPoints {
                 center: new_point,
@@ -543,6 +549,7 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
             },
             _ => unreachable!(),
         };
+        println!("new Geos: Center={:?}, L={}, R={}, T={}, B={}", new.center, new.left, new.right, new.top, new.bottom);
         Ok(Box::new(self.clone_with_point(new)?))
     }
 
@@ -574,62 +581,105 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
     }
 }
 
+// fn create_skewed_quadrant_geos(
+//     data_points: DataPoints,
+//     x_channel: &str,
+//     y_channel: &str,
+// ) -> anyhow::Result<(GateGeometry, GateGeometry, GateGeometry, GateGeometry)> {
+//     let (center, bottom, left, top, right) = (
+//         data_points.center,
+//         data_points.bottom,
+//         data_points.left,
+//         data_points.top,
+//         data_points.right,
+//     );
+
+
+//     let bl1 = (f32::MIN, f32::MIN);
+//     let bl2 = (bottom, f32::MIN);
+//     let bl3 = center;
+//     let bl4 = (f32::MIN, left);
+//     let bl = flow_gates::geometry::create_polygon_geometry(
+//         vec![bl1, bl2, bl3, bl4],
+//         x_channel,
+//         y_channel,
+//     )
+//     .map_err(|_| anyhow::anyhow!("failed to create polygon geometry"))?;
+
+//     let br1 = (bottom, f32::MIN);
+//     let br2 = (f32::MAX, f32::MIN);
+//     let br3 = (f32::MAX, right);
+//     let br4 = center;
+//     let br = flow_gates::geometry::create_polygon_geometry(
+//         vec![br1, br2, br3, br4],
+//         x_channel,
+//         y_channel,
+//     )
+//     .map_err(|_| anyhow::anyhow!("failed to create polygon geometry"))?;
+
+//     let tr1 = center;
+//     let tr2 = br3;
+//     let tr3 = (f32::MAX, f32::MAX);
+//     let tr4 = (top, f32::MAX);
+//     let tr = flow_gates::geometry::create_polygon_geometry(
+//         vec![tr1, tr2, tr3, tr4],
+//         x_channel,
+//         y_channel,
+//     )
+//     .map_err(|_| anyhow::anyhow!("failed to create polygon geometry"))?;
+
+//     let tl1 = bl4;
+//     let tl2 = center;
+//     let tl3 = tr4;
+//     let tl4 = (f32::MIN, f32::MAX);
+//     let tl = flow_gates::geometry::create_polygon_geometry(
+//         vec![tl1, tl2, tl3, tl4],
+//         x_channel,
+//         y_channel,
+//     )
+//     .map_err(|_| anyhow::anyhow!("failed to create polygon geometry"))?;
+
+//     Ok((bl, br, tr, tl))
+// }
 fn create_skewed_quadrant_geos(
     data_points: DataPoints,
     x_channel: &str,
     y_channel: &str,
 ) -> anyhow::Result<(GateGeometry, GateGeometry, GateGeometry, GateGeometry)> {
-    let (center, bottom, left, top, right) = (
-        data_points.center,
-        data_points.bottom,
-        data_points.left,
-        data_points.top,
-        data_points.right,
-    );
+    let c = data_points.center;
+    let b_x = data_points.bottom;
+    let l_y = data_points.left;
+    let t_x = data_points.top;
+    let r_y = data_points.right;
 
-    let bl1 = (f32::MIN, f32::MIN);
-    let bl2 = (bottom, f32::MIN);
-    let bl3 = center;
-    let bl4 = (f32::MIN, left);
+    let x_min = f32::MIN;
+    let x_max = f32::MAX;
+    let y_min = f32::MIN;
+    let y_max = f32::MAX;
+
+    // Bottom-Left (BL)
     let bl = flow_gates::geometry::create_polygon_geometry(
-        vec![bl1, bl2, bl3, bl4],
-        x_channel,
-        y_channel,
-    )
-    .map_err(|_| anyhow::anyhow!("failed to create polygon geometry"))?;
+        vec![(x_min, y_min), (b_x, y_min), c, (x_min, l_y)],
+        x_channel, y_channel,
+    ).map_err(|_| anyhow::anyhow!("failed bl"))?;
 
-    let br1 = (bottom, f32::MIN);
-    let br2 = (f32::MAX, f32::MIN);
-    let br3 = (f32::MAX, right);
-    let br4 = center;
+    // Bottom-Right (BR)
     let br = flow_gates::geometry::create_polygon_geometry(
-        vec![br1, br2, br3, br4],
-        x_channel,
-        y_channel,
-    )
-    .map_err(|_| anyhow::anyhow!("failed to create polygon geometry"))?;
+        vec![(b_x, y_min), (x_max, y_min), (x_max, r_y), c],
+        x_channel, y_channel,
+    ).map_err(|_| anyhow::anyhow!("failed br"))?;
 
-    let tr1 = center;
-    let tr2 = br3;
-    let tr3 = (f32::MAX, f32::MAX);
-    let tr4 = (top, f32::MAX);
+    // Top-Right (TR) - Adjusted for CCW from bottom-left of the quad
     let tr = flow_gates::geometry::create_polygon_geometry(
-        vec![tr1, tr2, tr3, tr4],
-        x_channel,
-        y_channel,
-    )
-    .map_err(|_| anyhow::anyhow!("failed to create polygon geometry"))?;
+        vec![c, (x_max, r_y), (x_max, y_max), (t_x, y_max)],
+        x_channel, y_channel,
+    ).map_err(|_| anyhow::anyhow!("failed tr"))?;
 
-    let tl1 = bl4;
-    let tl2 = center;
-    let tl3 = tr4;
-    let tl4 = (f32::MIN, f32::MAX);
+    // Top-Left (TL)
     let tl = flow_gates::geometry::create_polygon_geometry(
-        vec![tl1, tl2, tl3, tl4],
-        x_channel,
-        y_channel,
-    )
-    .map_err(|_| anyhow::anyhow!("failed to create polygon geometry"))?;
+        vec![(x_min, l_y), c, (t_x, y_max), (x_min, y_max)],
+        x_channel, y_channel,
+    ).map_err(|_| anyhow::anyhow!("failed tl"))?;
 
     Ok((bl, br, tr, tl))
 }

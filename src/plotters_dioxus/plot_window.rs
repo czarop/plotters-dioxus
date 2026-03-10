@@ -475,35 +475,19 @@ pub fn PlotWindow() -> Element {
 
                 {
 
-                    if !plot_data_signal.read().is_empty() {
-
-                        rsx! {
-                            div {
-                                NewGateButtons { callback: move |gate_type| current_gate_type.set(gate_type) }
-                                PseudoColourPlot {
-                                    size: (600, 600),
-                                    data: plot_data_signal,
-                                    x_axis_info: x_axis_limits.read().clone(),
-                                    y_axis_info: y_axis_limits.read().clone(),
-                                    parental_gate_id: parental_gate,
-                                }
-                            }
-                        }
-                    } else {
-                        rsx! {
-                            div {
-                                border: "1px solid #ddd",
-                                width: "600px",
-                                height: "600px",
-                                display: "flex",
-                                align_items: "center",
-                                justify_content: "center",
-                                background_color: "#f9f9f9",
-                                color: "#888",
-                                "Plot area (waiting for data)"
+                    rsx! {
+                        div {
+                            NewGateButtons { callback: move |gate_type| current_gate_type.set(gate_type) }
+                            PseudoColourPlot {
+                                size: (600, 600),
+                                data: plot_data_signal,
+                                x_axis_info: x_axis_limits.read().clone(),
+                                y_axis_info: y_axis_limits.read().clone(),
+                                parental_gate_id: parental_gate,
                             }
                         }
                     }
+
                 }
             
             }
