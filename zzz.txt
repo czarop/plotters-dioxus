@@ -1,4 +1,7 @@
-skewed gates logic is wrong
+skewed gates logic is wrong on move point
+skewed gates lose link when selected after resize?
+plot showing no events - we lose the plot entirely and therefore all the signals reset!
+
 changes to composite gates create new arcs for the subgates whereas they should be cloned
 Cache gate filter events with the built in api
 name gates smth sensible

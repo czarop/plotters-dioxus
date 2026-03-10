@@ -3,7 +3,7 @@ use flow_fcs::TransformType;
 use flow_gates::{Gate, GateGeometry};
 use indexmap::IndexMap;
 use rustc_hash::FxBuildHasher;
-use std::sync::Arc;
+use std::{ops::Index, sync::Arc};
 
 use crate::plotters_dioxus::{
     gates::{
@@ -32,28 +32,71 @@ impl QuadrantGate {
         y_axis_param: Arc<str>,
     ) -> anyhow::Result<Self> {
         let click_loc_data = plot_map.pixel_to_data(click_loc_raw.0, click_loc_raw.1, None, None);
-        QuadrantGate::try_new_from_data_coord(id, click_loc_data, x_axis_param, y_axis_param, true)
+        QuadrantGate::try_new_from_data_coord(id, click_loc_data, x_axis_param, y_axis_param, true, None)
     }
 
-    pub fn try_new_from_data_coord(
+    fn try_new_from_data_coord(
         id: Arc<str>,
         click_loc_data: (f32, f32),
         x_axis_param: Arc<str>,
         y_axis_param: Arc<str>,
         axis_matched: bool,
+        subgate_ids: Option<Vec<Arc<str>>>
     ) -> anyhow::Result<Self> {
         let mut gate_map = FxIndexMap::default();
         let parameters = (x_axis_param.clone(), y_axis_param.clone());
 
         let geos = create_quadrant_geos(click_loc_data.0, click_loc_data.1, &x_axis_param, &y_axis_param)?;
-        let id_top_left = format!("{id}_TL");
-        let id_top_right = format!("{id}_TR");
-        let id_bottom_left = format!("{id}_BL");
-        let id_bottom_right = format!("{id}_BR");
-        let id_top_left_arc: Arc<str> = Arc::from(id_top_left.as_str());
-        let id_top_right_arc: Arc<str> = Arc::from(id_top_right.as_str());
-        let id_bottom_left_arc: Arc<str> = Arc::from(id_bottom_left.as_str());
-        let id_bottom_right_arc: Arc<str> = Arc::from(id_bottom_right.as_str());
+        
+        let (
+            id_bottom_left,
+            id_bottom_right,
+            id_top_right, 
+            id_top_left, 
+            id_bottom_left_arc,
+            id_bottom_right_arc,
+            id_top_right_arc,
+            id_top_left_arc,
+            
+         ) = if let Some(subgate_ids) = subgate_ids {
+            (
+                subgate_ids[0].to_string(),
+                subgate_ids[1].to_string(),
+                subgate_ids[2].to_string(),
+                subgate_ids[3].to_string(),
+                subgate_ids[0].clone(),
+                subgate_ids[1].clone(),
+                subgate_ids[2].clone(),
+                subgate_ids[3].clone(),
+            )
+
+        } else {
+            let (a, b, c, d) = (
+            format!("{id}_BL"),
+            format!("{id}_BR"),
+            format!("{id}_TR"),
+            format!("{id}_TL"),
+            
+        );
+
+            let (astr, bstr, cstr, dstr) = (
+                a.as_str(),
+                b.as_str(),
+                c.as_str(),
+                d.as_str()
+            );
+
+            (a.clone(),
+            b.clone(),
+            c.clone(),
+            d.clone(),
+            Arc::from(astr),
+            Arc::from(bstr),
+            Arc::from(cstr),
+            Arc::from(dstr))
+        };
+
+
         let gate_bottom_left = Gate {
             id: id_bottom_left_arc.clone(),
             name: id_bottom_left,
@@ -143,7 +186,15 @@ impl QuadrantGate {
         cy: f32,
     ) -> anyhow::Result<Self> {
         let (x_axis_param, y_axis_param) = self.parameters.clone();
-        QuadrantGate::try_new_from_data_coord(self.id.clone(), (cx, cy), x_axis_param, y_axis_param, self.axis_matched)
+
+        let subgate_bl_id = self.gates.index(0).get_id();
+        let subgate_br_id = self.gates.index(1).get_id();
+        let subgate_tr_id = self.gates.index(2).get_id();
+        let subgate_tl_id = self.gates.index(3).get_id();
+
+        let gate_ids = vec![subgate_bl_id, subgate_br_id, subgate_tr_id, subgate_tl_id];
+
+        QuadrantGate::try_new_from_data_coord(self.id.clone(), (cx, cy), x_axis_param, y_axis_param, self.axis_matched, Some(gate_ids))
 
 
     }
