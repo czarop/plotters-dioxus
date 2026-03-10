@@ -8,20 +8,17 @@ use dioxus::prelude::*;
 
 pub fn filter_events_to_mask(fcs: &Fcs, gate: &Gate, 
     axis_settings: Arc<RwLock<rustc_hash::FxHashMap<Arc<str>, crate::plotters_dioxus::AxisInfo>>>
-    // axis_settings: Store<crate::plotters_dioxus::plot_helpers::ParameterStore>,
 
 ) -> anyhow::Result<BooleanChunked> {
     
     
     let (x_param, y_param) = gate.parameters.clone();
-    // let x_transform = axis_settings.settings().get(x_param.clone()).ok_or_else(|| anyhow::anyhow!("axis info not found for {}", x_param.clone()))?().transform;
-    // let y_transform = axis_settings.settings().get(y_param.clone()).ok_or_else(|| anyhow::anyhow!("axis info not found for {}", y_param.clone()))?().transform;
-    
     let x_transform = axis_settings.read().expect("lock poisoned").get(&x_param).ok_or_else(|| anyhow::anyhow!("axis info not found for {}", x_param.clone()))?.transform.clone();
     let y_transform = axis_settings.read().expect("lock poisoned").get(&y_param).ok_or_else(|| anyhow::anyhow!("axis info not found for {}", y_param.clone()))?.transform.clone();
 
     let df = &fcs.data_frame;
     
+    println!("called");
 
     match &gate.geometry {
         GateGeometry::Rectangle { min, max } => {
@@ -41,6 +38,8 @@ pub fn filter_events_to_mask(fcs: &Fcs, gate: &Gate,
                         .ok_or(anyhow::anyhow!("y_coord not found"))?),
                 )
             };
+
+            println!("{minx} {maxx} {miny} {maxy}");
 
             // This generates the mask in one pass with zero manual indexing
             let mask =
@@ -198,18 +197,12 @@ pub fn filter_events_by_hierarchy_to_mask(
     fcs: &Fcs,
     gate_chain: &[&Gate],
     axis_settings: Arc<RwLock<rustc_hash::FxHashMap<Arc<str>, crate::plotters_dioxus::AxisInfo>>>
-    // axis_settings: Store<crate::plotters_dioxus::plot_helpers::ParameterStore>,
 ) -> Result<BooleanChunked, anyhow::Error> {
     let event_count = fcs.data_frame.height();
-
-    // Start with "True" for everyone (Identity mask)
     let mut final_mask = BooleanChunked::full("mask".into(), true, event_count);
-
+    println!("called with gate chain length {}", gate_chain.len());
     for gate in gate_chain {
-        // Generate the mask for the current gate ONLY
         let gate_mask = filter_events_to_mask(fcs, gate, axis_settings.clone())?;
-
-        // Bitwise AND: narrow the population
         final_mask = final_mask & gate_mask;
     }
 

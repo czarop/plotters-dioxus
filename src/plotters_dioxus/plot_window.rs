@@ -39,11 +39,15 @@ async fn get_scaled_data_to_display(
         let arcs: Vec<(Arc<str>, Arc<dyn DrawableGate>)> = gate_store.hierarchy().peek().get_chain_to_root(parent)
             .iter()
             .filter_map(|id| {
-                gate_store.gate_registry().peek().get(id).map(|g| (id.clone(), g.clone()))
+                gate_store.primary_and_subgate_registry().peek().get(id).map(|g| (id.clone(), g.clone()))
     })
             .collect();
         
-        if arcs.is_empty() { None } else { Some(arcs) }
+        if arcs.is_empty() {
+            None
+         } else { 
+            Some(arcs) 
+        }
     } else {
         None
     };
@@ -212,8 +216,6 @@ pub fn PlotWindow() -> Element {
     let processed_data_resource = use_resource(move || {
         let x_fluoro = x_axis_marker.read().fluoro.clone();
         let y_fluoro = y_axis_marker.read().fluoro.clone();
-        
-
         async move {
             let parental_gate = &*parental_gate.read();
             let x_transform = parameter_settings

@@ -1,11 +1,12 @@
-For composite gates need to adjust max bounds whenever axis is rescaled.
+skewed quadrants don't create correct polygon shapes
+Cache gate filter events with the built in api
+name gates smth sensible
+context menu on gates + renaming
 
-gating hierarchy
-Gating hierarchy panel
-Select gated events
 
-Quadrant gates
-Flexi-Quadrant Gates
+
+
+
 NOT gates
 AND gates
 OR gates
@@ -32,7 +33,7 @@ Set Comp from omiq Comp
 Nice to have:
 NAND gates
 NOR gates
-
+Contourplot
 Histogram
 
 

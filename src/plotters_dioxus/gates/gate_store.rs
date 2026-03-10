@@ -49,23 +49,6 @@ pub struct GatePositionKey {
     file_id: GateId,
 }
 
-// #[derive(Hash, PartialEq, Eq, Clone)]
-// pub struct GateKey {
-//     gate_id: Id,
-// }
-
-// impl GateKey {
-//     pub fn new(id: Id) -> Self {
-//         Self { gate_id: id }
-//     }
-// }
-
-// impl From<Arc<str>> for GateKey {
-//     fn from(id: Arc<str>) -> Self {
-//         Self { gate_id: id }
-//     }
-// }
-
 /// a plot is selected for a file,
 /// The currently selected (parental) gate id is stored in a signal and accessed.
 /// Create a GatesOnPlotKey with the current params and the parental gate id,
@@ -77,7 +60,9 @@ pub struct GateState {
     // For the Renderer: "What gates do I draw on this Plot?"
     pub gate_ids_by_view: FxHashMap<GatesOnPlotKey, Vec<GateId>>,
     // For the Logic: "What is the actual data for Gate X?"
-    pub gate_registry: FxHashMap<GateId, Arc<dyn DrawableGate>>,
+    pub primary_gate_registry: FxHashMap<GateId, Arc<dyn DrawableGate>>,
+
+    pub primary_and_subgate_registry: FxHashMap<GateId, Arc<dyn DrawableGate>>,
 
     // composite_redirect: FxHashMap<GateId, GateId>,
     // For the Filtering: "How are these gates nested?"
@@ -215,12 +200,13 @@ impl<Lens> Store<GateState, Lens> {
 
         if g.is_composite(){
             let gates = g.get_inner_gate_ids();
-            for g in gates{
-                println!("Adding gate {} with parent {}", g, parental_gate_id.as_ref().unwrap_or(&ROOTGATE));
+            for sg in gates{
+                println!("Adding composite subgate gate {} with parent {}", sg, parental_gate_id.as_ref().unwrap_or(&ROOTGATE));
                 self.hierarchy().write().add_gate_child(
                     parental_gate_id.clone().unwrap_or(ROOTGATE.clone()),
-                    g,
+                    sg.clone(),
                 )?;
+                self.primary_and_subgate_registry().write().insert(sg, g.clone());
             }
         } else {
             println!("Adding gate {} with parent {}", g.get_id(), parental_gate_id.as_ref().unwrap_or(&ROOTGATE));
@@ -235,7 +221,8 @@ impl<Lens> Store<GateState, Lens> {
         //     self.composite_redirect().insert(subgate.into(), g.get_id().into());
         // }
 
-        self.gate_registry().write().insert(gate_key, g);
+        self.primary_gate_registry().write().insert(gate_key.clone(), g.clone());
+        self.primary_and_subgate_registry().write().insert(gate_key, g);
 
 
         Ok(())
@@ -250,7 +237,7 @@ impl<Lens> Store<GateState, Lens> {
         //     gate_id.clone()
         // };
 
-        if let Some((id, gate)) = self.gate_registry().write().remove_entry(&gate_id){
+        if let Some((id, gate)) = self.primary_gate_registry().write().remove_entry(&gate_id){
             let (x_param, y_param) = gate.get_params();
             let key = GatesOnPlotKey::new(x_param.clone(), y_param.clone(), parental_gate_id.clone());
         
@@ -286,7 +273,7 @@ impl<Lens> Store<GateState, Lens> {
         // };
 
         if let Some(mut gate_ptr) = self
-            .gate_registry()
+            .primary_gate_registry()
             .get_mut(&gate_id)
         {
             if let Ok(new_gate_box) = gate_ptr.replace_point(new_point, point_idx, plot_map) {
@@ -307,7 +294,7 @@ impl<Lens> Store<GateState, Lens> {
         // };
 
         if let Some(mut gate_ptr) = self
-            .gate_registry()
+            .primary_gate_registry()
             .get_mut(&gate_drag_data.gate_id())
         {
             if let Ok(Some(new_gate_box)) = gate_ptr.replace_points(gate_drag_data) {
@@ -331,7 +318,7 @@ impl<Lens> Store<GateState, Lens> {
         // };
 
         if let Some(mut gate_ptr) = self
-            .gate_registry()
+            .primary_gate_registry()
             .get_mut(&gate_id)
         {
             if let Ok(Some(new_gate_box)) = gate_ptr.rotate_gate(current_position) {
@@ -356,7 +343,7 @@ impl<Lens> Store<GateState, Lens> {
         let mut gate_list = vec![];
         if let Some(key_store) = key_options {
             let ids = key_store.read().clone();
-            let registry = self.gate_registry();
+            let registry = self.primary_gate_registry();
             let registry_guard = registry.read();
             for k in ids {
                 if let Some(gate_store_entry) = registry_guard.get(&k) {
@@ -384,7 +371,7 @@ impl<Lens> Store<GateState, Lens> {
             let ids = key_store.read().clone();
 
             for k in ids {
-                if let Some(mut gate) = self.gate_registry().get_mut(&k) {
+                if let Some(mut gate) = self.primary_gate_registry().get_mut(&k) {
                     if let Ok(Some(g)) = gate.match_to_plot_axis(x, y){
                         *gate = Arc::from(g);
                     };
@@ -403,7 +390,7 @@ impl<Lens> Store<GateState, Lens> {
         new_axis_options: &AxisInfo,
     ) -> Result<(), Vec<String>> {
         let mut errors = vec![];
-        for (_, gate) in self.gate_registry().write().iter_mut() {
+        for (_, gate) in self.primary_gate_registry().write().iter_mut() {
             let (x_marker, y_marker) = &gate.get_params();
             if marker == x_marker || marker == y_marker {
                 match gate.recalculate_gate_for_rescaled_axis(

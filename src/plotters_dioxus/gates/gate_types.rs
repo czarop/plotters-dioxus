@@ -2,6 +2,35 @@ use std::sync::Arc;
 
 use crate::plotters_dioxus::gates::gate_store::GateId;
 
+// #[derive(Clone, PartialEq, Hash)]
+// pub enum GateTypeID {
+//     Primary(Arc<str>),
+//     SubGate(Arc<str>, Arc<str>)
+// }
+
+// impl GateID {
+//     pub fn get_primary_id(&self) -> Arc<str> {
+//         match self{
+//             GateID::Primary(i) => i.clone(),
+//             GateID::SubGate(i, _) => i.clone(),
+//         }
+//     }
+
+//     pub fn get_subgate_id(&self) -> Option<Arc<str>> {
+//         match self{
+//             GateID::Primary(_) => None,
+//             GateID::SubGate(_, i) => Some(i.clone()),
+//         }
+//     }
+
+//     pub fn is_subgate(&self) -> bool {
+//         match self{
+//             GateID::Primary(_) => false,
+//             GateID::SubGate(_, _) => true,
+//         }
+//     }
+// }
+
 #[derive(Clone, PartialEq, Copy)]
 pub enum GateType {
     Polygon,
