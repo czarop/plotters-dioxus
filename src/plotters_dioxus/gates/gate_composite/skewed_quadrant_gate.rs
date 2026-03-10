@@ -94,7 +94,7 @@ impl SkewedQuadrantGate {
     ) -> anyhow::Result<Self> {
         let mut gate_map = FxIndexMap::default();
         let parameters = (x_axis_param.clone(), y_axis_param.clone());
-
+        println!("called");
         let geos = create_skewed_quadrant_geos(data_points, &x_axis_param, &y_axis_param)?;
         let id_top_left = format!("{id}_TL");
         let id_top_right = format!("{id}_TR");

@@ -1,7 +1,8 @@
-skewed quadrants don't create correct polygon shapes
+skewed gates logic is wrong
+changes to composite gates create new arcs for the subgates whereas they should be cloned
 Cache gate filter events with the built in api
 name gates smth sensible
-context menu on gates + renaming
+context menu on gates + renaming + deleting
 
 
 
