@@ -628,29 +628,47 @@ fn create_skewed_quadrant_geos(
     let (x_data_min, x_data_max) = (data_points.x_data_range.start().min(x_min), data_points.x_data_range.end().max(x_max));
     let (y_data_min, y_data_max) = (data_points.y_data_range.start().min(y_min), data_points.y_data_range.end().max(y_max));
 
-
     // Bottom-Left (BL)
     let bl = flow_gates::geometry::create_polygon_geometry(
-        vec![(x_data_min, y_data_min), (b_x, y_data_min), (b_x, y_min), c, (x_min, l_y), (x_data_min, l_y)],
+        vec![
+            (x_data_min, y_data_min), 
+            (b_x, y_data_min),        // Vertical spoke projected to bottom
+            c,                       // Center
+            (x_data_min, l_y)         // Horizontal spoke projected to left
+        ],
         x_channel, y_channel,
     ).map_err(|_| anyhow::anyhow!("failed bl"))?;
 
     // Bottom-Right (BR)
     let br = flow_gates::geometry::create_polygon_geometry(
-        vec![(b_x, y_data_min), (x_data_max, y_data_min), (x_data_max, r_y), (x_max, r_y), c, (b_x, y_min)],
+        vec![
+            (b_x, y_data_min), 
+            (x_data_max, y_data_min), 
+            (x_data_max, r_y),        // Right spoke projected to data max
+            c
+        ],
         x_channel, y_channel,
     ).map_err(|_| anyhow::anyhow!("failed br"))?;
 
     // Top-Right (TR)
     let tr = flow_gates::geometry::create_polygon_geometry(
-        vec![c, (x_max, r_y), (x_data_max, r_y), (x_data_max, y_data_max), (t_x, y_data_max), (t_x, y_max)],
+        vec![
+            c, 
+            (x_data_max, r_y), 
+            (x_data_max, y_data_max), 
+            (t_x, y_data_max)         // Top spoke projected to data max
+        ],
         x_channel, y_channel,
     ).map_err(|_| anyhow::anyhow!("failed tr"))?;
 
-
     // Top-Left (TL)
     let tl = flow_gates::geometry::create_polygon_geometry(
-        vec![(x_data_min, l_y), (x_min, l_y), c, (t_x, y_max), (t_x, y_data_max), (x_data_min, y_data_max)],
+        vec![
+            (x_data_min, l_y), 
+            c, 
+            (t_x, y_data_max), 
+            (x_data_min, y_data_max)
+        ],
         x_channel, y_channel,
     ).map_err(|_| anyhow::anyhow!("failed tl"))?;
 

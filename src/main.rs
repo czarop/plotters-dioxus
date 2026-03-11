@@ -34,11 +34,12 @@ fn main() {
             ),
         )
         .launch(App);
+
 }
 
-#[cfg(not(feature = "desktop"))]
-fn main() {
-    // For Web, we use the simple launch
-    // Dioxus handles the WASM panic hook and browser mounting automatically
-    dioxus::launch(App);
-}
+// #[cfg(not(feature = "desktop"))]
+// fn main() {
+//     // For Web, we use the simple launch
+//     // Dioxus handles the WASM panic hook and browser mounting automatically
+//     dioxus::launch(App);
+// }

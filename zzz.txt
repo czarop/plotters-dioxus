@@ -1,6 +1,6 @@
 Ellipse gates are not accounting for scaling
-Skewed quadrants are slightly off - possibly to do with scaling
-Skewed quadrants don't update properly on axis limit setting
+
+Skewed quadrants don't update properly on axis limit setting - you need to tell the gate the axis limits have changed
 
 Add filter Cache
 

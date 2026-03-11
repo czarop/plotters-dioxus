@@ -62,14 +62,6 @@ pub trait DrawableGate: Send + Sync {
 
     fn get_params(&self) -> (Arc<str>, Arc<str>);
 
-    // fn is_selected(&self) -> bool;
-
-    // fn set_selected(&mut self, state: bool);
-
-    // fn is_drag_point(&self) -> bool;
-
-    // fn set_drag_point(&mut self, drag_data: Option<PointDragData>);
-
     fn is_point_on_perimeter(&self, point: (f32, f32), tolerance: (f32, f32), mapper: &PlotMapper,) -> Option<f32>;
 
     fn match_to_plot_axis(
@@ -85,6 +77,13 @@ pub trait DrawableGate: Send + Sync {
         new_transform: &TransformType,
         data_range: (f32, f32)
     ) -> anyhow::Result<Box<dyn DrawableGate>>;
+
+    fn recalculate_gate_for_new_axis_limits(
+        &self,
+        param: std::sync::Arc<str>,
+        lower: f32,
+        upper: f32,
+    ) -> anyhow::Result<Option<Box<dyn DrawableGate>>>;
 
     fn rotate_gate(
         &self,
