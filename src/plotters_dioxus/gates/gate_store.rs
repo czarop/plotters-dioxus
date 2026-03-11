@@ -2,7 +2,7 @@ use anyhow::anyhow;
 use dioxus::prelude::*;
 use flow_gates::{Gate, GateHierarchy};
 use rustc_hash::FxHashMap;
-
+use std::ops::{Deref, DerefMut};
 use std::{
     sync::{Arc, LazyLock}
 };
@@ -49,6 +49,37 @@ pub struct GatePositionKey {
     file_id: GateId,
 }
 
+
+pub struct GateMap(pub FxHashMap<GateId, Arc<dyn DrawableGate>>);
+
+
+impl Deref for GateMap {
+    type Target = FxHashMap<GateId, Arc<dyn DrawableGate>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for GateMap {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl Default for GateMap{
+    fn default() -> Self {
+        Self(Default::default())
+    }
+}
+
+
+impl flow_gates::GateResolver for GateMap {
+    fn resolve(&self, id: &str) -> Option<&Gate> {
+        self.0.get(id).map(|drawable| drawable.get_gate_ref(Some(id)))?
+    }
+}
+
 /// a plot is selected for a file,
 /// The currently selected (parental) gate id is stored in a signal and accessed.
 /// Create a GatesOnPlotKey with the current params and the parental gate id,
@@ -60,9 +91,9 @@ pub struct GateState {
     // For the Renderer: "What gates do I draw on this Plot?"
     pub gate_ids_by_view: FxHashMap<GatesOnPlotKey, Vec<GateId>>,
     // For the Logic: "What is the actual data for Gate X?"
-    pub primary_gate_registry: FxHashMap<GateId, Arc<dyn DrawableGate>>,
+    pub primary_gate_registry: GateMap,
 
-    pub primary_and_subgate_registry: FxHashMap<GateId, Arc<dyn DrawableGate>>,
+    pub primary_and_subgate_registry: GateMap,
 
     // composite_redirect: FxHashMap<GateId, GateId>,
     // For the Filtering: "How are these gates nested?"
@@ -266,7 +297,7 @@ impl<Lens> Store<GateState, Lens> {
     ) -> anyhow::Result<()> {
 
         let old_gate = self
-            .primary_gate_registry()
+            .primary_gate_registry().deref()
             .get(gate_id.clone()).ok_or_else(|| anyhow!("Gate {} does not exist", gate_id.clone()))?;
 
         let new_gate = old_gate().replace_point(new_point, point_idx, plot_map)?;
@@ -275,8 +306,9 @@ impl<Lens> Store<GateState, Lens> {
         if new_gate_arc.is_composite() {
             let subgate_ids = new_gate_arc.get_inner_gate_ids();
             for subgate_id in subgate_ids {
-                if let Some(mut gate_ptr) = self
+                if let Some(gate_ptr) = self
                     .primary_and_subgate_registry()
+                    .write()
                     .get_mut(&subgate_id)
                 {
                     *gate_ptr = new_gate_arc.clone();
@@ -285,8 +317,9 @@ impl<Lens> Store<GateState, Lens> {
             }
         }
 
-        if let Some(mut gate_ptr) = self
+        if let Some(gate_ptr) = self
             .primary_and_subgate_registry()
+            .write()
             .get_mut(&gate_id)
         {   
             *gate_ptr = new_gate_arc.clone();
@@ -294,8 +327,9 @@ impl<Lens> Store<GateState, Lens> {
 
         
 
-        if let Some(mut gate_ptr) = self
+        if let Some(gate_ptr) = self
             .primary_gate_registry()
+            .write()
             .get_mut(&gate_id)
         {
             *gate_ptr = new_gate_arc.clone();
@@ -306,20 +340,12 @@ impl<Lens> Store<GateState, Lens> {
 
     fn move_gate(&mut self, gate_drag_data: GateDragData) -> Result<()> {
 
-        // if let Some(mut gate_ptr) = self
-        //     .primary_gate_registry()
-        //     .get_mut(&gate_drag_data.gate_id())
-        // {
-        //     if let Ok(Some(new_gate_box)) = gate_ptr.replace_points(gate_drag_data) {
-        //         *gate_ptr = Arc::from(new_gate_box);
-        //     }
-        // }
         let gate_id = &gate_drag_data.gate_id();
-        let old_gate = self
+        let new_gate = self
             .primary_gate_registry()
-            .get(gate_id.clone()).ok_or_else(|| anyhow!("Gate {} does not exist", gate_id.clone()))?;
-
-        let new_gate = old_gate().replace_points(gate_drag_data)?;
+            .read()
+            .get(&gate_id.clone()).ok_or_else(|| anyhow!("Gate {} does not exist", gate_id.clone()))?
+            .replace_points(gate_drag_data)?;
         if let Some(new_gate) = new_gate{
 
         
@@ -328,8 +354,9 @@ impl<Lens> Store<GateState, Lens> {
             if new_gate_arc.is_composite() {
                 let subgate_ids = new_gate_arc.get_inner_gate_ids();
                 for subgate_id in subgate_ids {
-                    if let Some(mut gate_ptr) = self
+                    if let Some(gate_ptr) = self
                         .primary_and_subgate_registry()
+                        .write()
                         .get_mut(&subgate_id)
                     {
                         *gate_ptr = new_gate_arc.clone();
@@ -338,18 +365,20 @@ impl<Lens> Store<GateState, Lens> {
                 }
             }
 
-            if let Some(mut gate_ptr) = self
+            if let Some(gate_ptr) = self
                 .primary_and_subgate_registry()
-                .get_mut(&gate_id)
+                .write()
+                .get_mut(&gate_id.clone())
             {   
                 *gate_ptr = new_gate_arc.clone();
             }
 
             
 
-            if let Some(mut gate_ptr) = self
+            if let Some(gate_ptr) = self
                 .primary_gate_registry()
-                .get_mut(&gate_id)
+                .write()
+                .get_mut(gate_id)
             {
                 *gate_ptr = new_gate_arc.clone();
             }
@@ -363,22 +392,12 @@ impl<Lens> Store<GateState, Lens> {
         gate_id: GateId,
         current_position: (f32, f32),
     ) -> anyhow::Result<()> {
-        
 
-        // if let Some(mut gate_ptr) = self
-        //     .primary_gate_registry()
-        //     .get_mut(&gate_id)
-        // {
-        //     if let Ok(Some(new_gate_box)) = gate_ptr.rotate_gate(current_position) {
-        //         *gate_ptr = Arc::from(new_gate_box);
-        //     }
-        // }
-
-        let old_gate = self
+        let new_gate = self
             .primary_gate_registry()
-            .get(gate_id.clone()).ok_or_else(|| anyhow!("Gate {} does not exist", gate_id.clone()))?;
-
-        let new_gate = old_gate().rotate_gate(current_position)?;
+            .read()
+            .get(&gate_id).ok_or_else(|| anyhow!("Gate {} does not exist", gate_id.clone()))?
+            .rotate_gate(current_position)?;
         if let Some(new_gate) = new_gate{
 
         
@@ -387,8 +406,9 @@ impl<Lens> Store<GateState, Lens> {
             if new_gate_arc.is_composite() {
                 let subgate_ids = new_gate_arc.get_inner_gate_ids();
                 for subgate_id in subgate_ids {
-                    if let Some(mut gate_ptr) = self
+                    if let Some(gate_ptr) = self
                         .primary_and_subgate_registry()
+                        .write()
                         .get_mut(&subgate_id)
                     {
                         *gate_ptr = new_gate_arc.clone();
@@ -397,8 +417,9 @@ impl<Lens> Store<GateState, Lens> {
                 }
             }
 
-            if let Some(mut gate_ptr) = self
+            if let Some(gate_ptr) = self
                 .primary_and_subgate_registry()
+                .write()
                 .get_mut(&gate_id)
             {   
                 *gate_ptr = new_gate_arc.clone();
@@ -406,8 +427,9 @@ impl<Lens> Store<GateState, Lens> {
 
             
 
-            if let Some(mut gate_ptr) = self
+            if let Some(gate_ptr) = self
                 .primary_gate_registry()
+                .write()
                 .get_mut(&gate_id)
             {
                 *gate_ptr = new_gate_arc.clone();
@@ -460,11 +482,11 @@ impl<Lens> Store<GateState, Lens> {
             let ids = key_store.read().clone();
 
             for k in ids {
-                let old_gate = self
+                let new_gate = self
                     .primary_gate_registry()
-                    .get(k.clone()).ok_or_else(|| anyhow!("Gate {} does not exist", k.clone()))?;
-
-                let new_gate = old_gate().match_to_plot_axis(x, y)?;
+                    .read()
+                    .get(&k).ok_or_else(|| anyhow!("Gate {} does not exist", k.clone()))?
+                    .match_to_plot_axis(x, y)?;
 
                 if let Some(new_gate) = new_gate {
                 let new_gate_arc: Arc<dyn DrawableGate> = Arc::from(new_gate);
@@ -472,8 +494,9 @@ impl<Lens> Store<GateState, Lens> {
                 if new_gate_arc.is_composite() {
                     let subgate_ids = new_gate_arc.get_inner_gate_ids();
                     for subgate_id in subgate_ids {
-                        if let Some(mut gate_ptr) = self
+                        if let Some(gate_ptr) = self
                             .primary_and_subgate_registry()
+                            .write()
                             .get_mut(&subgate_id)
                         {
                             *gate_ptr = new_gate_arc.clone();
@@ -482,8 +505,9 @@ impl<Lens> Store<GateState, Lens> {
                     }
                 }
 
-                if let Some(mut gate_ptr) = self
+                if let Some(gate_ptr) = self
                     .primary_and_subgate_registry()
+                    .write()
                     .get_mut(&k)
                 {   
                     *gate_ptr = new_gate_arc.clone();
@@ -491,8 +515,9 @@ impl<Lens> Store<GateState, Lens> {
 
                 
 
-                if let Some(mut gate_ptr) = self
+                if let Some(gate_ptr) = self
                     .primary_gate_registry()
+                    .write()
                     .get_mut(&k)
                 {
                     *gate_ptr = new_gate_arc.clone();
@@ -501,12 +526,6 @@ impl<Lens> Store<GateState, Lens> {
 
             }
 
-
-                // if let Some(mut gate) = self.primary_gate_registry().get_mut(&k) {
-                //     if let Ok(Some(g)) = gate.match_to_plot_axis(x, y){
-                //         *gate = Arc::from(g);
-                //     };
-                // }
             }
         }
 
@@ -514,78 +533,130 @@ impl<Lens> Store<GateState, Lens> {
         return Ok(());
     }
 
-    fn rescale_gates(
-        &mut self,
-        marker: &Arc<str>,
-        old_axis_options: &AxisInfo,
-        new_axis_options: &AxisInfo,
-    ) -> Result<(), Vec<String>> {
-        let mut errors = vec![];
-        for (_, gate) in self.primary_gate_registry().write().iter_mut() {
-            let (x_marker, y_marker) = &gate.get_params();
-            let gate_id = gate.get_id();
-            if marker == x_marker || marker == y_marker {
+    // fn rescale_gates(
+    //     &mut self,
+    //     marker: &Arc<str>,
+    //     old_axis_options: &AxisInfo,
+    //     new_axis_options: &AxisInfo,
+    // ) -> Result<(), Vec<String>> {
+    //     let mut errors = vec![];
+    //     let mut_self = self;
+    //     for (_, gate) in mut_self.primary_gate_registry().write().iter_mut() {
+    //         let (x_marker, y_marker) = &gate.get_params();
+    //         let gate_id = gate.get_id();
+    //         if marker == x_marker || marker == y_marker {
                 
 
-                let new_gate_arc: Arc<dyn DrawableGate> = match gate.recalculate_gate_for_rescaled_axis(marker.clone(),
-                    &old_axis_options.transform,
-                    &new_axis_options.transform,){
-                        Ok(g) => {
-                            Arc::from(g)
-                        },
-                        Err(e) => {
-                            errors.push(e.to_string());
-                            continue
-                        },
-                    };
+    //             let new_gate_arc: Arc<dyn DrawableGate> = match gate.recalculate_gate_for_rescaled_axis(marker.clone(),
+    //                 &old_axis_options.transform,
+    //                 &new_axis_options.transform,
+    //                 (new_axis_options.data_lower, new_axis_options.data_upper)
+    //         ){
+    //                     Ok(g) => {
+    //                         Arc::from(g)
+    //                     },
+    //                     Err(e) => {
+    //                         errors.push(e.to_string());
+    //                         continue
+    //                     },
+    //                 };
                 
-                if new_gate_arc.is_composite() {
-                    let subgate_ids = new_gate_arc.get_inner_gate_ids();
-                    for subgate_id in subgate_ids {
-                        if let Some(mut gate_ptr) = self
-                            .primary_and_subgate_registry()
-                            .get_mut(&subgate_id)
-                        {
-                            *gate_ptr = new_gate_arc.clone();
+    //             if new_gate_arc.is_composite() {
+    //                 let subgate_ids = new_gate_arc.get_inner_gate_ids();
+    //                 for subgate_id in subgate_ids {
+    //                     if let Some(gate_ptr) = mut_self
+    //                         .primary_and_subgate_registry()
+    //                         .write()
+    //                         .get_mut(&subgate_id)
+    //                     {
+    //                         *gate_ptr = new_gate_arc.clone();
                             
-                        }
-                    }
-                }
+    //                     }
+    //                 }
+    //             }
 
-                if let Some(mut gate_ptr) = self
-                    .primary_and_subgate_registry()
-                    .get_mut(&gate_id)
-                {   
-                    *gate_ptr = new_gate_arc.clone();
-                }
+    //             if let Some(gate_ptr) = mut_self
+    //                 .primary_and_subgate_registry()
+    //                 .write()
+    //                 .get_mut(&gate_id)
+    //             {   
+    //                 *gate_ptr = new_gate_arc.clone();
+    //             }
 
                 
 
-                if let Some(mut gate_ptr) = self
-                    .primary_gate_registry()
-                    .get_mut(&gate_id)
-                {
-                    *gate_ptr = new_gate_arc.clone();
+    //             if let Some(gate_ptr) = mut_self
+    //                 .primary_gate_registry()
+    //                 .write()
+    //                 .get_mut(&gate_id)
+    //             {
+    //                 *gate_ptr = new_gate_arc.clone();
+    //             }
+    //         }
+    //     }
+    //     if errors.is_empty() {
+    //         Ok(())
+    //     } else {
+    //         Err(errors)
+    //     }
+    // }
+
+    fn rescale_gates(
+    &mut self,
+    marker: &Arc<str>,
+    old_axis_options: &AxisInfo,
+    new_axis_options: &AxisInfo,
+) -> Result<(), Vec<String>> {
+    let mut errors = vec![];
+    
+    // 1. Create a temporary storage for the new gates to avoid nested locking
+    let mut updates: Vec<(Arc<str>, Arc<dyn DrawableGate>)> = Vec::new();
+
+    // Scope for the first read/write lock
+    {
+        
+        for (_, gate) in self.primary_gate_registry().read().iter() {
+            let (x_marker, y_marker) = gate.get_params();
+            if marker == &x_marker || marker == &y_marker {
+                match gate.recalculate_gate_for_rescaled_axis(
+                    marker.clone(),
+                    &old_axis_options.transform,
+                    &new_axis_options.transform,
+                    (new_axis_options.data_lower, new_axis_options.data_upper),
+                ) {
+                    Ok(new_g) => updates.push((gate.get_id(), Arc::from(new_g))),
+                    Err(e) => errors.push(e.to_string()),
                 }
-                
-
-
-                // match gate.recalculate_gate_for_rescaled_axis(
-                //     marker.clone(),
-                //     &old_axis_options.transform,
-                //     &new_axis_options.transform,
-                // ){
-                //     Ok(g) => *gate = Arc::from(g),
-                //     Err(e) => errors.push(e.to_string()),
-                // } 
-
-
             }
         }
-        if errors.is_empty() {
-            Ok(())
-        } else {
-            Err(errors)
+    } // First lock drops here!
+
+    // 2. Now apply updates to both registries
+    if !updates.is_empty() {
+
+
+        for (gate_id, new_gate_arc) in updates {
+            // Update subgates if composite
+            if new_gate_arc.is_composite() {
+                for subgate_id in new_gate_arc.get_inner_gate_ids() {
+                    if let Some(gate_ptr) = self.primary_and_subgate_registry().write().get_mut(&subgate_id) {
+                        *gate_ptr = new_gate_arc.clone();
+                    }
+                }
+            }
+
+            // Update primary and sub registry for the main gate
+            if let Some(gate_ptr) = self.primary_and_subgate_registry().write().get_mut(&gate_id) {
+                *gate_ptr = new_gate_arc.clone();
+            }
+
+            // Update primary registry
+            if let Some(gate_ptr) = self.primary_gate_registry().write().get_mut(&gate_id) {
+                *gate_ptr = new_gate_arc.clone();
+            }
         }
     }
+
+    if errors.is_empty() { Ok(()) } else { Err(errors) }
+}
 }

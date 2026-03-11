@@ -8,7 +8,7 @@ use crate::plotters_dioxus::{gates::{
 
 pub trait DrawableGate: Send + Sync {
 
-    fn get_gate_ref(&self, id: Option<Arc<str>>) -> Option<&flow_gates::Gate>;
+    fn get_gate_ref(&self, id: Option<&str>) -> Option<&flow_gates::Gate>;
 
     fn get_inner_gate_ids(&self) -> Vec<Arc<str>>;
 
@@ -83,6 +83,7 @@ pub trait DrawableGate: Send + Sync {
         param: std::sync::Arc<str>,
         old_transform: &TransformType,
         new_transform: &TransformType,
+        data_range: (f32, f32)
     ) -> anyhow::Result<Box<dyn DrawableGate>>;
 
     fn rotate_gate(

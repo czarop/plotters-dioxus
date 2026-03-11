@@ -3,7 +3,7 @@ use flow_fcs::TransformType;
 use flow_gates::{Gate, GateGeometry};
 use indexmap::IndexMap;
 use rustc_hash::FxBuildHasher;
-use std::sync::Arc;
+use std::{ops::RangeInclusive, sync::Arc};
 use std::ops::Index;
 
 use crate::plotters_dioxus::{
@@ -18,13 +18,15 @@ use crate::plotters_dioxus::{
 
 type FxIndexMap<K, V> = IndexMap<K, V, FxBuildHasher>;
 
-#[derive(PartialEq, Clone, Copy)]
+#[derive(PartialEq, Clone)]
 struct DataPoints {
     center: (f32, f32),
     left: (f32, f32),
     bottom: (f32, f32),
     right: (f32, f32),
     top: (f32, f32),
+    x_data_range: RangeInclusive<f32>,
+    y_data_range: RangeInclusive<f32>
 }
 
 impl DataPoints {
@@ -35,16 +37,19 @@ impl DataPoints {
         let right = (xmax, cy);
         let bottom = (cx, ymin);
         let top = (cx, ymax);
-        Self::new_from_points((cx, cy), left, bottom, right, top)
+        println!("center: {:?} left: {:?}, bottom: {:?}, right: {:?}, top: {:?}", (cx, cy), left, bottom, right, top);
+        Self::new_from_points((cx, cy), left, bottom, right, top, plot_map.x_data_min_max(), plot_map.y_data_min_max())
     }
 
-    fn new_from_points(center: (f32, f32), left: (f32, f32), bottom: (f32, f32), right: (f32, f32), top: (f32, f32)) -> Self {
+    fn new_from_points(center: (f32, f32), left: (f32, f32), bottom: (f32, f32), right: (f32, f32), top: (f32, f32), x_data_range: RangeInclusive<f32>, y_data_range: RangeInclusive<f32>) -> Self {
         Self {
             center,
             left,
             bottom,
             right,
             top,
+            x_data_range,
+            y_data_range
         }
     }
 
@@ -56,6 +61,8 @@ impl DataPoints {
                 right: (self.top.1, self.top.0),
                 bottom: (self.left.1, self.left.0),
                 top: (self.right.1, self.right.0),
+                x_data_range: self.y_data_range.clone(),
+                y_data_range: self.x_data_range.clone()
             }
         } else {
             Self {
@@ -64,6 +71,8 @@ impl DataPoints {
                 right: (self.top.1, self.top.0),
                 bottom: (self.left.1, self.left.0),
                 top: (self.right.1, self.right.0),
+                x_data_range: self.y_data_range.clone(),
+                y_data_range: self.x_data_range.clone()
             }
         }
     }
@@ -98,11 +107,11 @@ impl SkewedQuadrantGate {
         x_axis_param: Arc<str>,
         y_axis_param: Arc<str>,
         axis_matched: bool,
-        subgate_ids: Option<Vec<Arc<str>>>
+        subgate_ids: Option<Vec<Arc<str>>>,
     ) -> anyhow::Result<Self> {
         let mut gate_map = FxIndexMap::default();
         let parameters = (x_axis_param.clone(), y_axis_param.clone());
-        let geos = create_skewed_quadrant_geos(data_points, &x_axis_param, &y_axis_param)?;
+        let geos = create_skewed_quadrant_geos(data_points.clone(), &x_axis_param, &y_axis_param)?;
         let (
             id_bottom_left,
             id_bottom_right,
@@ -222,7 +231,7 @@ impl SkewedQuadrantGate {
             Box::new(Self {
                 gates,
                 id: self.id.clone(),
-                points: self.points,
+                points: self.points.clone(),
                 axis_matched: self.axis_matched,
                 parameters: self.parameters.clone(),
             })
@@ -243,7 +252,7 @@ impl SkewedQuadrantGate {
             x_axis_param,
             y_axis_param,
             self.axis_matched,
-            Some(gate_ids)
+            Some(gate_ids),
         )
     }
 
@@ -463,8 +472,10 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
         param: std::sync::Arc<str>,
         old_transform: &TransformType,
         new_transform: &TransformType,
+        data_range: (f32, f32)
     ) -> anyhow::Result<Box<dyn super::super::gate_traits::DrawableGate>> {
         let (x_param, _) = &self.parameters;
+        let is_x = x_param == &param;
         let c = crate::plotters_dioxus::gates::gate_single::rescale_helper_point(
             self.points.center,
             &param,
@@ -474,12 +485,12 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
         )?;
 
         let (l, b, r, t) = {
-                (
-                    rescale_helper_point(self.points.left, &param, x_param, old_transform, new_transform)?,
-                    rescale_helper_point(self.points.bottom, &param, x_param, old_transform, new_transform)?,
-                    rescale_helper_point(self.points.right, &param, x_param, old_transform, new_transform)?,
-                    rescale_helper_point(self.points.top, &param, x_param, old_transform, new_transform)?,
-                )
+            (
+                rescale_helper_point(self.points.left, &param, x_param, old_transform, new_transform)?,
+                rescale_helper_point(self.points.bottom, &param, x_param, old_transform, new_transform)?,
+                rescale_helper_point(self.points.right, &param, x_param, old_transform, new_transform)?,
+                rescale_helper_point(self.points.top, &param, x_param, old_transform, new_transform)?,
+            )
         };
 
         let new = DataPoints {
@@ -488,6 +499,8 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
             bottom: b,
             right: r,
             top: t,
+            x_data_range: if is_x {RangeInclusive::new(data_range.0, data_range.1)} else {self.points.x_data_range.clone()},
+            y_data_range: if !is_x {RangeInclusive::new(data_range.0, data_range.1)} else {self.points.y_data_range.clone()}
         };
 
         Ok(Box::new(self.clone_with_point(new)?))
@@ -524,6 +537,8 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
                 bottom: b,
                 right: r,
                 top: t,
+                x_data_range: self.points.x_data_range.clone(),
+                y_data_range: self.points.y_data_range.clone(),
             },
             1 => DataPoints {
                 center: c,
@@ -531,6 +546,8 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
                 bottom: b,
                 right: r,
                 top: t,
+                x_data_range: self.points.x_data_range.clone(),
+                y_data_range: self.points.y_data_range.clone(),
             },
             2 => DataPoints {
                 center: c,
@@ -538,6 +555,8 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
                 bottom: (new_point.0, ymin),
                 right: r,
                 top: t,
+                x_data_range: self.points.x_data_range.clone(),
+                y_data_range: self.points.y_data_range.clone(),
             },
             3 => DataPoints {
                 center: c,
@@ -545,6 +564,8 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
                 bottom: b,
                 right: (xmax, new_point.1),
                 top: t,
+                x_data_range: self.points.x_data_range.clone(),
+                y_data_range: self.points.y_data_range.clone(),
             },
             4 => DataPoints {
                 center: c,
@@ -552,6 +573,8 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
                 bottom: b,
                 right: r,
                 top: (new_point.0, ymax),
+                x_data_range: self.points.x_data_range.clone(),
+                y_data_range: self.points.y_data_range.clone(),
             },
             _ => unreachable!(),
         };
@@ -569,10 +592,10 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
         Box::new(self.clone())
     }
 
-    fn get_gate_ref(&self, id: Option<Arc<str>>) -> Option<&Gate> {
+    fn get_gate_ref(&self, id: Option<&str>) -> Option<&Gate> {
 
         if let Some(id) = id {
-            if let Some(g) = self.gates.get(&id){
+            if let Some(g) = self.gates.get(id){
                 g.get_gate_ref(None)
             } else {
                 None
@@ -602,29 +625,35 @@ fn create_skewed_quadrant_geos(
     let y_min = data_points.bottom.1;
     let y_max = data_points.top.1;
 
+    let (x_data_min, x_data_max) = (data_points.x_data_range.start().min(x_min), data_points.x_data_range.end().max(x_max));
+    let (y_data_min, y_data_max) = (data_points.y_data_range.start().min(y_min), data_points.y_data_range.end().max(y_max));
+    
+
     // Bottom-Left (BL)
     let bl = flow_gates::geometry::create_polygon_geometry(
-        vec![(x_min, y_min), (b_x, y_min), c, (x_min, l_y)],
+        vec![(x_data_min, y_data_min), (b_x, y_data_min), (b_x, y_min), c, (x_min, l_y), (x_data_min, l_y)],
         x_channel, y_channel,
     ).map_err(|_| anyhow::anyhow!("failed bl"))?;
 
     // Bottom-Right (BR)
     let br = flow_gates::geometry::create_polygon_geometry(
-        vec![(b_x, y_min), (x_max, y_min), (x_max, r_y), c],
+        vec![(b_x, y_data_min), (x_data_max, y_data_min), (x_data_max, r_y), (x_max, r_y), c, (b_x, y_min)],
         x_channel, y_channel,
     ).map_err(|_| anyhow::anyhow!("failed br"))?;
 
-    // Top-Right (TR) - Adjusted for CCW from bottom-left of the quad
+    // Top-Right (TR)
     let tr = flow_gates::geometry::create_polygon_geometry(
-        vec![c, (x_max, r_y), (x_max, y_max), (t_x, y_max)],
+        vec![c, (x_max, r_y), (x_data_max, r_y), (x_data_max, y_data_max), (t_x, y_data_max), (t_x, y_max)],
         x_channel, y_channel,
     ).map_err(|_| anyhow::anyhow!("failed tr"))?;
 
+
     // Top-Left (TL)
     let tl = flow_gates::geometry::create_polygon_geometry(
-        vec![(x_min, l_y), c, (t_x, y_max), (x_min, y_max)],
+        vec![(x_data_min, l_y), (x_min, l_y), c, (t_x, y_max), (t_x, y_data_max), (x_data_min, y_data_max)],
         x_channel, y_channel,
     ).map_err(|_| anyhow::anyhow!("failed tl"))?;
 
+    println!("gates created");
     Ok((bl, br, tr, tl))
 }

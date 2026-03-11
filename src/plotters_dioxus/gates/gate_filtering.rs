@@ -17,9 +17,6 @@ pub fn filter_events_to_mask(fcs: &Fcs, gate: &Gate,
     let y_transform = axis_settings.read().expect("lock poisoned").get(&y_param).ok_or_else(|| anyhow::anyhow!("axis info not found for {}", y_param.clone()))?.transform.clone();
 
     let df = &fcs.data_frame;
-    
-    println!("called");
-
     match &gate.geometry {
         GateGeometry::Rectangle { min, max } => {
             // Polars native SIMD comparison - Extremely Fast
@@ -38,8 +35,6 @@ pub fn filter_events_to_mask(fcs: &Fcs, gate: &Gate,
                         .ok_or(anyhow::anyhow!("y_coord not found"))?),
                 )
             };
-
-            println!("{minx} {maxx} {miny} {maxy}");
 
             // This generates the mask in one pass with zero manual indexing
             let mask =

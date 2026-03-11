@@ -129,7 +129,7 @@ impl RectangleGate {
 }
 
 impl DrawableGate for RectangleGate {
-    fn get_gate_ref(&self, _id: Option<Arc<str>>) -> Option<&flow_gates::Gate>  {
+    fn get_gate_ref(&self, _id: Option<&str>) -> Option<&flow_gates::Gate>  {
         Some(&self.inner)
     }
     fn get_inner_gate_ids(&self) -> Vec<Arc<str>>{
@@ -211,6 +211,7 @@ impl DrawableGate for RectangleGate {
         param: Arc<str>,
         old: &TransformType,
         new: &TransformType,
+        _data_range: (f32, f32)
     ) -> anyhow::Result<Box<dyn DrawableGate>> {
         Ok(Box::new(self.clone_rectangle_for_rescaled_axis(param, old, new)?))
     }
@@ -270,7 +271,6 @@ pub fn create_default_rectangle(
     let min = plot_map.pixel_to_data(cx_raw - half_width, cy_raw - half_height, None, None);
     let coords = vec![min, max];
 
-    println!("creating rectangle with min {:?}, max {:?}", min, max);
     flow_gates::geometry::create_rectangle_geometry(coords, x_channel, y_channel)
         .map_err(|_| anyhow::anyhow!("failed to create rectangle geometry"))
 }

@@ -246,6 +246,7 @@ impl DrawableGate for EllipseGate {
         param: Arc<str>,
         old: &TransformType,
         new: &TransformType,
+        _data_range: (f32, f32)
     ) -> anyhow::Result<Box<dyn DrawableGate>> {
         let points = rescale_helper(
             &self.get_points(),
@@ -323,7 +324,7 @@ impl DrawableGate for EllipseGate {
         vec![]
     }
     
-    fn get_gate_ref(&self, _id: Option<Arc<str>>) -> Option<&flow_gates::Gate>  {
+    fn get_gate_ref(&self, _id: Option<&str>) -> Option<&flow_gates::Gate>  {
         Some(&self.inner)
     }
     fn get_inner_gate_ids(&self) -> Vec<Arc<str>>{

@@ -346,6 +346,7 @@ impl super::super::gate_traits::DrawableGate for QuadrantGate {
         param: std::sync::Arc<str>,
         old_transform: &TransformType,
         new_transform: &TransformType,
+        data_range: (f32, f32)
     ) -> anyhow::Result<Box<dyn super::super::gate_traits::DrawableGate>> {
         let(x_param, _) = &self.parameters;
         let (cx, cy) = crate::plotters_dioxus::gates::gate_single::rescale_helper_point(self.points, &param, x_param, old_transform, new_transform)?;
@@ -379,10 +380,10 @@ impl super::super::gate_traits::DrawableGate for QuadrantGate {
         Box::new(self.clone())
     }
 
-    fn get_gate_ref(&self, id: Option<Arc<str>>) -> Option<&Gate> {
+    fn get_gate_ref(&self, id: Option<&str>) -> Option<&Gate> {
 
         if let Some(id) = id {
-            if let Some(g) = self.gates.get(&id){
+            if let Some(g) = self.gates.get(id){
                 g.get_gate_ref(None)
             } else {
                 None

@@ -14,20 +14,24 @@ use crate::plotters_dioxus::{AxisInfo, gates::GateId};
 pub struct PlotMapper {
     view_width: f32,
     view_height: f32,
+    x_data_axis_range: RangeInclusive<f32>,
+    y_data_axis_range: RangeInclusive<f32>,
     x_data_range: RangeInclusive<f32>,
     y_data_range: RangeInclusive<f32>,
     x_transform: TransformType,
     y_transform: TransformType,
-    pub x_pix_range: std::ops::Range<u32>,
-    pub y_pix_range: std::ops::Range<u32>,
+    x_pix_range: std::ops::Range<u32>,
+    y_pix_range: std::ops::Range<u32>,
 }
 
 impl PlotMapper {
     pub fn new(
         width: f32,
         height: f32,
-        x_range: RangeInclusive<f32>,
-        y_range: RangeInclusive<f32>,
+        x_data_axis_range: RangeInclusive<f32>,
+        y_data_axis_range: RangeInclusive<f32>,
+        x_data_range: RangeInclusive<f32>,
+        y_data_range: RangeInclusive<f32>,
         x_transform: TransformType,
         y_transform: TransformType,
     ) -> Self {
@@ -36,18 +40,20 @@ impl PlotMapper {
         Self {
             view_width: width,
             view_height: height,
-            x_data_range: x_range,
-            y_data_range: y_range,
+            x_data_axis_range,
+            y_data_axis_range,
             x_transform,
             y_transform,
+            x_data_range,
+            y_data_range,
             x_pix_range,
             y_pix_range,
         }
     }
 
     pub fn get_data_tolerance(&self, pixel_slop: f32) -> (f32, f32) {
-        let x_span = self.x_data_range.end() - self.x_data_range.start();
-        let y_span = self.y_data_range.end() - self.y_data_range.start();
+        let x_span = self.x_data_axis_range.end() - self.x_data_axis_range.start();
+        let y_span = self.y_data_axis_range.end() - self.y_data_axis_range.start();
 
         let plot_w = (self.x_pix_range.end - self.x_pix_range.start) as f32;
         let plot_h = (self.y_pix_range.end - self.y_pix_range.start) as f32;
@@ -79,9 +85,9 @@ impl PlotMapper {
         }
         // println!("x pixel {} data range start {} end {}, x pixel range start {}, end {}", px, self.x_data_range.start(), self.x_data_range.end(), self.x_pix_range.start, self.x_pix_range.end);
         // let xt = TransformType::Arcsinh { cofactor: 6000f32 };
-        let dx_raw = pixel_to_raw(px, &self.x_data_range, &self.x_pix_range, &xt);
+        let dx_raw = pixel_to_raw(px, &self.x_data_axis_range, &self.x_pix_range, &xt);
         // let dx = raw_to_transformed(dx_raw, &xt);
-        let dy_raw = pixel_to_raw_y(py, &self.y_data_range, &self.y_pix_range, &yt);
+        let dy_raw = pixel_to_raw_y(py, &self.y_data_axis_range, &self.y_pix_range, &yt);
         // let dy = raw_to_transformed(dy_raw, &yt);
         let (dx, dy) = (dx_raw, dy_raw);
         println!("raw: {dx_raw}, {dy_raw} transformed: {dx}, {dy}");
@@ -101,7 +107,7 @@ impl PlotMapper {
         } else {
             xt = t.unwrap();
         }
-        let dx = pixel_to_raw(x, &self.x_data_range, &self.x_pix_range, &xt);
+        let dx = pixel_to_raw(x, &self.x_data_axis_range, &self.x_pix_range, &xt);
         dx
     }
 
@@ -117,7 +123,7 @@ impl PlotMapper {
         } else {
             yt = t.unwrap();
         }
-        let dy = pixel_to_raw_y(y, &self.y_data_range, &self.y_pix_range, &yt);
+        let dy = pixel_to_raw_y(y, &self.y_data_axis_range, &self.y_pix_range, &yt);
         dy
     }
 
@@ -141,8 +147,8 @@ impl PlotMapper {
             yt = y_t.unwrap();
         }
 
-        let px = raw_to_pixel(dx, &self.x_data_range, &self.x_pix_range, &xt);
-        let py = raw_to_pixel_y(dy, &self.y_data_range, &self.y_pix_range, &yt);
+        let px = raw_to_pixel(dx, &self.x_data_axis_range, &self.x_pix_range, &xt);
+        let py = raw_to_pixel_y(dy, &self.y_data_axis_range, &self.y_pix_range, &yt);
         
         (px, py)
     }
@@ -155,11 +161,19 @@ impl PlotMapper {
     }
 
     pub fn x_axis_min_max(&self) -> (f32, f32) {
-        (*self.x_data_range.start(), *self.x_data_range.end())
+        (*self.x_data_axis_range.start(), *self.x_data_axis_range.end())
     }
 
     pub fn y_axis_min_max(&self) -> (f32, f32) {
-        (*self.y_data_range.start(), *self.y_data_range.end())
+        (*self.y_data_axis_range.start(), *self.y_data_axis_range.end())
+    }
+
+    pub fn x_data_min_max(&self) -> RangeInclusive<f32> {
+        self.x_data_range.clone()
+    }
+
+    pub fn y_data_min_max(&self) -> RangeInclusive<f32> {
+        self.y_data_range.clone()
     }
 
 }
@@ -220,7 +234,9 @@ impl<Lens> Store<ParameterStore, Lens> {
                     -10000.0
                 };
 
-                AxisInfo::new_from_raw(p.clone(), lower, 4194304.0, transform)
+                let (data_lower, data_upper) = fcs_file.get_minmax_of_parameter(&p.fluoro).expect("couldn't find parameter");
+
+                AxisInfo::new_from_raw(p.clone(), lower, 4194304.0, data_lower, data_upper, transform)
             });
     }
 

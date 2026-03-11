@@ -1,5 +1,5 @@
 #![allow(non_snake_case)]
-use std::sync::Arc;
+use std::{ops::RangeInclusive, sync::Arc};
 
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
@@ -46,13 +46,13 @@ pub fn PseudoColourPlot(
             .expect("shouldn't fail");
 
         let x_axis_options = flow_plots::AxisOptions::new()
-            .range(x_axis_info.lower..=x_axis_info.upper)
+            .range(x_axis_info.axis_lower..=x_axis_info.axis_upper)
             .transform(x_axis_info.transform.clone())
             .label(&x_axis_info.param.to_string())
             .build()
             .expect("axis options failed");
         let y_axis_options = flow_plots::AxisOptions::new()
-            .range(y_axis_info.lower..=y_axis_info.upper)
+            .range(y_axis_info.axis_lower..=y_axis_info.axis_upper)
             .transform(y_axis_info.transform.clone())
             .label(y_axis_info.param.to_string())
             .build()
@@ -73,6 +73,8 @@ pub fn PseudoColourPlot(
             height as f32,
             inc_x,
             inc_y,
+            RangeInclusive::new(x_axis_info.data_lower, x_axis_info.data_upper),
+            RangeInclusive::new(y_axis_info.data_lower, y_axis_info.data_upper),
             x_axis_info.transform.clone(),
             y_axis_info.transform.clone(),
         );

@@ -59,7 +59,7 @@ async fn get_scaled_data_to_display(
 
     if let Some(chain) = gate_chain {
         let gate_refs: Vec<&Gate> = chain.iter()
-            .filter_map(|(id, gate)| gate.get_gate_ref(Some(id.clone()))) 
+            .filter_map(|(id, gate)| gate.get_gate_ref(Some(&id))) 
             .collect();
 
         // 1. Get the final narrowed mask for the whole hierarchy
