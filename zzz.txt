@@ -1,3 +1,7 @@
+Ellipse gates are not accounting for scaling
+Skewed quadrants are slightly off - possibly to do with scaling
+Skewed quadrants don't update properly on axis limit setting
+
 Add filter Cache
 
 changes to composite gates create new arcs for the subgates whereas they should be cloned
