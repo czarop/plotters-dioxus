@@ -199,8 +199,8 @@ impl super::super::gate_traits::DrawableGate for BisectorGate {
         plot_map: &PlotMapper,
     ) -> Vec<GateRenderShape> {
         let (min, max) = {
-            let (xmin, xmax) = plot_map.x_axis_min_max();
-            let (ymin, ymax) = plot_map.y_axis_min_max();
+            let (xmin, xmax) = {let axis = plot_map.x_axis_min_max(); (*axis.start(), *axis.end())};
+            let (ymin, ymax) = {let axis = plot_map.y_axis_min_max(); (*axis.start(), *axis.end())};
             ((xmin, ymin), (xmax, ymax))
         };
         let mut center = self.points;
@@ -325,10 +325,10 @@ impl super::super::gate_traits::DrawableGate for BisectorGate {
         &self,
         point: (f32, f32),
         tolerance: (f32, f32),
-        mapper: &PlotMapper,
+        plot_map: &PlotMapper,
     ) -> Option<f32> {
-        let (xmin, xmax) = mapper.x_axis_min_max();
-        let (ymin, ymax) = mapper.y_axis_min_max();
+        let (xmin, xmax) = {let axis = plot_map.x_axis_min_max(); (*axis.start(), *axis.end())};
+        let (ymin, ymax) = {let axis = plot_map.y_axis_min_max(); (*axis.start(), *axis.end())};
         let min = if self.axis_matched {
             (xmin, self.points.1)
         } else {

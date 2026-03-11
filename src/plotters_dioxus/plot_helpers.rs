@@ -160,12 +160,20 @@ impl PlotMapper {
         self.view_height
     }
 
-    pub fn x_axis_min_max(&self) -> (f32, f32) {
-        (*self.x_data_axis_range.start(), *self.x_data_axis_range.end())
+    // pub fn x_axis_min_max(&self) -> (f32, f32) {
+    //     (*self.x_data_axis_range.start(), *self.x_data_axis_range.end())
+    // }
+
+    // pub fn y_axis_min_max(&self) -> (f32, f32) {
+    //     (*self.y_data_axis_range.start(), *self.y_data_axis_range.end())
+    // }
+
+    pub fn x_axis_min_max(&self) -> RangeInclusive<f32> {
+        self.x_data_axis_range.clone()
     }
 
-    pub fn y_axis_min_max(&self) -> (f32, f32) {
-        (*self.y_data_axis_range.start(), *self.y_data_axis_range.end())
+    pub fn y_axis_min_max(&self) -> RangeInclusive<f32> {
+        self.y_data_axis_range.clone()
     }
 
     pub fn x_data_min_max(&self) -> RangeInclusive<f32> {

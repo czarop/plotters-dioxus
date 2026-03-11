@@ -278,8 +278,8 @@ impl DrawableGate for LineGate {
         plot_map: &PlotMapper,
     ) -> Vec<GateRenderShape> {
         let (min, max) = {
-            let (xmin, xmax) = plot_map.x_axis_min_max();
-            let (ymin, ymax) = plot_map.y_axis_min_max();
+            let (xmin, xmax) = {let axis = plot_map.x_axis_min_max(); (*axis.start(), *axis.end())};
+            let (ymin, ymax) = {let axis = plot_map.y_axis_min_max(); (*axis.start(), *axis.end())};
             ((xmin, ymin), (xmax, ymax))
         };
 

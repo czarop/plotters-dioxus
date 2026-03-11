@@ -1,5 +1,3 @@
-Quadrant gates only BL is working
-Change the composite gates to separate geometry from drawing - currently events off the bottom axis will not be included int he gates
 Add filter Cache
 
 changes to composite gates create new arcs for the subgates whereas they should be cloned

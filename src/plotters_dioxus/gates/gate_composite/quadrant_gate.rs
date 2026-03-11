@@ -3,7 +3,7 @@ use flow_fcs::TransformType;
 use flow_gates::{Gate, GateGeometry};
 use indexmap::IndexMap;
 use rustc_hash::FxBuildHasher;
-use std::{ops::Index, sync::Arc};
+use std::{ops::{Index, RangeInclusive}, sync::Arc};
 
 use crate::plotters_dioxus::{
     gates::{
@@ -19,6 +19,10 @@ pub struct QuadrantGate {
     gates: FxIndexMap<Arc<str>, PolygonGate>,
     id: Arc<str>,
     points: (f32, f32),
+    x_data_range: RangeInclusive<f32>,
+    y_data_range: RangeInclusive<f32>,
+    x_axis_range: RangeInclusive<f32>,
+    y_axis_range: RangeInclusive<f32>,
     axis_matched: bool,
     parameters: (Arc<str>, Arc<str>),
 }
@@ -32,7 +36,11 @@ impl QuadrantGate {
         y_axis_param: Arc<str>,
     ) -> anyhow::Result<Self> {
         let click_loc_data = plot_map.pixel_to_data(click_loc_raw.0, click_loc_raw.1, None, None);
-        QuadrantGate::try_new_from_data_coord(id, click_loc_data, x_axis_param, y_axis_param, true, None)
+        
+        QuadrantGate::try_new_from_data_coord(
+            id, click_loc_data, x_axis_param, y_axis_param, true, None, 
+            plot_map.x_data_min_max(), plot_map.y_data_min_max(),
+        plot_map.x_axis_min_max(), plot_map.y_axis_min_max())
     }
 
     fn try_new_from_data_coord(
@@ -41,12 +49,19 @@ impl QuadrantGate {
         x_axis_param: Arc<str>,
         y_axis_param: Arc<str>,
         axis_matched: bool,
-        subgate_ids: Option<Vec<Arc<str>>>
+        subgate_ids: Option<Vec<Arc<str>>>,
+        x_data_range: RangeInclusive<f32>,
+        y_data_range: RangeInclusive<f32>,
+        x_axis_range: RangeInclusive<f32>,
+        y_axis_range: RangeInclusive<f32>
     ) -> anyhow::Result<Self> {
         let mut gate_map = FxIndexMap::default();
         let parameters = (x_axis_param.clone(), y_axis_param.clone());
 
-        let geos = create_quadrant_geos(click_loc_data.0, click_loc_data.1, &x_axis_param, &y_axis_param)?;
+        let geos = create_quadrant_geos(
+            click_loc_data.0, click_loc_data.1, 
+            &x_axis_param, &y_axis_param,
+        &x_data_range, &y_data_range, &x_axis_range, &y_axis_range)?;
         
         let (
             id_bottom_left,
@@ -148,6 +163,10 @@ impl QuadrantGate {
             gates: gate_map,
             id,
             points,
+            x_data_range,
+            y_data_range,
+            x_axis_range,
+            y_axis_range,
             axis_matched: axis_matched,
             parameters: (x_axis_param, y_axis_param),
         })
@@ -165,6 +184,10 @@ impl QuadrantGate {
                 gates,
                 id: self.id.clone(),
                 points: new_points,
+                x_data_range: self.y_data_range.clone(),
+                y_data_range: self.x_data_range.clone(),
+                x_axis_range: self.y_axis_range.clone(),
+                y_axis_range: self.x_axis_range.clone(),
                 axis_matched: !self.axis_matched,
                 parameters: new_parameters,
             })
@@ -173,6 +196,10 @@ impl QuadrantGate {
                 gates,
                 id: self.id.clone(),
                 points: self.points,
+                x_data_range: self.x_data_range.clone(),
+                y_data_range: self.y_data_range.clone(),
+                x_axis_range: self.x_axis_range.clone(),
+                y_axis_range: self.y_axis_range.clone(),
                 axis_matched: self.axis_matched,
                 parameters: self.parameters.clone(),
             })
@@ -184,6 +211,10 @@ impl QuadrantGate {
         &self,
         cx: f32,
         cy: f32,
+        x_data_range: RangeInclusive<f32>,
+        y_data_range: RangeInclusive<f32>,
+        x_axis_range: RangeInclusive<f32>,
+        y_axis_range: RangeInclusive<f32>
     ) -> anyhow::Result<Self> {
         let (x_axis_param, y_axis_param) = self.parameters.clone();
 
@@ -194,7 +225,7 @@ impl QuadrantGate {
 
         let gate_ids = vec![subgate_bl_id, subgate_br_id, subgate_tr_id, subgate_tl_id];
 
-        QuadrantGate::try_new_from_data_coord(self.id.clone(), (cx, cy), x_axis_param, y_axis_param, self.axis_matched, Some(gate_ids))
+        QuadrantGate::try_new_from_data_coord(self.id.clone(), (cx, cy), x_axis_param, y_axis_param, self.axis_matched, Some(gate_ids), x_data_range, y_data_range, x_axis_range, y_axis_range)
 
 
     }
@@ -217,8 +248,8 @@ impl super::super::gate_traits::DrawableGate for QuadrantGate {
         plot_map: &PlotMapper,
     ) -> Vec<GateRenderShape> {
         let (min, max) = {
-            let (xmin, xmax) = plot_map.x_axis_min_max();
-            let (ymin, ymax) = plot_map.y_axis_min_max();
+            let (xmin, xmax) = {let axis = plot_map.x_axis_min_max(); (*axis.start(), *axis.end())};
+            let (ymin, ymax) = {let axis = plot_map.y_axis_min_max(); (*axis.start(), *axis.end())};
             ((xmin, ymin), (xmax, ymax))
         };
         let mut center = self.points;
@@ -294,10 +325,10 @@ impl super::super::gate_traits::DrawableGate for QuadrantGate {
         &self,
         point: (f32, f32),
         tolerance: (f32, f32),
-        mapper: &PlotMapper,
+        plot_map: &PlotMapper,
     ) -> Option<f32> {
-        let (xmin, xmax) = mapper.x_axis_min_max();
-        let (ymin, ymax) = mapper.y_axis_min_max();
+        let (xmin, xmax) = {let axis = plot_map.x_axis_min_max(); (*axis.start(), *axis.end())};
+        let (ymin, ymax) = {let axis = plot_map.y_axis_min_max(); (*axis.start(), *axis.end())};
         let (cx, cy) = self.points;
 
         let mut closest = std::f32::INFINITY;
@@ -349,8 +380,16 @@ impl super::super::gate_traits::DrawableGate for QuadrantGate {
         data_range: (f32, f32)
     ) -> anyhow::Result<Box<dyn super::super::gate_traits::DrawableGate>> {
         let(x_param, _) = &self.parameters;
+        let is_x = x_param == &param;
         let (cx, cy) = crate::plotters_dioxus::gates::gate_single::rescale_helper_point(self.points, &param, x_param, old_transform, new_transform)?;
-        Ok(Box::new(self.clone_with_point(cx, cy)?))
+
+        Ok(Box::new(self.clone_with_point(
+            cx, 
+            cy,
+            if is_x {RangeInclusive::new(data_range.0, data_range.1)} else {self.x_data_range.clone()},
+            if !is_x {RangeInclusive::new(data_range.0, data_range.1)} else {self.y_data_range.clone()},
+            self.x_axis_range.clone(), self.y_axis_range.clone()
+        )?))
     }
 
     fn rotate_gate(
@@ -366,7 +405,7 @@ impl super::super::gate_traits::DrawableGate for QuadrantGate {
         _point_index: usize,
         _mapper: &PlotMapper,
     ) -> anyhow::Result<Box<dyn super::super::gate_traits::DrawableGate>> {
-        Ok(Box::new(self.clone_with_point(new_point.0, new_point.1)?))
+        Ok(Box::new(self.clone_with_point(new_point.0, new_point.1, self.x_data_range.clone(), self.y_data_range.clone(), self.x_axis_range.clone(), self.y_axis_range.clone())?))
     }
 
     fn replace_points(
@@ -403,34 +442,42 @@ fn create_quadrant_geos(
     cy: f32,
     x_channel: &str,
     y_channel: &str,
+    x_data_range: &RangeInclusive<f32>,
+    y_data_range: &RangeInclusive<f32>,
+    x_axis_range: &RangeInclusive<f32>,
+    y_axis_range: &RangeInclusive<f32>
 ) -> anyhow::Result<(GateGeometry, GateGeometry, GateGeometry, GateGeometry)> {
     let center = (cx, cy);
-    
-    let bl1 = (f32::MIN, f32::MIN);
-    let bl2 = (center.0, f32::MIN);
+    let (x_min, x_max) = (*x_axis_range.start(), *x_axis_range.end());
+    let (y_min, y_max) = (*y_axis_range.start(), *y_axis_range.end());
+    let (x_data_min, x_data_max) = (x_data_range.start().min(x_min), x_data_range.end().max(x_max));
+    let (y_data_min, y_data_max) = (y_data_range.start().min(y_min), y_data_range.end().max(y_max));
+
+    let bl1 = (x_data_min, y_data_min);
+    let bl2 = (center.0, y_data_min);
     let bl3 = center;
-    let bl4 = (f32::MIN, center.1);
+    let bl4 = (x_data_min, center.1);
     let bl = flow_gates::geometry::create_polygon_geometry(vec![bl1, bl2, bl3, bl4], x_channel, y_channel)
         .map_err(|_| anyhow::anyhow!("failed to create polygon geometry"))?;
 
-    let br1 = (center.0, f32::MIN);
-    let br2 = (f32::MAX, f32::MIN);
-    let br3 = (f32::MAX, center.1);
+    let br1 = (center.0, y_data_min);
+    let br2 = (x_data_max, y_data_min);
+    let br3 = (x_data_max, center.1);
     let br4 = center;
     let br = flow_gates::geometry::create_polygon_geometry(vec![br1, br2, br3, br4], x_channel, y_channel)
         .map_err(|_| anyhow::anyhow!("failed to create polygon geometry"))?;
 
     let tr1 = center;
     let tr2 = br3;
-    let tr3 = (f32::MAX, f32::MAX);
-    let tr4 = (center.0, f32::MAX);
+    let tr3 = (x_data_max, y_data_max);
+    let tr4 = (center.0, y_data_max);
     let tr = flow_gates::geometry::create_polygon_geometry(vec![tr1, tr2, tr3, tr4], x_channel, y_channel)
         .map_err(|_| anyhow::anyhow!("failed to create polygon geometry"))?;
 
-    let tl1 = (f32::MIN, center.1);
+    let tl1 = (x_data_min, center.1);
     let tl2 = center;
-    let tl3 = (center.0, f32::MAX);
-    let tl4 = (f32::MIN, f32::MAX);
+    let tl3 = (center.0, y_data_max);
+    let tl4 = (x_data_min, y_data_max);
     let tl = flow_gates::geometry::create_polygon_geometry(vec![tl1, tl2, tl3, tl4], x_channel, y_channel)
         .map_err(|_| anyhow::anyhow!("failed to create polygon geometry"))?;
 

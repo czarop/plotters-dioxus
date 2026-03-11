@@ -31,8 +31,8 @@ struct DataPoints {
 
 impl DataPoints {
     fn new_from_click(cx: f32, cy: f32, plot_map: &PlotMapper) -> Self {
-        let (ymin, ymax) = plot_map.y_axis_min_max();
-        let (xmin, xmax) = plot_map.x_axis_min_max();
+        let (xmin, xmax) = {let axis = plot_map.x_axis_min_max(); (*axis.start(), *axis.end())};
+        let (ymin, ymax) = {let axis = plot_map.y_axis_min_max(); (*axis.start(), *axis.end())};
         let left = (xmin, cy);
         let right = (xmax, cy);
         let bottom = (cx, ymin);
@@ -272,8 +272,8 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
         drag_point: Option<PointDragData>,
         plot_map: &PlotMapper,
     ) -> Vec<GateRenderShape> {
-        let (xmin, xmax) = plot_map.x_axis_min_max();
-        let (ymin, ymax) = plot_map.y_axis_min_max();
+        let (xmin, xmax) = {let axis = plot_map.x_axis_min_max(); (*axis.start(), *axis.end())};
+        let (ymin, ymax) = {let axis = plot_map.y_axis_min_max(); (*axis.start(), *axis.end())};
 
         let (mut left, mut right, mut top, mut bottom, mut center) = (
             self.points.left,
@@ -408,10 +408,10 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
         &self,
         point: (f32, f32),
         tolerance: (f32, f32),
-        mapper: &PlotMapper,
+        plot_map: &PlotMapper,
     ) -> Option<f32> {
-        let (xmin, xmax) = mapper.x_axis_min_max();
-        let (ymin, ymax) = mapper.y_axis_min_max();
+        let (xmin, xmax) = {let axis = plot_map.x_axis_min_max(); (*axis.start(), *axis.end())};
+        let (ymin, ymax) = {let axis = plot_map.y_axis_min_max(); (*axis.start(), *axis.end())};
 
         let (left, bottom, right, top, center) = {
             (
@@ -493,7 +493,6 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
             )
         };
 
-        // println!("old {:?}, new {:?}", self.points.x_data_range, data_range);
         let new = DataPoints {
             center: c,
             left: l,
@@ -520,8 +519,8 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
         point_index: usize,
         mapper: &PlotMapper,
     ) -> anyhow::Result<Box<dyn super::super::gate_traits::DrawableGate>> {
-        let (ymin, ymax) = mapper.y_axis_min_max();
-        let (xmin, xmax) = mapper.x_axis_min_max();
+        let (xmin, xmax) = {let axis = mapper.x_axis_min_max(); (*axis.start(), *axis.end())};
+        let (ymin, ymax) = {let axis = mapper.y_axis_min_max(); (*axis.start(), *axis.end())};
 
         let (c, l, r, t, b) = (
             self.points.center,
