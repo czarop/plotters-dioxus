@@ -493,6 +493,7 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
             )
         };
 
+        // println!("old {:?}, new {:?}", self.points.x_data_range, data_range);
         let new = DataPoints {
             center: c,
             left: l,
@@ -627,7 +628,7 @@ fn create_skewed_quadrant_geos(
 
     let (x_data_min, x_data_max) = (data_points.x_data_range.start().min(x_min), data_points.x_data_range.end().max(x_max));
     let (y_data_min, y_data_max) = (data_points.y_data_range.start().min(y_min), data_points.y_data_range.end().max(y_max));
-    
+
 
     // Bottom-Left (BL)
     let bl = flow_gates::geometry::create_polygon_geometry(
