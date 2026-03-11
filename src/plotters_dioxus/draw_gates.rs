@@ -200,7 +200,6 @@ pub fn GateLayer(
 
                                     }
                                     GateDragType::Gate(gate_drag_data) => {
-                                        println!("moving gate");
                                         gate_store
                                             .move_gate(
                                                 gate_drag_data
@@ -344,7 +343,6 @@ fn RenderGate(props: RenderGateProps) -> Element {
     } else {
         None
     };
-    println!("Only printing for gate: {}", gate_id);
 
     let (is_point, idx) = if let Some(GateDragType::Point(dd)) = &props.drag_data {
         (true, dd.point_index())
@@ -693,7 +691,6 @@ fn RenderShape(
                 shape_type: _,
             } => {
                 let (mx, my, m_width, m_height) = rectangle_gate::map_rect_to_pixels(x, y, width, height, mapper);
-
                 rsx! {
                     g { transform,
                         rect {
@@ -721,7 +718,6 @@ fn RenderShape(
             } => {
                 let p1 = mapper.data_to_pixel(x1, y1, None, None);
                 let p2 = mapper.data_to_pixel(x2, y2, None, None);
-                println!("{:?} {:?}", p1, p2);
                 rsx! {
                     g { transform,
                         line {

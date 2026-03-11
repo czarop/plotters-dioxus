@@ -9,7 +9,7 @@ use std::ops::Index;
 use crate::plotters_dioxus::{
     gates::{
         gate_drag::PointDragData,
-        gate_single::{polygon_gate::PolygonGate, rescale_helper_single},
+        gate_single::{polygon_gate::PolygonGate, rescale_helper_point},
         gate_traits::DrawableGate,
         gate_types::{DEFAULT_LINE, GateRenderShape, SELECTED_LINE, ShapeType},
     },
@@ -21,20 +21,26 @@ type FxIndexMap<K, V> = IndexMap<K, V, FxBuildHasher>;
 #[derive(PartialEq, Clone, Copy)]
 struct DataPoints {
     center: (f32, f32),
-    left: f32,
-    bottom: f32,
-    right: f32,
-    top: f32,
+    left: (f32, f32),
+    bottom: (f32, f32),
+    right: (f32, f32),
+    top: (f32, f32),
 }
 
 impl DataPoints {
-    fn new_from_click(cx: f32, cy: f32) -> Self {
-        Self::new_from_points(cx, cy, cy, cx, cy, cx)
+    fn new_from_click(cx: f32, cy: f32, plot_map: &PlotMapper) -> Self {
+        let (ymin, ymax) = plot_map.y_axis_min_max();
+        let (xmin, xmax) = plot_map.x_axis_min_max();
+        let left = (xmin, cy);
+        let right = (xmax, cy);
+        let bottom = (cx, ymin);
+        let top = (cx, ymax);
+        Self::new_from_points((cx, cy), left, bottom, right, top)
     }
 
-    fn new_from_points(cx: f32, cy: f32, left: f32, bottom: f32, right: f32, top: f32) -> Self {
+    fn new_from_points(center: (f32, f32), left: (f32, f32), bottom: (f32, f32), right: (f32, f32), top: (f32, f32)) -> Self {
         Self {
-            center: (cx, cy),
+            center,
             left,
             bottom,
             right,
@@ -46,18 +52,18 @@ impl DataPoints {
         if !prev_axis_matched {
             Self {
                 center: (self.center.1, self.center.0),
-                left: self.bottom,
-                right: self.top,
-                bottom: self.left,
-                top: self.right,
+                left: (self.bottom.1, self.bottom.0),
+                right: (self.top.1, self.top.0),
+                bottom: (self.left.1, self.left.0),
+                top: (self.right.1, self.right.0),
             }
         } else {
             Self {
                 center: (self.center.1, self.center.0),
-                left: self.bottom,
-                right: self.top,
-                bottom: self.left,
-                top: self.right,
+                left: (self.bottom.1, self.bottom.0),
+                right: (self.top.1, self.top.0),
+                bottom: (self.left.1, self.left.0),
+                top: (self.right.1, self.right.0),
             }
         }
     }
@@ -81,7 +87,7 @@ impl SkewedQuadrantGate {
         y_axis_param: Arc<str>,
     ) -> anyhow::Result<Self> {
         let (cx, cy) = plot_map.pixel_to_data(click_loc_raw.0, click_loc_raw.1, None, None);
-        let points = DataPoints::new_from_click(cx, cy);
+        let points = DataPoints::new_from_click(cx, cy, plot_map);
 
         SkewedQuadrantGate::try_new_from_data_points(id, points, x_axis_param, y_axis_param, true, None)
     }
@@ -271,10 +277,10 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
         if let Some(dd) = drag_point {
             match dd.point_index() {
                 0 => center = dd.loc(),
-                1 => left = dd.loc().1,
-                2 => bottom = dd.loc().0,
-                3 => right = dd.loc().1,
-                4 => top = dd.loc().0,
+                1 => left.1 = dd.loc().1,
+                2 => bottom.0 = dd.loc().0,
+                3 => right.1 = dd.loc().1,
+                4 => top.0 = dd.loc().0,
                 _ => unreachable!(),
             }
         };
@@ -288,7 +294,7 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
         let main = {
             let left = GateRenderShape::Line {
                 x1: xmin,
-                y1: left,
+                y1: left.1,
                 x2: center.0,
                 y2: center.1,
                 style,
@@ -298,13 +304,13 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
                 x1: center.0,
                 y1: center.1,
                 x2: xmax,
-                y2: right,
+                y2: right.1,
                 style,
                 shape_type: ShapeType::UndraggableLine,
             };
 
             let bottom = GateRenderShape::Line {
-                x1: bottom,
+                x1: bottom.0,
                 y1: ymin,
                 x2: center.0,
                 y2: center.1,
@@ -315,7 +321,7 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
             let top = GateRenderShape::Line {
                 x1: center.0,
                 y1: center.1,
-                x2: top,
+                x2: top.0,
                 y2: ymax,
                 style,
                 shape_type: ShapeType::UndraggableLine,
@@ -332,26 +338,26 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
                 shape_type: ShapeType::UndraggablePoint(0),
             };
             let l = GateRenderShape::Circle {
-                center: (xmin, left),
+                center: (xmin, left.1),
                 radius: 3.0,
                 fill: "red",
                 shape_type: ShapeType::UndraggablePoint(1),
             };
             let b = GateRenderShape::Circle {
-                center: (bottom, ymin),
+                center: (bottom.0, ymin),
                 radius: 3.0,
                 fill: "red",
                 shape_type: ShapeType::UndraggablePoint(2),
             };
             let r = GateRenderShape::Circle {
-                center: (xmax, right),
+                center: (xmax, right.1),
                 radius: 3.0,
                 fill: "red",
                 shape_type: ShapeType::UndraggablePoint(3),
             };
 
             let t = GateRenderShape::Circle {
-                center: (top, ymax),
+                center: (top.0, ymax),
                 radius: 3.0,
                 fill: "red",
                 shape_type: ShapeType::UndraggablePoint(4),
@@ -362,7 +368,19 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
             None
         };
 
-        crate::collate_vecs!(main, selected)
+        // crate::collate_vecs!(main, selected)
+
+        let mut inner_gates = vec![];
+        for (i, (_, shape)) in self.gates.iter().enumerate(){
+            if i == 0{
+                let res = shape.draw_self(false, None, plot_map);
+                inner_gates.extend_from_slice(&res);
+            }
+            
+            
+        }
+
+        crate::collate_vecs!(inner_gates, main, selected)
     }
 
     fn is_composite(&self) -> bool {
@@ -398,16 +416,16 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
 
         let mut closest = std::f32::INFINITY;
 
-        if let Some(dis) = self.is_near_segment(point, left, center, tolerance) {
+        if let Some(dis) = self.is_near_segment(point, left.1, center, tolerance) {
             closest = closest.min(dis);
         }
-        if let Some(dis) = self.is_near_segment(point, center, right, tolerance) {
+        if let Some(dis) = self.is_near_segment(point, center, right.1, tolerance) {
             closest = closest.min(dis);
         }
-        if let Some(dis) = self.is_near_segment(point, center, bottom, tolerance) {
+        if let Some(dis) = self.is_near_segment(point, center, bottom.0, tolerance) {
             closest = closest.min(dis);
         }
-        if let Some(dis) = self.is_near_segment(point, center, top, tolerance) {
+        if let Some(dis) = self.is_near_segment(point, center, top.0, tolerance) {
             closest = closest.min(dis);
         }
 
@@ -456,21 +474,12 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
         )?;
 
         let (l, b, r, t) = {
-            if &param == x_param {
                 (
-                    self.points.left,
-                    rescale_helper_single(self.points.bottom, old_transform, new_transform)?,
-                    self.points.right,
-                    rescale_helper_single(self.points.top, old_transform, new_transform)?,
+                    rescale_helper_point(self.points.left, &param, x_param, old_transform, new_transform)?,
+                    rescale_helper_point(self.points.bottom, &param, x_param, old_transform, new_transform)?,
+                    rescale_helper_point(self.points.right, &param, x_param, old_transform, new_transform)?,
+                    rescale_helper_point(self.points.top, &param, x_param, old_transform, new_transform)?,
                 )
-            } else {
-                (
-                    rescale_helper_single(self.points.left, old_transform, new_transform)?,
-                    self.points.bottom,
-                    rescale_helper_single(self.points.right, old_transform, new_transform)?,
-                    self.points.top,
-                )
-            }
         };
 
         let new = DataPoints {
@@ -495,8 +504,11 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
         &self,
         new_point: (f32, f32),
         point_index: usize,
-        _mapper: &PlotMapper,
+        mapper: &PlotMapper,
     ) -> anyhow::Result<Box<dyn super::super::gate_traits::DrawableGate>> {
+        let (ymin, ymax) = mapper.y_axis_min_max();
+        let (xmin, xmax) = mapper.x_axis_min_max();
+
         let (c, l, r, t, b) = (
             self.points.center,
             self.points.left,
@@ -504,12 +516,6 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
             self.points.top,
             self.points.bottom,
         );
-
-
-
-        println!("{point_index}");
-
-        println!("Old Geos: Center={:?}, L={}, R={}, T={}, B={}", c, l, r, t, b);
 
         let new = match point_index {
             0 => DataPoints {
@@ -521,7 +527,7 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
             },
             1 => DataPoints {
                 center: c,
-                left: new_point.1,
+                left: (xmin, new_point.1),
                 bottom: b,
                 right: r,
                 top: t,
@@ -529,7 +535,7 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
             2 => DataPoints {
                 center: c,
                 left: l,
-                bottom: new_point.0,
+                bottom: (new_point.0, ymin),
                 right: r,
                 top: t,
             },
@@ -537,7 +543,7 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
                 center: c,
                 left: l,
                 bottom: b,
-                right: new_point.1,
+                right: (xmax, new_point.1),
                 top: t,
             },
             4 => DataPoints {
@@ -545,11 +551,10 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
                 left: l,
                 bottom: b,
                 right: r,
-                top: new_point.0,
+                top: (new_point.0, ymax),
             },
             _ => unreachable!(),
         };
-        println!("new Geos: Center={:?}, L={}, R={}, T={}, B={}", new.center, new.left, new.right, new.top, new.bottom);
         Ok(Box::new(self.clone_with_point(new)?))
     }
 
@@ -581,81 +586,21 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
     }
 }
 
-// fn create_skewed_quadrant_geos(
-//     data_points: DataPoints,
-//     x_channel: &str,
-//     y_channel: &str,
-// ) -> anyhow::Result<(GateGeometry, GateGeometry, GateGeometry, GateGeometry)> {
-//     let (center, bottom, left, top, right) = (
-//         data_points.center,
-//         data_points.bottom,
-//         data_points.left,
-//         data_points.top,
-//         data_points.right,
-//     );
-
-
-//     let bl1 = (f32::MIN, f32::MIN);
-//     let bl2 = (bottom, f32::MIN);
-//     let bl3 = center;
-//     let bl4 = (f32::MIN, left);
-//     let bl = flow_gates::geometry::create_polygon_geometry(
-//         vec![bl1, bl2, bl3, bl4],
-//         x_channel,
-//         y_channel,
-//     )
-//     .map_err(|_| anyhow::anyhow!("failed to create polygon geometry"))?;
-
-//     let br1 = (bottom, f32::MIN);
-//     let br2 = (f32::MAX, f32::MIN);
-//     let br3 = (f32::MAX, right);
-//     let br4 = center;
-//     let br = flow_gates::geometry::create_polygon_geometry(
-//         vec![br1, br2, br3, br4],
-//         x_channel,
-//         y_channel,
-//     )
-//     .map_err(|_| anyhow::anyhow!("failed to create polygon geometry"))?;
-
-//     let tr1 = center;
-//     let tr2 = br3;
-//     let tr3 = (f32::MAX, f32::MAX);
-//     let tr4 = (top, f32::MAX);
-//     let tr = flow_gates::geometry::create_polygon_geometry(
-//         vec![tr1, tr2, tr3, tr4],
-//         x_channel,
-//         y_channel,
-//     )
-//     .map_err(|_| anyhow::anyhow!("failed to create polygon geometry"))?;
-
-//     let tl1 = bl4;
-//     let tl2 = center;
-//     let tl3 = tr4;
-//     let tl4 = (f32::MIN, f32::MAX);
-//     let tl = flow_gates::geometry::create_polygon_geometry(
-//         vec![tl1, tl2, tl3, tl4],
-//         x_channel,
-//         y_channel,
-//     )
-//     .map_err(|_| anyhow::anyhow!("failed to create polygon geometry"))?;
-
-//     Ok((bl, br, tr, tl))
-// }
 fn create_skewed_quadrant_geos(
     data_points: DataPoints,
     x_channel: &str,
     y_channel: &str,
 ) -> anyhow::Result<(GateGeometry, GateGeometry, GateGeometry, GateGeometry)> {
     let c = data_points.center;
-    let b_x = data_points.bottom;
-    let l_y = data_points.left;
-    let t_x = data_points.top;
-    let r_y = data_points.right;
+    let b_x = data_points.bottom.0;
+    let l_y = data_points.left.1;
+    let t_x = data_points.top.0;
+    let r_y = data_points.right.1;
 
-    let x_min = f32::MIN;
-    let x_max = f32::MAX;
-    let y_min = f32::MIN;
-    let y_max = f32::MAX;
+    let x_min = data_points.left.0;
+    let x_max = data_points.right.0;
+    let y_min = data_points.bottom.1;
+    let y_max = data_points.top.1;
 
     // Bottom-Left (BL)
     let bl = flow_gates::geometry::create_polygon_geometry(
