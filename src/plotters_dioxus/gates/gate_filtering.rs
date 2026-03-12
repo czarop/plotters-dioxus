@@ -175,10 +175,9 @@ pub fn filter_events_to_mask(df: &DataFrame, gate: &Gate,
         }
         _ => {
             // Fallback for complex polygons where an index actually helps
-            let x_chunk = df.column(&x_param)?.rechunk();
-            let x_series = x_chunk.f32()?.cont_slice()?;
-            let y_chunk = df.column(&y_param)?.rechunk();
-            let y_series = y_chunk.f32()?.cont_slice()?;
+            let x_series = df.column(&x_param)?.f32()?;
+            let y_series = df.column(&y_param)?.f32()?;
+
             let indices = filter_events_by_gate(x_series, y_series, gate).map_err(|e| anyhow::anyhow!("failed to gate events"))?;
 
             // Convert indices to mask (slightly slower, but necessary for complex shapes)
@@ -208,13 +207,15 @@ pub fn filter_events_by_hierarchy_to_mask(
 }
 
 pub fn filter_events_by_gate(
-    x_events: &[f32],
-    y_events: &[f32],
+    // x_events: &[f32],
+    // y_events: &[f32],
+    x_ca: &Float32Chunked, 
+    y_ca: &Float32Chunked,
     gate: &Gate,
 ) -> Result<Vec<usize>> {
 
         // Build index from slices (zero-copy)
-        let index = EventIndex::build(x_events, y_events)?;
+        let index = build_event_index_from_polars(x_ca, y_ca``)?;
         let indices = index.filter_by_gate(gate)?;
     
 
@@ -233,3 +234,20 @@ pub fn filter_events_by_gate_with_index(
 
     Ok(indices)
 }
+
+pub fn build_event_index_from_polars(x_ca: &Float32Chunked, y_ca: &Float32Chunked) -> anyhow::Result<EventIndex> {
+        // Ensure both are contiguous and get the slices
+        // We rechunk here to be safe, in case they come from different DF operations
+        let x_rechunked = x_ca.rechunk();
+        let y_rechunked = y_ca.rechunk();
+        
+        let x_slice = x_rechunked.cont_slice().map_err(|_| 
+            anyhow::anyhow!("Failed to get contiguous slice for X")
+        )?;
+        let y_slice = y_rechunked.cont_slice().map_err(|_| 
+            anyhow::anyhow!("Failed to get contiguous slice for Y")
+        )?;
+
+        // Delegate to your existing slice-based build fn
+        EventIndex::build(x_slice, y_slice).map_err(|e| anyhow::anyhow!("{e}"))
+    }
