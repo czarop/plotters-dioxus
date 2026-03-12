@@ -9,6 +9,7 @@ use core::f32;
 use std::{ops::RangeInclusive, sync::{Arc, RwLock}};
 
 use crate::plotters_dioxus::{AxisInfo, gates::GateId};
+use crate::plotters_dioxus::gates::gate_store::GateStateImplExt;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct PlotMapper {
@@ -280,26 +281,48 @@ impl<Lens> Store<ParameterStore, Lens> {
         Err(anyhow!("Could not find axis"))
     }
 
-    fn update_lower(&mut self, id: &GateId, lower: f32) {
+    fn update_lower(&mut self, id: &GateId, lower: f32) -> anyhow::Result<(f32, f32)> {
+
+        let mut old_upper = None;
+        let mut new_lower = None;
         self.settings()
         .write()
         .write()
         .expect("lock poisoned")
         .entry(id.clone())
         .and_modify(|axis_arc| {
+            old_upper = Some(axis_arc.axis_upper);
             let new_axis_data = axis_arc.into_new_lower(lower);
+            new_lower = Some(new_axis_data.axis_lower);
             *axis_arc = new_axis_data;
         });
+
+        if let (Some(upper), Some(lower)) = (old_upper, new_lower) {
+            Ok((lower, upper))
+        } else {
+            Err(anyhow!("error modifying axis for {}", id.clone()))
+        }
     }
-    fn update_upper(&mut self, id: &GateId, upper: f32) {
+    fn update_upper(&mut self, id: &GateId, upper: f32) -> anyhow::Result<(f32, f32)> {
+        let mut new_upper = None;
+        let mut old_lower = None;
+
         self.settings()
         .write()
         .write()
         .expect("lock poisoned")
         .entry(id.clone())
         .and_modify(|axis_arc| {
+            old_lower = Some(axis_arc.axis_lower);
             let new_axis_data = axis_arc.into_new_upper(upper);
+            new_upper = Some(new_axis_data.axis_upper);
             *axis_arc = new_axis_data;
         });
+
+        if let (Some(upper), Some(lower)) = (new_upper, old_lower) {
+            Ok((lower, upper))
+        } else {
+            Err(anyhow!("error modifying axis for {}", id.clone()))
+        }
     }
 }

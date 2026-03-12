@@ -8,7 +8,7 @@ use crate::{
     },
     searchable_select::SearchableSelect,
 };
-use flow_fcs::{Fcs, TransformType, Transformable};
+use flow_fcs::{Fcs, TransformType};
 use crate::plotters_dioxus::gates::gate_buttons::NewGateButtons;
 use std::sync::{Arc};
 use tokio::task;
@@ -55,7 +55,18 @@ async fn get_scaled_data_to_display(
     let settings= store().settings;
 
     task::spawn_blocking(move || -> Result<Vec<(f32, f32)>, anyhow::Error> {
-    let mut df = fs_clone.data_frame.as_ref().clone();
+    let mut df ;
+    ////!!!!! do this when rescaling and use this df - currently doesn't work for chains as it only scales the current parameters!
+    let mut transforms = vec![];
+        match transform_1 {
+            TransformType::Arcsinh { cofactor } => transforms.push((col1_name.as_str(), cofactor)),
+            _ => {}
+        }
+        match transform_2 {
+            TransformType::Arcsinh { cofactor } => transforms.push((col2_name.as_str(), cofactor)),
+            _ => {}
+        }
+    df = fs_clone.apply_arcsinh_transforms(&transforms)?;
 
     if let Some(chain) = gate_chain {
         let gate_refs: Vec<&Gate> = chain.iter()
@@ -63,10 +74,14 @@ async fn get_scaled_data_to_display(
             .collect();
 
         // 1. Get the final narrowed mask for the whole hierarchy
-        let mask = super::gates::gate_filtering::filter_events_by_hierarchy_to_mask(&fs_clone, &gate_refs, settings)?;
+
+        
+        
+
+        let mask = super::gates::gate_filtering::filter_events_by_hierarchy_to_mask(&df, &gate_refs, settings)?;
 
         // 2. Filter the dataframe once at the end
-        df = df.filter(&mask)?;
+        df = df.filter(&mask)?.into();
     }
 
     // 3. Extract and Transform (The heavy math)
@@ -77,7 +92,7 @@ async fn get_scaled_data_to_display(
         .zip(y_series.into_iter())
         .filter_map(|(x, y)| {
             match (x, y) {
-                (Some(vx), Some(vy)) => Some((transform_1.transform(&vx), transform_2.transform(&vy))),
+                (Some(vx), Some(vy)) => Some((vx, vy)),
                 _ => None
             }
         })
@@ -324,7 +339,17 @@ pub fn PlotWindow() -> Element {
                                 oninput: move |e| {
                                     if let Ok(lower) = e.value().parse::<i32>() {
                                         let param = x_axis_marker.peek();
-                                        parameter_settings.update_lower(&param.fluoro, lower as f32);
+                                        match parameter_settings.update_lower(&param.fluoro, lower as f32) {
+                                            Ok(l_u) => {
+                                                match gate_store
+                                                    .set_current_axis_limits(param.fluoro.clone(), l_u.0, l_u.1)
+                                                {
+                                                    Ok(_) => {}
+                                                    Err(e) => println!("{e}"),
+                                                };
+                                            }
+                                            Err(e) => println!("{e}"),
+                                        };
                                     }
                                 },
                             }
@@ -337,7 +362,17 @@ pub fn PlotWindow() -> Element {
                                 oninput: move |e| {
                                     if let Ok(upper) = e.value().parse::<i32>() {
                                         let param = x_axis_marker.peek();
-                                        parameter_settings.update_upper(&param.fluoro, upper as f32);
+                                        match parameter_settings.update_upper(&param.fluoro, upper as f32) {
+                                            Ok(l_u) => {
+                                                match gate_store
+                                                    .set_current_axis_limits(param.fluoro.clone(), l_u.0, l_u.1)
+                                                {
+                                                    Ok(_) => {}
+                                                    Err(e) => println!("{e}"),
+                                                };
+                                            }
+                                            Err(e) => println!("{e}"),
+                                        };
                                     }
                                 },
                             }
@@ -393,7 +428,17 @@ pub fn PlotWindow() -> Element {
                                 oninput: move |e| {
                                     if let Ok(lower) = e.value().parse::<i32>() {
                                         let param = y_axis_marker.peek();
-                                        parameter_settings.update_lower(&param.fluoro, lower as f32);
+                                        match parameter_settings.update_lower(&param.fluoro, lower as f32) {
+                                            Ok(l_u) => {
+                                                match gate_store
+                                                    .set_current_axis_limits(param.fluoro.clone(), l_u.0, l_u.1)
+                                                {
+                                                    Ok(_) => {}
+                                                    Err(e) => println!("{e}"),
+                                                };
+                                            }
+                                            Err(e) => println!("{e}"),
+                                        };
                                     }
                                 },
                             }
@@ -406,7 +451,17 @@ pub fn PlotWindow() -> Element {
                                 oninput: move |e| {
                                     if let Ok(upper) = e.value().parse::<i32>() {
                                         let param = y_axis_marker.peek();
-                                        parameter_settings.update_upper(&param.fluoro, upper as f32);
+                                        match parameter_settings.update_upper(&param.fluoro, upper as f32) {
+                                            Ok(l_u) => {
+                                                match gate_store
+                                                    .set_current_axis_limits(param.fluoro.clone(), l_u.0, l_u.1)
+                                                {
+                                                    Ok(_) => {}
+                                                    Err(e) => println!("{e}"),
+                                                };
+                                            }
+                                            Err(e) => println!("{e}"),
+                                        };
                                     }
                                 },
                             }

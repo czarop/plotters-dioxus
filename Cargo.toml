@@ -8,31 +8,20 @@ resolver = "2"
 dioxus = { version = "0.7.3", features = ["router"] }
 plotters = "0.3.5"
 thiserror = "2.0.12"
-# polars = {version = "0.53", default-features = false}
-# tokio = { version = "1", default-features = false, features = ["macros", "rt-multi-thread"] }
 tokio = { version = "1", default-features = false, features = ["macros", "sync", "rt-multi-thread"] }
 anyhow = "1"
 flow-fcs = {git="https://github.com/jrmoynihan/flow", rev="44a0537"}
 flow-plots = {git="https://github.com/jrmoynihan/flow", rev="44a0537"}
 flow-gates = {git="https://github.com/jrmoynihan/flow", rev="44a0537"}
-
-
-
 base64 = "0.22.1"
 plotters-bitmap = "0.3.3"
 dioxus-primitives = { git = "https://github.com/DioxusLabs/components", version = "0.0.1", default-features = false }
 rustc-hash = "2.1"
 indexmap = "2.1"
-
-# [target.'cfg(windows)'.dependencies]
-# polars = {version = "0.53", default-features = false, features = ["lazy", "performant", "timezones"]}
 polars = {version = "0.53", default-features = false, features = ["lazy", "performant"]}
-# blitz = {git = "https://github.com/dioxuslabs/blitz", rev = "2b3d3ac"}
+
 
 
 [features]
 default = ["desktop"]
 desktop = ["dioxus/desktop"]
-
-[patch.crates-io]
-image = { git = "https://github.com/image-rs/image", tag = "v0.25.6" }

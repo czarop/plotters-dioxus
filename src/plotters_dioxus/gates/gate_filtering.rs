@@ -1,22 +1,22 @@
 use std::sync::RwLock;
 
 use flow_fcs::{Fcs, Transformable};
-use flow_gates::{Gate, GateGeometry};
+use flow_gates::{EventIndex, Gate, GateGeometry};
 use polars::prelude::*;
 use dioxus::prelude::*;
 
 
-pub fn filter_events_to_mask(fcs: &Fcs, gate: &Gate, 
+pub fn filter_events_to_mask(df: &DataFrame, gate: &Gate, 
     axis_settings: Arc<RwLock<rustc_hash::FxHashMap<Arc<str>, crate::plotters_dioxus::AxisInfo>>>
 
 ) -> anyhow::Result<BooleanChunked> {
     
     
     let (x_param, y_param) = gate.parameters.clone();
-    let x_transform = axis_settings.read().expect("lock poisoned").get(&x_param).ok_or_else(|| anyhow::anyhow!("axis info not found for {}", x_param.clone()))?.transform.clone();
-    let y_transform = axis_settings.read().expect("lock poisoned").get(&y_param).ok_or_else(|| anyhow::anyhow!("axis info not found for {}", y_param.clone()))?.transform.clone();
+    // let x_transform = axis_settings.read().expect("lock poisoned").get(&x_param).ok_or_else(|| anyhow::anyhow!("axis info not found for {}", x_param.clone()))?.transform.clone();
+    // let y_transform = axis_settings.read().expect("lock poisoned").get(&y_param).ok_or_else(|| anyhow::anyhow!("axis info not found for {}", y_param.clone()))?.transform.clone();
 
-    let df = &fcs.data_frame;
+
     match &gate.geometry {
         GateGeometry::Rectangle { min, max } => {
             // Polars native SIMD comparison - Extremely Fast
@@ -25,14 +25,14 @@ pub fn filter_events_to_mask(fcs: &Fcs, gate: &Gate,
 
             let (minx, miny, maxx, maxy) = {
                 (
-                    x_transform.inverse_transform(&min.get_coordinate(&x_param)
-                        .ok_or(anyhow::anyhow!("x_coord not found"))?),
-                    y_transform.inverse_transform(&min.get_coordinate(&y_param)
-                        .ok_or(anyhow::anyhow!("y_coord not found"))?),
-                    x_transform.inverse_transform(&max.get_coordinate(&x_param)
-                        .ok_or(anyhow::anyhow!("x_coord not found"))?),
-                    y_transform.inverse_transform(&max.get_coordinate(&y_param)
-                        .ok_or(anyhow::anyhow!("y_coord not found"))?),
+                    min.get_coordinate(&x_param)
+                        .ok_or(anyhow::anyhow!("x_coord not found"))?,
+                    min.get_coordinate(&y_param)
+                        .ok_or(anyhow::anyhow!("y_coord not found"))?,
+                    max.get_coordinate(&x_param)
+                        .ok_or(anyhow::anyhow!("x_coord not found"))?,
+                    max.get_coordinate(&y_param)
+                        .ok_or(anyhow::anyhow!("y_coord not found"))?,
                 )
             };
 
@@ -49,15 +49,12 @@ pub fn filter_events_to_mask(fcs: &Fcs, gate: &Gate,
             angle,
         } => {
             // 1. EXTRACTION: Get coordinates from the HashMap once
-            let h = x_transform.inverse_transform(&center
+            let h = center
                 .get_coordinate(&x_param)
-                .ok_or_else(|| anyhow::anyhow!("Missing X"))?);
-            let k = y_transform.inverse_transform(&center
+                .ok_or_else(|| anyhow::anyhow!("Missing X"))?;
+            let k = center
                 .get_coordinate(&y_param)
-                .ok_or_else(|| anyhow::anyhow!("Missing Y"))?);
-
-            let radius_x = x_transform.inverse_transform(&radius_x);
-            let radius_y = y_transform.inverse_transform(&radius_y);
+                .ok_or_else(|| anyhow::anyhow!("Missing Y"))?;
 
             // 2. PRE-CALCULATION: Trig and Bounding Box
             let cos_a = angle.cos();
@@ -107,8 +104,10 @@ pub fn filter_events_to_mask(fcs: &Fcs, gate: &Gate,
             let coords: Vec<(f32, f32)> = nodes
                 .iter()
                 .filter_map(|node| {
-                    let x = x_transform.inverse_transform(&node.get_coordinate(&x_param)?);
-                    let y = y_transform.inverse_transform(&node.get_coordinate(&y_param)?);
+                    // let x = x_transform.inverse_transform(&node.get_coordinate(&x_param)?);
+                    // let y = y_transform.inverse_transform(&node.get_coordinate(&y_param)?);
+                    let x = node.get_coordinate(&x_param)?;
+                    let y = node.get_coordinate(&y_param)?;
                     Some((x, y))
                 })
                 .collect();
@@ -176,7 +175,11 @@ pub fn filter_events_to_mask(fcs: &Fcs, gate: &Gate,
         }
         _ => {
             // Fallback for complex polygons where an index actually helps
-            let indices = flow_gates::filter_events_by_gate(fcs, gate, None)?;
+            let x_chunk = df.column(&x_param)?.rechunk();
+            let x_series = x_chunk.f32()?.cont_slice()?;
+            let y_chunk = df.column(&y_param)?.rechunk();
+            let y_series = y_chunk.f32()?.cont_slice()?;
+            let indices = filter_events_by_gate(x_series, y_series, gate).map_err(|e| anyhow::anyhow!("failed to gate events"))?;
 
             // Convert indices to mask (slightly slower, but necessary for complex shapes)
             let mut mask_vec = vec![false; df.height()];
@@ -189,17 +192,44 @@ pub fn filter_events_to_mask(fcs: &Fcs, gate: &Gate,
 }
 
 pub fn filter_events_by_hierarchy_to_mask(
-    fcs: &Fcs,
+    scaled_data: &DataFrame,
     gate_chain: &[&Gate],
     axis_settings: Arc<RwLock<rustc_hash::FxHashMap<Arc<str>, crate::plotters_dioxus::AxisInfo>>>
 ) -> Result<BooleanChunked, anyhow::Error> {
-    let event_count = fcs.data_frame.height();
+    let event_count = scaled_data.height();
     let mut final_mask = BooleanChunked::full("mask".into(), true, event_count);
     println!("called with gate chain length {}", gate_chain.len());
     for gate in gate_chain {
-        let gate_mask = filter_events_to_mask(fcs, gate, axis_settings.clone())?;
+        let gate_mask = filter_events_to_mask(scaled_data, gate, axis_settings.clone())?;
         final_mask = final_mask & gate_mask;
     }
 
     Ok(final_mask)
+}
+
+pub fn filter_events_by_gate(
+    x_events: &[f32],
+    y_events: &[f32],
+    gate: &Gate,
+) -> Result<Vec<usize>> {
+
+        // Build index from slices (zero-copy)
+        let index = EventIndex::build(x_events, y_events)?;
+        let indices = index.filter_by_gate(gate)?;
+    
+
+    Ok(indices)
+}
+
+pub fn filter_events_by_gate_with_index(
+    gate: &Gate,
+    spatial_index: &EventIndex,
+) -> Result<Vec<usize>> {
+
+    // Use provided index or build one
+    let indices = 
+        spatial_index.filter_by_gate(gate)?;
+    
+
+    Ok(indices)
 }

@@ -434,6 +434,15 @@ impl super::super::gate_traits::DrawableGate for QuadrantGate {
     fn get_inner_gate_ids(&self) -> Vec<Arc<str>>{
         self.gates.keys().map(|k|k.clone()).collect()
     }
+
+    fn recalculate_gate_for_new_axis_limits(
+        &self,
+        _param: std::sync::Arc<str>,
+        _lower: f32,
+        _upper: f32,
+    ) -> anyhow::Result<Option<Box<dyn DrawableGate>>> {
+        Ok(None)
+    }
 }
 
 

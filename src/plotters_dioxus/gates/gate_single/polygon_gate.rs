@@ -247,6 +247,15 @@ impl DrawableGate for PolygonGate {
             .and_then(|d| draw_ghost_point_for_polygon(d, &pts));
         crate::collate_vecs!(main, selected, ghost)
     }
+
+    fn recalculate_gate_for_new_axis_limits(
+        &self,
+        _param: std::sync::Arc<str>,
+        _lower: f32,
+        _upper: f32,
+    ) -> anyhow::Result<Option<Box<dyn DrawableGate>>> {
+        Ok(None)
+    }
 }
 
 use crate::plotters_dioxus::gates::gate_types::{DRAGGED_LINE, DrawingStyle};

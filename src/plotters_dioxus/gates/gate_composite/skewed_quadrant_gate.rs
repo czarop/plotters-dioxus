@@ -607,6 +607,22 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
     fn get_inner_gate_ids(&self) -> Vec<Arc<str>>{
         self.gates.keys().map(|k|k.clone()).collect()
     }
+
+    fn recalculate_gate_for_new_axis_limits(
+        &self,
+        param: std::sync::Arc<str>,
+        lower: f32,
+        upper: f32,
+    ) -> anyhow::Result<Option<Box<dyn DrawableGate>>> {
+        let is_x = param == self.parameters.0;
+        if is_x {
+            println!("old lower {} old upper {}. new lower {}, new upper {}", self.points.left.0, self.points.right.0, lower, upper);
+        } else {
+            println!("old lower {} old upper {}. new lower {}, new upper {}", self.points.bottom.1, self.points.top.1, lower, upper);
+        }
+        
+        Ok(None)
+    }
 }
 
 fn create_skewed_quadrant_geos(

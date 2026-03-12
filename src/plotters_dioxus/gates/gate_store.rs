@@ -606,17 +606,8 @@ impl<Lens> Store<GateState, Lens> {
         } 
 
         // 2. Now apply updates to both registries
-        if !updates.is_empty() {
-            for (gate_id, new_gate_arc) in updates {
-            let new_gate = self
-                .primary_gate_registry()
-                .read()
-                .get(&gate_id).ok_or_else(|| anyhow!("Gate {} does not exist", gate_id.clone()))?
-                .rotate_gate(current_position)?;
-            if let Some(new_gate) = new_gate{
 
-            
-                let new_gate_arc: Arc<dyn DrawableGate> = Arc::from(new_gate);
+            for (gate_id, new_gate_arc) in updates {
 
                 if new_gate_arc.is_composite() {
                     let subgate_ids = new_gate_arc.get_inner_gate_ids();
@@ -649,10 +640,12 @@ impl<Lens> Store<GateState, Lens> {
                 {
                     *gate_ptr = new_gate_arc.clone();
                 }
-            }
+            
 
 
         }
-        Ok(())
-    }
+        
+    
+    Ok(())
+}
 }
