@@ -19,18 +19,18 @@ use crate::plotters_dioxus::{
 type FxIndexMap<K, V> = IndexMap<K, V, FxBuildHasher>;
 
 #[derive(PartialEq, Clone)]
-struct DataPoints {
-    center: (f32, f32),
-    left: (f32, f32),
-    bottom: (f32, f32),
-    right: (f32, f32),
-    top: (f32, f32),
-    x_data_range: RangeInclusive<f32>,
-    y_data_range: RangeInclusive<f32>,
+pub struct DataPoints {
+    pub center: (f32, f32),
+    pub left: (f32, f32),
+    pub bottom: (f32, f32),
+    pub right: (f32, f32),
+    pub top: (f32, f32),
+    pub x_data_range: RangeInclusive<f32>,
+    pub y_data_range: RangeInclusive<f32>,
 }
 
 impl DataPoints {
-    fn new_from_click(cx: f32, cy: f32, plot_map: &PlotMapper) -> Self {
+    pub fn new_from_click(cx: f32, cy: f32, plot_map: &PlotMapper) -> Self {
     let (xmin, xmax) = {
         let axis = plot_map.x_axis_min_max();
         (*axis.start(), *axis.end())
@@ -77,7 +77,7 @@ impl DataPoints {
     }
 
 
-    fn clone_for_swap_axis(&self, prev_axis_matched: bool) -> Self {
+    pub fn clone_for_swap_axis(&self, prev_axis_matched: bool) -> Self {
         if !prev_axis_matched {
             Self {
                 center: (self.center.1, self.center.0),
@@ -834,7 +834,7 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
     }
 }
 
-fn create_skewed_quadrant_geos(
+pub fn create_skewed_quadrant_geos(
     data_points: DataPoints,
     x_channel: &str,
     y_channel: &str,
@@ -920,7 +920,7 @@ fn create_skewed_quadrant_geos(
     Ok((bl, br, tr, tl))
 }
 
-fn project_to_boundary(
+pub fn project_to_boundary(
     center: (f32, f32),
     handle: (f32, f32),
     min: (f32, f32),
