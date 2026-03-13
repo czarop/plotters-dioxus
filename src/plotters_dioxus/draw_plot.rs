@@ -13,7 +13,7 @@ use flow_plots::{
     BasePlotOptions, ColorMaps, DensityPlot, DensityPlotOptions, Plot, render::RenderConfig,
 };
 
-use crate::plotters_dioxus::{AxisInfo, draw_gates::GateLayer, plot_helpers::PlotMapper};
+use crate::plotters_dioxus::{AxisInfo, draw_gates::GateLayer, plots::parameters::PlotMapper};
 
 pub type DioxusDrawingArea<'a> = DrawingArea<BitMapBackend<'a>, Shift>;
 
@@ -116,7 +116,7 @@ pub fn PseudoColourPlot(
                 x_channel: x_axis_info().param.fluoro.clone(),
                 y_channel: y_axis_info().param.fluoro.clone(),
                 parental_gate_id,
-
+            
             }
         }
     }

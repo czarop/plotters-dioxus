@@ -1,19 +1,14 @@
-use std::sync::RwLock;
-
 use dioxus::prelude::*;
-use flow_fcs::{Fcs, Transformable};
 use flow_gates::{EventIndex, Gate, GateGeometry};
 use polars::prelude::*;
 
 pub fn filter_events_to_mask(
     df: &DataFrame,
     gate: &Gate,
-    axis_settings: Arc<RwLock<rustc_hash::FxHashMap<Arc<str>, crate::plotters_dioxus::AxisInfo>>>,
+
 ) -> anyhow::Result<BooleanChunked> {
     let (x_param, y_param) = gate.parameters.clone();
-    // let x_transform = axis_settings.read().expect("lock poisoned").get(&x_param).ok_or_else(|| anyhow::anyhow!("axis info not found for {}", x_param.clone()))?.transform.clone();
-    // let y_transform = axis_settings.read().expect("lock poisoned").get(&y_param).ok_or_else(|| anyhow::anyhow!("axis info not found for {}", y_param.clone()))?.transform.clone();
-
+    
     match &gate.geometry {
         GateGeometry::Rectangle { min, max } => {
             // Polars native SIMD comparison - Extremely Fast
@@ -176,7 +171,7 @@ pub fn filter_events_to_mask(
             let y_series = df.column(&y_param)?.f32()?;
 
             let indices = filter_events_by_gate(x_series, y_series, gate)
-                .map_err(|e| anyhow::anyhow!("failed to gate events"))?;
+                .map_err(|_| anyhow::anyhow!("failed to gate events"))?;
 
             // Convert indices to mask (slightly slower, but necessary for complex shapes)
             let mut mask_vec = vec![false; df.height()];
@@ -191,13 +186,13 @@ pub fn filter_events_to_mask(
 pub fn filter_events_by_hierarchy_to_mask(
     scaled_data: &DataFrame,
     gate_chain: &[&Gate],
-    axis_settings: Arc<RwLock<rustc_hash::FxHashMap<Arc<str>, crate::plotters_dioxus::AxisInfo>>>,
+
 ) -> Result<BooleanChunked, anyhow::Error> {
     let event_count = scaled_data.height();
     let mut final_mask = BooleanChunked::full("mask".into(), true, event_count);
     println!("called with gate chain length {}", gate_chain.len());
     for gate in gate_chain {
-        let gate_mask = filter_events_to_mask(scaled_data, gate, axis_settings.clone())?;
+        let gate_mask = filter_events_to_mask(scaled_data, gate)?;
         final_mask = final_mask & gate_mask;
     }
 
@@ -205,8 +200,6 @@ pub fn filter_events_by_hierarchy_to_mask(
 }
 
 pub fn filter_events_by_gate(
-    // x_events: &[f32],
-    // y_events: &[f32],
     x_ca: &Float32Chunked,
     y_ca: &Float32Chunked,
     gate: &Gate,

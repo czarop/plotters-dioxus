@@ -7,7 +7,7 @@ use crate::plotters_dioxus::{
         gate_drag::{GateDragData, PointDragData},
         gate_types::GateRenderShape,
     },
-    plot_helpers::PlotMapper,
+    plots::parameters::PlotMapper,
 };
 
 pub trait DrawableGate: Send + Sync {

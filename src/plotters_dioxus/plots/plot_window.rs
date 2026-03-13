@@ -1,9 +1,9 @@
 use anyhow::anyhow;
 use dioxus::prelude::*;
-use flow_gates::Gate;
 use polars::frame::DataFrame;
 
 use crate::plotters_dioxus::gates::gate_buttons::NewGateButtons;
+use crate::plotters_dioxus::plots::data_helpers::{get_filtered_data_to_display, get_flow_data};
 use crate::{
     file_load::FcsFiles,
     plotters_dioxus::{
@@ -11,97 +11,16 @@ use crate::{
         gate_sidebar::GateSidebar,
         gates::{
             GateState,
-            gate_store::{GateStateImplExt, GateStateStoreExt, ROOTGATE},
-            gate_traits::DrawableGate,
+            gate_store::{GateStateImplExt, ROOTGATE},
             gate_types::GateType,
         },
-        plot_helpers::{Param, ParameterStore, ParameterStoreImplExt, ParameterStoreStoreExt as _},
+        plots::parameters::{
+            Param, ParameterStore, ParameterStoreImplExt, ParameterStoreStoreExt as _,
+        },
     },
     searchable_select::SearchableSelect,
 };
-use flow_fcs::{Fcs, TransformType};
 use std::sync::Arc;
-use tokio::task;
-
-async fn get_flow_data(path: std::path::PathBuf) -> Result<Arc<Fcs>, Arc<anyhow::Error>> {
-    task::spawn_blocking(move || {
-        let fcs_file = Fcs::open(path.to_str().unwrap_or_default())?;
-        Ok(Arc::new(fcs_file))
-    })
-    .await
-    .map_err(|e| Arc::new(e.into()))?
-}
-
-async fn get_filtered_data_to_display(
-    df: Arc<DataFrame>,
-    // fs: Arc<Fcs>,
-    col1_name: &str,
-    col2_name: &str,
-    // transform_1: TransformType,
-    // transform_2: TransformType,
-    parental_gate_id: &Option<Arc<str>>,
-) -> Result<Vec<(f32, f32)>, anyhow::Error> {
-    let mut df_clone = df.clone();
-    let col1_name = col1_name.to_string();
-    let col2_name = col2_name.to_string();
-    let gate_store: Store<GateState> = use_context::<Store<GateState>>();
-    let gate_chain: Option<Vec<(Arc<str>, Arc<dyn DrawableGate>)>> =
-        if let Some(parent) = parental_gate_id {
-            let arcs: Vec<(Arc<str>, Arc<dyn DrawableGate>)> = gate_store
-                .hierarchy()
-                .peek()
-                .get_chain_to_root(parent)
-                .iter()
-                .filter_map(|id| {
-                    gate_store
-                        .primary_and_subgate_registry()
-                        .peek()
-                        .get(id)
-                        .map(|g| (id.clone(), g.clone()))
-                })
-                .collect();
-
-            if arcs.is_empty() { None } else { Some(arcs) }
-        } else {
-            None
-        };
-    let store = use_context::<Store<ParameterStore>>();
-    let settings = store().settings;
-
-    task::spawn_blocking(move || -> Result<Vec<(f32, f32)>, anyhow::Error> {
-        if let Some(chain) = gate_chain {
-            let gate_refs: Vec<&Gate> = chain
-                .iter()
-                .filter_map(|(id, gate)| gate.get_gate_ref(Some(&id)))
-                .collect();
-
-            // 1. Get the final narrowed mask for the whole hierarchy
-
-            let mask = super::gates::gate_filtering::filter_events_by_hierarchy_to_mask(
-                &df, &gate_refs, settings,
-            )?;
-
-            // 2. Filter the dataframe once at the end
-            df_clone = df.filter(&mask)?.into();
-        }
-
-        // 3. Extract and Transform (The heavy math)
-        let x_series = df_clone.column(&col1_name)?.f32()?;
-        let y_series = df_clone.column(&col2_name)?.f32()?;
-
-        let zipped_cols: Vec<(f32, f32)> = x_series
-            .into_iter()
-            .zip(y_series.into_iter())
-            .filter_map(|(x, y)| match (x, y) {
-                (Some(vx), Some(vy)) => Some((vx, vy)),
-                _ => None,
-            })
-            .collect();
-
-        Ok(zipped_cols)
-    })
-    .await?
-}
 
 static CSS_STYLE: Asset = asset!("assets/plot_window.css");
 
@@ -221,7 +140,7 @@ pub fn PlotWindow() -> Element {
 
             match result {
                 Ok(d) => d,
-                Err(e) => Err(anyhow::anyhow!("error scaling data")),
+                Err(_) => Err(anyhow::anyhow!("error scaling data")),
             }
         } else {
             Err(anyhow::anyhow!("No data to scale"))
@@ -281,31 +200,10 @@ pub fn PlotWindow() -> Element {
         let y_fluoro = y_axis_marker.read().fluoro.clone();
         async move {
             let parental_gate = &*parental_gate.read();
-            // let x_transform = parameter_settings
-            //     .settings()
-            //     .read().read().expect("lock poisoned")
-            //     .get(&x_fluoro)
-            //     .ok_or_else(|| anyhow::anyhow!("No data yet"))?
-            // .transform
-            // .clone();
-            // let y_transform = parameter_settings
-            //     .settings()
-            //     .read().read().expect("lock poisoned")
-            //     .get(&y_fluoro)
-            //     .ok_or_else(|| anyhow::anyhow!("No data yet"))?
-            // .transform
-            // .clone();
 
             if let Some(Ok(d)) = &*scaled_data.read() {
-                match get_filtered_data_to_display(
-                    d.clone(),
-                    &x_fluoro,
-                    &y_fluoro,
-                    // x_transform,
-                    // y_transform,
-                    parental_gate,
-                )
-                .await
+                match get_filtered_data_to_display(d.clone(), x_fluoro, y_fluoro, parental_gate)
+                    .await
                 {
                     Ok(d) => {
                         plot_data_signal.set(d);

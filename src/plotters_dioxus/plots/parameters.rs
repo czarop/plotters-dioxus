@@ -11,7 +11,6 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use crate::plotters_dioxus::gates::gate_store::GateStateImplExt;
 use crate::plotters_dioxus::{AxisInfo, gates::GateId};
 
 #[derive(Clone, Debug, PartialEq)]
@@ -153,14 +152,6 @@ impl PlotMapper {
     pub fn height(&self) -> f32 {
         self.view_height
     }
-
-    // pub fn x_axis_min_max(&self) -> (f32, f32) {
-    //     (*self.x_data_axis_range.start(), *self.x_data_axis_range.end())
-    // }
-
-    // pub fn y_axis_min_max(&self) -> (f32, f32) {
-    //     (*self.y_data_axis_range.start(), *self.y_data_axis_range.end())
-    // }
 
     pub fn x_axis_min_max(&self) -> RangeInclusive<f32> {
         self.x_data_axis_range.clone()

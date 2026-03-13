@@ -23,7 +23,7 @@ use crate::plotters_dioxus::{
         gate_traits::DrawableGate,
         gate_types::GateType,
     },
-    plot_helpers::PlotMapper,
+    plots::parameters::PlotMapper,
 };
 
 pub type GateId = std::sync::Arc<str>;

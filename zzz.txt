@@ -1,21 +1,21 @@
-Ellipse gates are not accounting for scaling
-
+Gates:
 
 Add filter Cache
 
-name gates smth sensible
-context menu on gates + renaming + deleting
-Gates should display default params - not what they were gated on, but what
 
 
-
-
+Gates should display default params
 
 NOT gates
 AND gates
 OR gates
 
+context menu on gate sidebar + renaming + deleting
+name gates
 Delete gates
+
+
+Meta:
 
 Metadata
 Metadata Groups
@@ -24,6 +24,9 @@ Set Metadata from FCS or Omiq
 Sample-specific gating
 
 Paired samples (FMX FS)
+
+
+Omiq Integration:
 
 Set gates from omiq gating
 Save gates to omiq gating

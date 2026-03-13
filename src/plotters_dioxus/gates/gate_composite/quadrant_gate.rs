@@ -8,7 +8,7 @@ use crate::plotters_dioxus::{
         gate_traits::DrawableGate,
         gate_types::{DEFAULT_LINE, GateRenderShape, SELECTED_LINE, ShapeType},
     },
-    plot_helpers::PlotMapper,
+    plots::parameters::PlotMapper,
 };
 use anyhow::Result;
 use flow_gates::Gate;

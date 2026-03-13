@@ -8,7 +8,7 @@ use crate::plotters_dioxus::{
         gate_traits::DrawableGate,
         gate_types::{GateRenderShape, GateType, ShapeType},
     },
-    plot_helpers::PlotMapper,
+    plots::parameters::PlotMapper,
 };
 
 use dioxus::prelude::*;
