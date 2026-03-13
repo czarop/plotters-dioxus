@@ -320,34 +320,101 @@ impl DrawableGate for EllipseGate {
     fn is_finalised(&self) -> bool {
         true
     }
+    // fn draw_self(
+    //     &self,
+    //     is_selected: bool,
+    //     drag_point: Option<PointDragData>,
+    //     _plot_map: &PlotMapper,
+    // ) -> Vec<GateRenderShape> {
+    //     let style = if is_selected {
+    //         &SELECTED_LINE
+    //     } else {
+    //         &DEFAULT_LINE
+    //     };
+    //     let pts = self.get_points();
+    //     if let GateGeometry::Ellipse {
+    //         radius_x,
+    //         radius_y,
+    //         angle,
+    //         ..
+    //     } = &self.inner.geometry
+    //     {
+    //         let main = draw_elipse(
+    //             pts[0],
+    //             *radius_x,
+    //             *radius_y,
+    //             *angle,
+    //             style,
+    //             ShapeType::Gate(self.inner.id.clone()),
+    //         );
+    //         let selected = if is_selected {
+    //             let mut c = draw_circles_for_selected_gate(&pts[1..], 1);
+    //             c.push(GateRenderShape::Handle {
+    //                 center: (pts[0].0, pts[0].1 + *radius_y),
+    //                 size: 5.0,
+    //                 shape_center: pts[0],
+    //                 shape_type: ShapeType::Rotation(*angle),
+    //             });
+    //             Some(c)
+    //         } else {
+    //             None
+    //         };
+    //         let ghost = drag_point.as_ref().and_then(|d| {
+    //             draw_ghost_point_for_ellipse(
+    //                 &self.inner.geometry,
+    //                 d,
+    //                 &self.inner.parameters.0,
+    //                 &self.inner.parameters.1,
+    //             )
+    //         });
+    //         return crate::collate_vecs!(main, selected, ghost);
+    //     }
+    //     vec![]
+    // }
+
     fn draw_self(
-        &self,
-        is_selected: bool,
-        drag_point: Option<PointDragData>,
-        _plot_map: &PlotMapper,
-    ) -> Vec<GateRenderShape> {
-        let style = if is_selected {
-            &SELECTED_LINE
-        } else {
-            &DEFAULT_LINE
-        };
-        let pts = self.get_points();
-        if let GateGeometry::Ellipse {
-            radius_x,
-            radius_y,
-            angle,
-            ..
-        } = &self.inner.geometry
-        {
-            let main = draw_elipse(
-                pts[0],
-                *radius_x,
-                *radius_y,
-                *angle,
-                style,
-                ShapeType::Gate(self.inner.id.clone()),
-            );
-            let selected = if is_selected {
+    &self,
+    is_selected: bool,
+    drag_point: Option<PointDragData>,
+    plot_map: &PlotMapper,
+) -> Vec<GateRenderShape> {
+    let style = if is_selected { &SELECTED_LINE } else { &DEFAULT_LINE };
+    
+    // Get the 5 control points (Center, R, T, L, B)
+    let pts = self.get_points();
+
+    if let GateGeometry::Ellipse { center, radius_x, radius_y, angle, .. } = &self.inner.geometry {
+        let cx = center.get_coordinate(&self.inner.parameters.0).unwrap_or(0.0);
+        let cy = center.get_coordinate(&self.inner.parameters.1).unwrap_or(0.0);
+
+        // --- 1. GENERATE ELLIPSE PATH ---
+        // We calculate the points in Data Space. 
+        // The PlotMapper will handle the visual stretching when these are rendered.
+        let mut path_points = Vec::with_capacity(65);
+        let segments = 64;
+        let (sin_a, cos_a) = angle.sin_cos();
+
+        for i in 0..=segments {
+            let theta = (i as f32) * 2.0 * std::f32::consts::PI / (segments as f32);
+            let (sin_t, cos_t) = theta.sin_cos();
+
+            // Parametric ellipse equation with rotation
+            let x_local = radius_x * cos_t;
+            let y_local = radius_y * sin_t;
+
+            let x = cx + x_local * cos_a - y_local * sin_a;
+            let y = cy + x_local * sin_a + y_local * cos_a;
+            
+            path_points.push((x, y));
+        }
+
+        let main = Some(vec![GateRenderShape::Polygon  {
+            points: path_points.into(),
+            style: style,
+            shape_type: ShapeType::Gate(self.inner.id.clone()),
+        }]);
+
+        let selected = if is_selected {
                 let mut c = draw_circles_for_selected_gate(&pts[1..], 1);
                 c.push(GateRenderShape::Handle {
                     center: (pts[0].0, pts[0].1 + *radius_y),
@@ -367,10 +434,11 @@ impl DrawableGate for EllipseGate {
                     &self.inner.parameters.1,
                 )
             });
-            return crate::collate_vecs!(main, selected, ghost);
-        }
-        vec![]
+
+        return crate::collate_vecs!(main, selected, ghost);
     }
+    vec![]
+}
 
     fn get_gate_ref(&self, _id: Option<&str>) -> Option<&flow_gates::Gate> {
         Some(&self.inner)
@@ -378,6 +446,52 @@ impl DrawableGate for EllipseGate {
     fn get_inner_gate_ids(&self) -> Vec<Arc<str>> {
         vec![self.inner.id.clone()]
     }
+
+    fn recalculate_gate_for_new_axis_limits(
+    &self,
+    param: Arc<str>,
+    _lower: f32, // New axis min
+    _upper: f32, // New axis max
+    _transform: &TransformType,
+) -> anyhow::Result<Option<Box<dyn DrawableGate>>> {
+    // 1. Extract the current geometry
+    let (cx, cy, rx, ry, angle) = match &self.inner.geometry {
+        GateGeometry::Ellipse { center, radius_x, radius_y, angle } => {
+            let x = center.get_coordinate(&self.inner.parameters.0).unwrap_or(0.0);
+            let y = center.get_coordinate(&self.inner.parameters.1).unwrap_or(0.0);
+            (x, y, *radius_x, *radius_y, *angle)
+        },
+        _ => return Ok(None),
+    };
+
+    // 2. The key insight: 
+    // Changing axis limits does NOT change the data-coordinates of the center
+    // and does NOT change the magnitude of the radii in data space.
+    // We simply rebuild the gate with the EXACT SAME values.
+    
+    let (x_param, y_param) = self.get_params();
+    let center_node = GateNode::new(self.get_id())
+        .with_coordinate(x_param.clone(), cx)
+        .with_coordinate(y_param.clone(), cy);
+
+    let new_geometry = GateGeometry::Ellipse {
+        center: center_node,
+        radius_x: rx,
+        radius_y: ry,
+        angle: angle,
+    };
+
+    let new_gate = flow_gates::Gate {
+        id: self.inner.id.clone(),
+        parameters: self.inner.parameters.clone(),
+        geometry: new_geometry,
+        label_position: self.inner.label_position.clone(),
+        name: self.inner.name.clone(),
+        mode: self.inner.mode.clone(),
+    };
+
+    Ok(Some(Box::new(EllipseGate::try_new(new_gate)?)))
+}
 }
 
 use crate::plotters_dioxus::gates::gate_types::{DRAGGED_LINE, DrawingStyle};
@@ -423,24 +537,24 @@ pub fn is_point_on_ellipse_perimeter(
     }
 }
 
-pub fn draw_elipse(
-    center: (f32, f32),
-    rx: f32,
-    ry: f32,
-    angle_rotation: f32,
-    style: &'static DrawingStyle,
-    shape_type: ShapeType,
-) -> Vec<GateRenderShape> {
-    let degrees_rotation = -angle_rotation.to_degrees();
-    vec![GateRenderShape::Ellipse {
-        center,
-        radius_x: rx,
-        radius_y: ry,
-        degrees_rotation,
-        style,
-        shape_type,
-    }]
-}
+// pub fn draw_elipse(
+//     center: (f32, f32),
+//     rx: f32,
+//     ry: f32,
+//     angle_rotation: f32,
+//     style: &'static DrawingStyle,
+//     shape_type: ShapeType,
+// ) -> Vec<GateRenderShape> {
+//     let degrees_rotation = -angle_rotation.to_degrees();
+//     vec![GateRenderShape::Ellipse {
+//         center,
+//         radius_x: rx,
+//         radius_y: ry,
+//         degrees_rotation,
+//         style,
+//         shape_type,
+//     }]
+// }
 pub fn calculate_ellipse_nodes(
     cx: f32,
     cy: f32,
