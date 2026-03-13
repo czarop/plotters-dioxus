@@ -427,17 +427,11 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
             None
         };
 
-        // crate::collate_vecs!(main, selected)
 
-        let mut inner_gates = vec![];
-        for (i, (_, shape)) in self.gates.iter().enumerate() {
-            if i == 0 {
-                let res = shape.draw_self(false, None, plot_map);
-                inner_gates.extend_from_slice(&res);
-            }
-        }
 
-        crate::collate_vecs!(inner_gates, main, selected)
+
+
+        crate::collate_vecs!(main, selected)
     }
 
     fn is_composite(&self) -> bool {
@@ -581,7 +575,6 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
                 nice_min..nice_max
             }
             TransformType::Arcsinh { cofactor: _ } | TransformType::Biexponential { .. } => {
-                // Keep the transformed range but we'll format nicely in the formatter
                 axis_range.0..axis_range.1
             }
         };

@@ -399,7 +399,7 @@ impl super::super::gate_traits::DrawableGate for QuadrantGate {
         old_transform: &TransformType,
         new_transform: &TransformType,
         data_range: (f32, f32),
-        _axis_range: (f32, f32),
+        axis_range: (f32, f32),
     ) -> anyhow::Result<Box<dyn super::super::gate_traits::DrawableGate>> {
         let (x_param, _) = &self.parameters;
         let is_x = x_param == &param;
@@ -424,8 +424,16 @@ impl super::super::gate_traits::DrawableGate for QuadrantGate {
             } else {
                 self.y_data_range.clone()
             },
-            self.x_axis_range.clone(),
-            self.y_axis_range.clone(),
+            if is_x {
+                RangeInclusive::new(axis_range.0, axis_range.1)
+            } else {
+                self.x_axis_range.clone()
+            },
+            if !is_x {
+                RangeInclusive::new(axis_range.0, axis_range.1)
+            } else {
+                self.y_axis_range.clone()
+            },
         )?))
     }
 
