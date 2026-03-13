@@ -556,12 +556,20 @@ use std::{
 //     Ok((bl, br, tr, tl))
 // }
 
-
 use anyhow::Result;
 
 // Assuming these are available in your crate scope
 
-use crate::plotters_dioxus::{gates::{gate_composite::skewed_quadrant_gate::{DataPoints, create_skewed_quadrant_geos}, gate_drag::{GateDragData, PointDragData}, gate_single::{polygon_gate::PolygonGate, rescale_helper_point}, gate_traits::DrawableGate, gate_types::{DEFAULT_LINE, GateRenderShape, SELECTED_LINE, ShapeType}}, plot_helpers::PlotMapper};
+use crate::plotters_dioxus::{
+    gates::{
+        gate_composite::skewed_quadrant_gate::{DataPoints, create_skewed_quadrant_geos},
+        gate_drag::{GateDragData, PointDragData},
+        gate_single::{polygon_gate::PolygonGate, rescale_helper_point},
+        gate_traits::DrawableGate,
+        gate_types::{DEFAULT_LINE, GateRenderShape, SELECTED_LINE, ShapeType},
+    },
+    plot_helpers::PlotMapper,
+};
 type FxIndexMap<K, V> = IndexMap<K, V, FxBuildHasher>;
 
 #[derive(PartialEq, Clone)]
@@ -584,14 +592,7 @@ impl QuadrantGate {
         let (cx, cy) = plot_map.pixel_to_data(click_loc_raw.0, click_loc_raw.1, None, None);
         let points = DataPoints::new_from_click(cx, cy, plot_map);
 
-        Self::try_new_from_data_points(
-            id,
-            points,
-            x_axis_param,
-            y_axis_param,
-            true,
-            None,
-        )
+        Self::try_new_from_data_points(id, points, x_axis_param, y_axis_param, true, None)
     }
 
     fn try_new_from_data_points(
@@ -610,7 +611,7 @@ impl QuadrantGate {
 
         let mut gate_map = FxIndexMap::default();
         let parameters = (x_axis_param.clone(), y_axis_param.clone());
-        
+
         // Reuse the skewed geometry generator (orthogonal is just 0 skew)
         let geos = create_skewed_quadrant_geos(data_points.clone(), &x_axis_param, &y_axis_param)?;
 
@@ -625,7 +626,12 @@ impl QuadrantGate {
             ]
         };
 
-        let names = [format!("{id}_BL"), format!("{id}_BR"), format!("{id}_TR"), format!("{id}_TL")];
+        let names = [
+            format!("{id}_BL"),
+            format!("{id}_BR"),
+            format!("{id}_TR"),
+            format!("{id}_TL"),
+        ];
 
         for (i, (id_arc, name)) in sub_ids.into_iter().zip(names.into_iter()).enumerate() {
             let geo = match i {
@@ -694,11 +700,21 @@ impl QuadrantGate {
 }
 
 impl DrawableGate for QuadrantGate {
-    fn is_finalised(&self) -> bool { true }
-    fn is_composite(&self) -> bool { true }
-    fn get_id(&self) -> Arc<str> { self.id.clone() }
-    fn get_params(&self) -> (Arc<str>, Arc<str>) { self.parameters.clone() }
-    fn clone_box(&self) -> Box<dyn DrawableGate> { Box::new(self.clone()) }
+    fn is_finalised(&self) -> bool {
+        true
+    }
+    fn is_composite(&self) -> bool {
+        true
+    }
+    fn get_id(&self) -> Arc<str> {
+        self.id.clone()
+    }
+    fn get_params(&self) -> (Arc<str>, Arc<str>) {
+        self.parameters.clone()
+    }
+    fn clone_box(&self) -> Box<dyn DrawableGate> {
+        Box::new(self.clone())
+    }
 
     fn draw_self(
         &self,
@@ -706,8 +722,14 @@ impl DrawableGate for QuadrantGate {
         drag_point: Option<PointDragData>,
         plot_map: &PlotMapper,
     ) -> Vec<GateRenderShape> {
-        let (xmin, xmax) = { let a = plot_map.x_axis_min_max(); (*a.start(), *a.end()) };
-        let (ymin, ymax) = { let a = plot_map.y_axis_min_max(); (*a.start(), *a.end()) };
+        let (xmin, xmax) = {
+            let a = plot_map.x_axis_min_max();
+            (*a.start(), *a.end())
+        };
+        let (ymin, ymax) = {
+            let a = plot_map.y_axis_min_max();
+            (*a.start(), *a.end())
+        };
 
         let mut center = self.points.center;
 
@@ -723,14 +745,46 @@ impl DrawableGate for QuadrantGate {
             }
         }
 
-        let style = if is_selected { &SELECTED_LINE } else { &DEFAULT_LINE };
+        let style = if is_selected {
+            &SELECTED_LINE
+        } else {
+            &DEFAULT_LINE
+        };
 
         // Draw perfectly horizontal and vertical lines crossing at center
         let mut shapes = vec![
-            GateRenderShape::Line { x1: xmin, y1: center.1, x2: center.0, y2: center.1, style, shape_type: ShapeType::UndraggableLine },
-            GateRenderShape::Line { x1: center.0, y1: center.1, x2: xmax, y2: center.1, style, shape_type: ShapeType::UndraggableLine },
-            GateRenderShape::Line { x1: center.0, y1: ymin, x2: center.0, y2: center.1, style, shape_type: ShapeType::UndraggableLine },
-            GateRenderShape::Line { x1: center.0, y1: center.1, x2: center.0, y2: ymax, style, shape_type: ShapeType::UndraggableLine },
+            GateRenderShape::Line {
+                x1: xmin,
+                y1: center.1,
+                x2: center.0,
+                y2: center.1,
+                style,
+                shape_type: ShapeType::UndraggableLine,
+            },
+            GateRenderShape::Line {
+                x1: center.0,
+                y1: center.1,
+                x2: xmax,
+                y2: center.1,
+                style,
+                shape_type: ShapeType::UndraggableLine,
+            },
+            GateRenderShape::Line {
+                x1: center.0,
+                y1: ymin,
+                x2: center.0,
+                y2: center.1,
+                style,
+                shape_type: ShapeType::UndraggableLine,
+            },
+            GateRenderShape::Line {
+                x1: center.0,
+                y1: center.1,
+                x2: center.0,
+                y2: ymax,
+                style,
+                shape_type: ShapeType::UndraggableLine,
+            },
         ];
 
         if is_selected {
@@ -750,14 +804,26 @@ impl DrawableGate for QuadrantGate {
         point_index: usize,
         mapper: &PlotMapper,
     ) -> Result<Box<dyn DrawableGate>> {
-        if point_index != 0 { return Ok(Box::new(self.clone())); }
+        if point_index != 0 {
+            return Ok(Box::new(self.clone()));
+        }
 
-        let (xmin, xmax) = { let a = mapper.x_axis_min_max(); (*a.start(), *a.end()) };
-        let (ymin, ymax) = { let a = mapper.y_axis_min_max(); (*a.start(), *a.end()) };
+        let (xmin, xmax) = {
+            let a = mapper.x_axis_min_max();
+            (*a.start(), *a.end())
+        };
+        let (ymin, ymax) = {
+            let a = mapper.y_axis_min_max();
+            (*a.start(), *a.end())
+        };
 
         let clamped_c = (
-            new_point.0.clamp(xmin + (xmax - xmin) * 0.1, xmax - (xmax - xmin) * 0.1),
-            new_point.1.clamp(ymin + (ymax - ymin) * 0.1, ymax - (ymax - ymin) * 0.1),
+            new_point
+                .0
+                .clamp(xmin + (xmax - xmin) * 0.1, xmax - (xmax - xmin) * 0.1),
+            new_point
+                .1
+                .clamp(ymin + (ymax - ymin) * 0.1, ymax - (ymax - ymin) * 0.1),
         );
 
         let new_pts = DataPoints {
@@ -812,8 +878,14 @@ impl DrawableGate for QuadrantGate {
         let (x_param, _) = &self.parameters;
         let is_x = x_param == &param;
 
-        let mut c = rescale_helper_point(self.points.center, &param, x_param, old_transform, new_transform)?;
-        
+        let mut c = rescale_helper_point(
+            self.points.center,
+            &param,
+            x_param,
+            old_transform,
+            new_transform,
+        )?;
+
         // Orthogonal quadrants only care about the center and the edges
         let new_lower = axis_range.0;
         let new_upper = axis_range.1;
@@ -829,36 +901,69 @@ impl DrawableGate for QuadrantGate {
             center: c,
             left: (if is_x { new_lower } else { self.points.left.0 }, c.1),
             right: (if is_x { new_upper } else { self.points.right.0 }, c.1),
-            bottom: (c.0, if !is_x { new_lower } else { self.points.bottom.1 }),
+            bottom: (
+                c.0,
+                if !is_x {
+                    new_lower
+                } else {
+                    self.points.bottom.1
+                },
+            ),
             top: (c.0, if !is_x { new_upper } else { self.points.top.1 }),
-            x_data_range: if is_x { RangeInclusive::new(data_range.0, data_range.1) } else { self.points.x_data_range.clone() },
-            y_data_range: if !is_x { RangeInclusive::new(data_range.0, data_range.1) } else { self.points.y_data_range.clone() },
+            x_data_range: if is_x {
+                RangeInclusive::new(data_range.0, data_range.1)
+            } else {
+                self.points.x_data_range.clone()
+            },
+            y_data_range: if !is_x {
+                RangeInclusive::new(data_range.0, data_range.1)
+            } else {
+                self.points.y_data_range.clone()
+            },
         };
 
         Ok(Box::new(self.clone_with_point(new_pts)?))
     }
 
-    fn match_to_plot_axis(&self, plot_x_param: &str, plot_y_param: &str) -> Result<Option<Box<dyn DrawableGate>>> {
+    fn match_to_plot_axis(
+        &self,
+        plot_x_param: &str,
+        plot_y_param: &str,
+    ) -> Result<Option<Box<dyn DrawableGate>>> {
         let mut new_gate_map = FxIndexMap::default();
         let mut swap_axis = false;
         for gate in self.gates.values() {
             if let Some(g) = gate.clone_polygon_for_axis_swap(plot_x_param, plot_y_param)? {
                 swap_axis = true;
                 new_gate_map.insert(gate.get_id(), g);
-            } else { return Ok(None); }
+            } else {
+                return Ok(None);
+            }
         }
         Ok(Some(self.clone_with_gates(new_gate_map, swap_axis)))
     }
 
     // Boilerplate trait passthroughs
     fn get_gate_ref(&self, id: Option<&str>) -> Option<&Gate> {
-        id.and_then(|id| self.gates.get(id)).and_then(|g| g.get_gate_ref(None))
+        id.and_then(|id| self.gates.get(id))
+            .and_then(|g| g.get_gate_ref(None))
     }
-    fn get_inner_gate_ids(&self) -> Vec<Arc<str>> { self.gates.keys().cloned().collect() }
-    fn rotate_gate(&self, _: (f32, f32)) -> Result<Option<Box<dyn DrawableGate>>> { Ok(None) }
-    fn replace_points(&self, _: GateDragData) -> Result<Option<Box<dyn DrawableGate>>> { Ok(None) }
-    
-    fn is_point_on_perimeter(&self, point: (f32, f32), tolerance: (f32, f32), plot_map: &PlotMapper) -> Option<f32> {
+    fn get_inner_gate_ids(&self) -> Vec<Arc<str>> {
+        self.gates.keys().cloned().collect()
+    }
+    fn rotate_gate(&self, _: (f32, f32)) -> Result<Option<Box<dyn DrawableGate>>> {
+        Ok(None)
+    }
+    fn replace_points(&self, _: GateDragData) -> Result<Option<Box<dyn DrawableGate>>> {
+        Ok(None)
+    }
+
+    fn is_point_on_perimeter(
+        &self,
+        point: (f32, f32),
+        tolerance: (f32, f32),
+        plot_map: &PlotMapper,
+    ) -> Option<f32> {
         let (xmin, xmax) = {
             let axis = plot_map.x_axis_min_max();
             (*axis.start(), *axis.end())

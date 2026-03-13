@@ -31,51 +31,49 @@ pub struct DataPoints {
 
 impl DataPoints {
     pub fn new_from_click(cx: f32, cy: f32, plot_map: &PlotMapper) -> Self {
-    let (xmin, xmax) = {
-        let axis = plot_map.x_axis_min_max();
-        (*axis.start(), *axis.end())
-    };
-    let (ymin, ymax) = {
-        let axis = plot_map.y_axis_min_max();
-        (*axis.start(), *axis.end())
-    };
+        let (xmin, xmax) = {
+            let axis = plot_map.x_axis_min_max();
+            (*axis.start(), *axis.end())
+        };
+        let (ymin, ymax) = {
+            let axis = plot_map.y_axis_min_max();
+            (*axis.start(), *axis.end())
+        };
 
-    // 1. Calculate the same 10% visual buffers used in your drag/resize logic
-    let x_span = (xmax - xmin).abs();
-    let y_span = (ymax - ymin).abs();
-    let x_buffer = x_span * 0.1;
-    let y_buffer = y_span * 0.1;
+        // 1. Calculate the same 10% visual buffers used in your drag/resize logic
+        let x_span = (xmax - xmin).abs();
+        let y_span = (ymax - ymin).abs();
+        let x_buffer = x_span * 0.1;
+        let y_buffer = y_span * 0.1;
 
-    let x_min_safe = xmin + x_buffer;
-    let x_max_safe = xmax - x_buffer;
-    let y_min_safe = ymin + y_buffer;
-    let y_max_safe = ymax - y_buffer;
+        let x_min_safe = xmin + x_buffer;
+        let x_max_safe = xmax - x_buffer;
+        let y_min_safe = ymin + y_buffer;
+        let y_max_safe = ymax - y_buffer;
 
-    // 2. Clamp the initial click coordinates to the safe zone
-    let safe_cx = cx.clamp(x_min_safe, x_max_safe);
-    let safe_cy = cy.clamp(y_min_safe, y_max_safe);
+        // 2. Clamp the initial click coordinates to the safe zone
+        let safe_cx = cx.clamp(x_min_safe, x_max_safe);
+        let safe_cy = cy.clamp(y_min_safe, y_max_safe);
 
-    // 3. Derive handles from the safe center
-    // Left/Right snap to X-axis edges but use the safe Y
-    let left = (xmin, safe_cy);
-    let right = (xmax, safe_cy);
-    
-    // Bottom/Top snap to Y-axis edges but use the safe X
-    let bottom = (safe_cx, ymin);
-    let top = (safe_cx, ymax);
+        // 3. Derive handles from the safe center
+        // Left/Right snap to X-axis edges but use the safe Y
+        let left = (xmin, safe_cy);
+        let right = (xmax, safe_cy);
 
+        // Bottom/Top snap to Y-axis edges but use the safe X
+        let bottom = (safe_cx, ymin);
+        let top = (safe_cx, ymax);
 
-    Self{
-        center: (safe_cx, safe_cy),
-        left,
-        bottom,
-        right,
-        top,
-        x_data_range: plot_map.x_data_min_max(),
-        y_data_range: plot_map.y_data_min_max(),
+        Self {
+            center: (safe_cx, safe_cy),
+            left,
+            bottom,
+            right,
+            top,
+            x_data_range: plot_map.x_data_min_max(),
+            y_data_range: plot_map.y_data_min_max(),
+        }
     }
-    }
-
 
     pub fn clone_for_swap_axis(&self, prev_axis_matched: bool) -> Self {
         if !prev_axis_matched {
@@ -336,7 +334,7 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
                 // Left/Right: X is fixed to axis edge, clamp Y skew
                 1 => left.1 = dd.loc().1.clamp(y_min_safe, y_max_safe),
                 3 => right.1 = dd.loc().1.clamp(y_min_safe, y_max_safe),
-                
+
                 // Bottom/Top: Y is fixed to axis edge, clamp X skew
                 2 => bottom.0 = dd.loc().0.clamp(x_min_safe, x_max_safe),
                 4 => top.0 = dd.loc().0.clamp(x_min_safe, x_max_safe),
@@ -426,10 +424,6 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
         } else {
             None
         };
-
-
-
-
 
         crate::collate_vecs!(main, selected)
     }
@@ -565,7 +559,6 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
                 )?,
             )
         };
-        
 
         let x_spec = match new_transform {
             TransformType::Linear => {
@@ -615,8 +608,16 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
             right: r,
             top: t,
             // Update the data ranges (raw space)
-            x_data_range: if is_x { RangeInclusive::new(data_range.0, data_range.1) } else { self.points.x_data_range.clone() },
-            y_data_range: if !is_x { RangeInclusive::new(data_range.0, data_range.1) } else { self.points.y_data_range.clone() },
+            x_data_range: if is_x {
+                RangeInclusive::new(data_range.0, data_range.1)
+            } else {
+                self.points.x_data_range.clone()
+            },
+            y_data_range: if !is_x {
+                RangeInclusive::new(data_range.0, data_range.1)
+            } else {
+                self.points.y_data_range.clone()
+            },
         };
 
         // let new = if is_x {

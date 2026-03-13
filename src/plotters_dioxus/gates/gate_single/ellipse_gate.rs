@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::anyhow;
-use flow_fcs::TransformType;
+use flow_fcs::{TransformType, Transformable};
 use flow_gates::{GateGeometry, create_ellipse_geometry};
 
 use crate::plotters_dioxus::{
@@ -249,15 +249,62 @@ impl DrawableGate for EllipseGate {
         _data_range: (f32, f32),
         _axis_range: (f32, f32),
     ) -> anyhow::Result<Box<dyn DrawableGate>> {
-        let points = rescale_helper(
-            &self.get_points(),
-            &param,
-            &self.inner.parameters.0,
-            old,
-            new,
-        )?;
-        let new_geometry =
-            create_ellipse_geometry(points, &self.inner.parameters.0, &self.inner.parameters.1)?;
+        let (x_param, y_param) = self.get_params();
+        let points = self.get_points();
+        let c_vis = points[0];
+        let r_vis = points[1]; // The actual vertex in space
+        let t_vis = points[2]; // The actual vertex in space
+
+        let is_x = x_param == param;
+
+        // 1. Get the current visual radii (the actual hypotenuse distance)
+        let current_rx = ((r_vis.0 - c_vis.0).powi(2) + (r_vis.1 - c_vis.1).powi(2)).sqrt();
+        let current_ry = ((t_vis.0 - c_vis.0).powi(2) + (t_vis.1 - c_vis.1).powi(2)).sqrt();
+
+        // 2. Determine the "Effective Edge" for round-tripping.
+        // We treat the radius as if it were lying flat on the axis to find its raw equivalent.
+        let (cx_new, rx_new) = if is_x {
+            let cx_raw = old.inverse_transform(&c_vis.0);
+            // We simulate a point that is 'radius' distance away on the RAW scale
+            let rx_edge_raw = old.inverse_transform(&(c_vis.0 + current_rx));
+
+            let cx_transformed = new.transform(&cx_raw);
+            let rx_edge_transformed = new.transform(&rx_edge_raw);
+
+            (cx_transformed, (rx_edge_transformed - cx_transformed).abs())
+        } else {
+            (c_vis.0, current_rx)
+        };
+
+        let (cy_new, ry_new) = if !is_x {
+            let cy_raw = old.inverse_transform(&c_vis.1);
+            let ry_edge_raw = old.inverse_transform(&(c_vis.1 + current_ry));
+
+            let cy_transformed = new.transform(&cy_raw);
+            let ry_edge_transformed = new.transform(&ry_edge_raw);
+
+            (cy_transformed, (ry_edge_transformed - cy_transformed).abs())
+        } else {
+            (c_vis.1, current_ry)
+        };
+
+        // 3. Extract Angle
+        let angle = match self.inner.geometry {
+            GateGeometry::Ellipse { angle, .. } => angle,
+            _ => 0.0,
+        };
+
+        let center = GateNode::new(self.get_id())
+            .with_coordinate(x_param, cx_new)
+            .with_coordinate(y_param, cy_new);
+
+        let new_geometry = GateGeometry::Ellipse {
+            center,
+            radius_x: rx_new,
+            radius_y: ry_new,
+            angle,
+        };
+
         let new_gate = flow_gates::Gate {
             id: self.inner.id.clone(),
             parameters: self.inner.parameters.clone(),
@@ -266,6 +313,7 @@ impl DrawableGate for EllipseGate {
             name: self.inner.name.clone(),
             mode: self.inner.mode.clone(),
         };
+
         Ok(Box::new(EllipseGate::try_new(new_gate)?))
     }
 

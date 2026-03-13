@@ -84,7 +84,7 @@ pub trait DrawableGate: Send + Sync {
         old_transform: &TransformType,
         new_transform: &TransformType,
         data_range: (f32, f32),
-        axis_range: (f32, f32)
+        axis_range: (f32, f32),
     ) -> anyhow::Result<Box<dyn DrawableGate>>;
 
     fn recalculate_gate_for_new_axis_limits(
