@@ -17,8 +17,6 @@ use crate::plotters_dioxus::{
 
 type FxIndexMap<K, V> = IndexMap<K, V, FxBuildHasher>;
 
-
-
 #[derive(PartialEq, Clone)]
 pub struct BisectorGate {
     gates: FxIndexMap<Arc<str>, LineGate>,
@@ -36,7 +34,7 @@ impl BisectorGate {
         x_axis_param: Arc<str>,
         y_axis_param: Arc<str>,
     ) -> anyhow::Result<Self> {
-        let mut gate_map  = FxIndexMap::default();
+        let mut gate_map = FxIndexMap::default();
         let parameters = (x_axis_param.clone(), y_axis_param.clone());
         let click_data = plot_map.pixel_to_data(click_loc.0, click_loc.1, None, None);
 
@@ -120,19 +118,14 @@ impl BisectorGate {
         })
     }
 
-    fn clone_with_point(
-        &self,
-        cx: f32,
-        cy: f32,
-    ) -> anyhow::Result<Self> {
+    fn clone_with_point(&self, cx: f32, cy: f32) -> anyhow::Result<Self> {
         let (x_channel, y_channel) = &self.parameters;
-        let mut gate_map  = FxIndexMap::default();
+        let mut gate_map = FxIndexMap::default();
         let max_left = (cx, f32::MAX);
         let min_left = (f32::MIN, f32::MIN);
         let coords = vec![min_left, max_left];
         let g1 = flow_gates::geometry::create_rectangle_geometry(coords, x_channel, y_channel)
             .map_err(|_| anyhow::anyhow!("failed to create rectangle geometry"))?;
-
 
         let max_right = (f32::MAX, f32::MAX);
         let min_right = (cx, f32::MIN);
@@ -176,8 +169,6 @@ impl BisectorGate {
             axis_matched: self.axis_matched,
             parameters: self.parameters.clone(),
         })
-
-
     }
 
     pub fn get_subgate_map(&self) -> &FxIndexMap<Arc<str>, LineGate> {
@@ -186,8 +177,6 @@ impl BisectorGate {
 }
 
 impl super::super::gate_traits::DrawableGate for BisectorGate {
-
-
     fn is_finalised(&self) -> bool {
         true
     }
@@ -199,8 +188,14 @@ impl super::super::gate_traits::DrawableGate for BisectorGate {
         plot_map: &PlotMapper,
     ) -> Vec<GateRenderShape> {
         let (min, max) = {
-            let (xmin, xmax) = {let axis = plot_map.x_axis_min_max(); (*axis.start(), *axis.end())};
-            let (ymin, ymax) = {let axis = plot_map.y_axis_min_max(); (*axis.start(), *axis.end())};
+            let (xmin, xmax) = {
+                let axis = plot_map.x_axis_min_max();
+                (*axis.start(), *axis.end())
+            };
+            let (ymin, ymax) = {
+                let axis = plot_map.y_axis_min_max();
+                (*axis.start(), *axis.end())
+            };
             ((xmin, ymin), (xmax, ymax))
         };
         let mut center = self.points;
@@ -229,44 +224,43 @@ impl super::super::gate_traits::DrawableGate for BisectorGate {
         let main = {
             let l;
             let center_tab;
-            if self.axis_matched{
+            if self.axis_matched {
                 l = GateRenderShape::Line {
-                x1: min.0,
-                y1: center.1,
-                x2: max.0,
-                y2: center.1,
-                style,
-                shape_type: ShapeType::CompositeGate(self.id.clone(), self.axis_matched),
-            };
+                    x1: min.0,
+                    y1: center.1,
+                    x2: max.0,
+                    y2: center.1,
+                    style,
+                    shape_type: ShapeType::CompositeGate(self.id.clone(), self.axis_matched),
+                };
 
-            center_tab = GateRenderShape::Line {
-                x1: center.0,
-                y1: center.1 - center_tab_height,
-                x2: center.0,
-                y2: center.1 + center_tab_height,
-                style,
-                shape_type: ShapeType::CompositeGate(self.id.clone(), self.axis_matched),
-            };
+                center_tab = GateRenderShape::Line {
+                    x1: center.0,
+                    y1: center.1 - center_tab_height,
+                    x2: center.0,
+                    y2: center.1 + center_tab_height,
+                    style,
+                    shape_type: ShapeType::CompositeGate(self.id.clone(), self.axis_matched),
+                };
             } else {
                 l = GateRenderShape::Line {
-                x1: center.0,
-                y1: min.1 ,
-                x2: center.0 ,
-                y2: max.1,
-                style,
-                shape_type: ShapeType::CompositeGate(self.id.clone(), self.axis_matched),
-            };
+                    x1: center.0,
+                    y1: min.1,
+                    x2: center.0,
+                    y2: max.1,
+                    style,
+                    shape_type: ShapeType::CompositeGate(self.id.clone(), self.axis_matched),
+                };
 
-            center_tab = GateRenderShape::Line {
-                x1: center.0 - center_tab_height,
-                y1: center.1,
-                x2: center.0 + center_tab_height,
-                y2: center.1,
-                style,
-                shape_type: ShapeType::CompositeGate(self.id.clone(), self.axis_matched),
-            };
+                center_tab = GateRenderShape::Line {
+                    x1: center.0 - center_tab_height,
+                    y1: center.1,
+                    x2: center.0 + center_tab_height,
+                    y2: center.1,
+                    style,
+                    shape_type: ShapeType::CompositeGate(self.id.clone(), self.axis_matched),
+                };
             }
-            
 
             Some(vec![l, center_tab])
         };
@@ -278,28 +272,25 @@ impl super::super::gate_traits::DrawableGate for BisectorGate {
                 fill: "red",
                 shape_type: ShapeType::CompositePoint(0, self.axis_matched),
             };
-            let line = if self.axis_matched{
+            let line = if self.axis_matched {
                 GateRenderShape::Line {
-                x1: center.0,
-                y1: min.1,
-                x2:center.0,
-                y2: max.1,
-                style: &GREY_LINE_DASHED,
-                shape_type: ShapeType::UndraggableLine,
-            }
+                    x1: center.0,
+                    y1: min.1,
+                    x2: center.0,
+                    y2: max.1,
+                    style: &GREY_LINE_DASHED,
+                    shape_type: ShapeType::UndraggableLine,
+                }
             } else {
                 GateRenderShape::Line {
-                x1: min.0 ,
-                y1: center.1,
-                x2: max.0,
-                y2: center.1,
-                style: &GREY_LINE_DASHED,
-                shape_type: ShapeType::UndraggableLine,
-            }
-            
+                    x1: min.0,
+                    y1: center.1,
+                    x2: max.0,
+                    y2: center.1,
+                    style: &GREY_LINE_DASHED,
+                    shape_type: ShapeType::UndraggableLine,
+                }
             };
-
-            
 
             Some(vec![line, p])
         } else {
@@ -327,8 +318,14 @@ impl super::super::gate_traits::DrawableGate for BisectorGate {
         tolerance: (f32, f32),
         plot_map: &PlotMapper,
     ) -> Option<f32> {
-        let (xmin, xmax) = {let axis = plot_map.x_axis_min_max(); (*axis.start(), *axis.end())};
-        let (ymin, ymax) = {let axis = plot_map.y_axis_min_max(); (*axis.start(), *axis.end())};
+        let (xmin, xmax) = {
+            let axis = plot_map.x_axis_min_max();
+            (*axis.start(), *axis.end())
+        };
+        let (ymin, ymax) = {
+            let axis = plot_map.y_axis_min_max();
+            (*axis.start(), *axis.end())
+        };
         let min = if self.axis_matched {
             (xmin, self.points.1)
         } else {
@@ -375,10 +372,11 @@ impl super::super::gate_traits::DrawableGate for BisectorGate {
         param: std::sync::Arc<str>,
         old_transform: &TransformType,
         new_transform: &TransformType,
-        _data_range: (f32, f32)
+        _data_range: (f32, f32),
     ) -> anyhow::Result<Box<dyn super::super::gate_traits::DrawableGate>> {
-        let(x_param, _) = &self.parameters;
-        let (cx, cy) = rescale_helper_point(self.points, &param, x_param, old_transform, new_transform)?;
+        let (x_param, _) = &self.parameters;
+        let (cx, cy) =
+            rescale_helper_point(self.points, &param, x_param, old_transform, new_transform)?;
         Ok(Box::new(self.clone_with_point(cx, cy)?))
     }
 
@@ -436,11 +434,10 @@ impl super::super::gate_traits::DrawableGate for BisectorGate {
     fn clone_box(&self) -> Box<dyn super::super::gate_traits::DrawableGate> {
         Box::new(self.clone())
     }
-    
-    fn get_gate_ref(&self, id: Option<&str>) -> Option<&Gate> {
 
+    fn get_gate_ref(&self, id: Option<&str>) -> Option<&Gate> {
         if let Some(id) = id {
-            if let Some(g) = self.gates.get(id){
+            if let Some(g) = self.gates.get(id) {
                 g.get_gate_ref(None)
             } else {
                 None
@@ -450,11 +447,9 @@ impl super::super::gate_traits::DrawableGate for BisectorGate {
         }
     }
 
-    fn get_inner_gate_ids(&self) -> Vec<Arc<str>>{
-        self.gates.keys().map(|k|k.clone()).collect()
+    fn get_inner_gate_ids(&self) -> Vec<Arc<str>> {
+        self.gates.keys().map(|k| k.clone()).collect()
     }
-    
-
 }
 
 fn create_default_bisector(
@@ -478,5 +473,3 @@ fn create_default_bisector(
 
     Ok((g1, g2))
 }
-
-

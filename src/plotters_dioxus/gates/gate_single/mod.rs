@@ -65,19 +65,15 @@ pub fn rescale_helper_point(
 
     let mut val = if is_x { pt.0 } else { pt.1 };
     let raw = match old {
-        TransformType::Arcsinh { cofactor } => {
-            asinh_reverse_f32(val, *cofactor).unwrap_or(val)
-        }
+        TransformType::Arcsinh { cofactor } => asinh_reverse_f32(val, *cofactor).unwrap_or(val),
         _ => val,
     };
     val = match new {
-        TransformType::Arcsinh { cofactor } => {
-            asinh_transform_f32(raw, *cofactor).unwrap_or(raw)
-        }
+        TransformType::Arcsinh { cofactor } => asinh_transform_f32(raw, *cofactor).unwrap_or(raw),
         _ => raw,
     };
-    
-    let new_point = if is_x {(val, pt.1)} else {(pt.0, val)};
+
+    let new_point = if is_x { (val, pt.1) } else { (pt.0, val) };
     Ok(new_point)
 }
 
@@ -88,18 +84,13 @@ pub fn rescale_helper_single(
 ) -> anyhow::Result<f32> {
     let mut val = pt;
     let raw = match old {
-        TransformType::Arcsinh { cofactor } => {
-            asinh_reverse_f32(val, *cofactor).unwrap_or(val)
-        }
+        TransformType::Arcsinh { cofactor } => asinh_reverse_f32(val, *cofactor).unwrap_or(val),
         _ => val,
     };
     val = match new {
-        TransformType::Arcsinh { cofactor } => {
-            asinh_transform_f32(raw, *cofactor).unwrap_or(raw)
-        }
+        TransformType::Arcsinh { cofactor } => asinh_transform_f32(raw, *cofactor).unwrap_or(raw),
         _ => raw,
     };
-    
 
     Ok(val)
 }

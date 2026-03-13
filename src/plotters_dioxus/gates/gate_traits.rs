@@ -2,12 +2,15 @@ use std::sync::Arc;
 
 use flow_fcs::TransformType;
 
-use crate::plotters_dioxus::{gates::{
-    gate_drag::{GateDragData, PointDragData}, gate_types::GateRenderShape
-}, plot_helpers::PlotMapper};
+use crate::plotters_dioxus::{
+    gates::{
+        gate_drag::{GateDragData, PointDragData},
+        gate_types::GateRenderShape,
+    },
+    plot_helpers::PlotMapper,
+};
 
 pub trait DrawableGate: Send + Sync {
-
     fn get_gate_ref(&self, id: Option<&str>) -> Option<&flow_gates::Gate>;
 
     fn get_inner_gate_ids(&self) -> Vec<Arc<str>>;
@@ -62,7 +65,12 @@ pub trait DrawableGate: Send + Sync {
 
     fn get_params(&self) -> (Arc<str>, Arc<str>);
 
-    fn is_point_on_perimeter(&self, point: (f32, f32), tolerance: (f32, f32), mapper: &PlotMapper,) -> Option<f32>;
+    fn is_point_on_perimeter(
+        &self,
+        point: (f32, f32),
+        tolerance: (f32, f32),
+        mapper: &PlotMapper,
+    ) -> Option<f32>;
 
     fn match_to_plot_axis(
         &self,
@@ -75,7 +83,7 @@ pub trait DrawableGate: Send + Sync {
         param: std::sync::Arc<str>,
         old_transform: &TransformType,
         new_transform: &TransformType,
-        data_range: (f32, f32)
+        data_range: (f32, f32),
     ) -> anyhow::Result<Box<dyn DrawableGate>>;
 
     fn recalculate_gate_for_new_axis_limits(
@@ -83,7 +91,7 @@ pub trait DrawableGate: Send + Sync {
         param: std::sync::Arc<str>,
         lower: f32,
         upper: f32,
-        transform: &TransformType
+        transform: &TransformType,
     ) -> anyhow::Result<Option<Box<dyn DrawableGate>>> {
         Ok(None)
     }
@@ -100,8 +108,10 @@ pub trait DrawableGate: Send + Sync {
         plot_map: &PlotMapper,
     ) -> anyhow::Result<Box<dyn DrawableGate>>;
 
-    fn replace_points(&self, gate_drag_data: GateDragData)
-    -> anyhow::Result<Option<Box<dyn DrawableGate>>>;
+    fn replace_points(
+        &self,
+        gate_drag_data: GateDragData,
+    ) -> anyhow::Result<Option<Box<dyn DrawableGate>>>;
 
     fn clone_box(&self) -> Box<dyn DrawableGate>;
 }

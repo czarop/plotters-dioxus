@@ -3,16 +3,24 @@ use dioxus::prelude::*;
 use flow_gates::Gate;
 use polars::frame::DataFrame;
 
+use crate::plotters_dioxus::gates::gate_buttons::NewGateButtons;
 use crate::{
     file_load::FcsFiles,
     plotters_dioxus::{
-        AxisInfo, PseudoColourPlot, gate_sidebar::GateSidebar, gates::{GateState, gate_store::{GateStateImplExt, GateStateStoreExt, ROOTGATE}, gate_traits::DrawableGate, gate_types::GateType}, plot_helpers::{Param, ParameterStore, ParameterStoreImplExt, ParameterStoreStoreExt as _}
+        AxisInfo, PseudoColourPlot,
+        gate_sidebar::GateSidebar,
+        gates::{
+            GateState,
+            gate_store::{GateStateImplExt, GateStateStoreExt, ROOTGATE},
+            gate_traits::DrawableGate,
+            gate_types::GateType,
+        },
+        plot_helpers::{Param, ParameterStore, ParameterStoreImplExt, ParameterStoreStoreExt as _},
     },
     searchable_select::SearchableSelect,
 };
 use flow_fcs::{Fcs, TransformType};
-use crate::plotters_dioxus::gates::gate_buttons::NewGateButtons;
-use std::sync::{Arc};
+use std::sync::Arc;
 use tokio::task;
 
 async fn get_flow_data(path: std::path::PathBuf) -> Result<Arc<Fcs>, Arc<anyhow::Error>> {
@@ -24,7 +32,6 @@ async fn get_flow_data(path: std::path::PathBuf) -> Result<Arc<Fcs>, Arc<anyhow:
     .map_err(|e| Arc::new(e.into()))?
 }
 
-
 async fn get_filtered_data_to_display(
     df: Arc<DataFrame>,
     // fs: Arc<Fcs>,
@@ -32,64 +39,67 @@ async fn get_filtered_data_to_display(
     col2_name: &str,
     // transform_1: TransformType,
     // transform_2: TransformType,
-    parental_gate_id: &Option<Arc<str>>
+    parental_gate_id: &Option<Arc<str>>,
 ) -> Result<Vec<(f32, f32)>, anyhow::Error> {
     let mut df_clone = df.clone();
     let col1_name = col1_name.to_string();
     let col2_name = col2_name.to_string();
     let gate_store: Store<GateState> = use_context::<Store<GateState>>();
-    let gate_chain: Option<Vec<(Arc<str>, Arc<dyn DrawableGate>)>> = if let Some(parent) = parental_gate_id {
-        let arcs: Vec<(Arc<str>, Arc<dyn DrawableGate>)> = gate_store.hierarchy().peek().get_chain_to_root(parent)
-            .iter()
-            .filter_map(|id| {
-                gate_store.primary_and_subgate_registry().peek().get(id).map(|g| (id.clone(), g.clone()))
-    })
-            .collect();
-        
-        if arcs.is_empty() {
+    let gate_chain: Option<Vec<(Arc<str>, Arc<dyn DrawableGate>)>> =
+        if let Some(parent) = parental_gate_id {
+            let arcs: Vec<(Arc<str>, Arc<dyn DrawableGate>)> = gate_store
+                .hierarchy()
+                .peek()
+                .get_chain_to_root(parent)
+                .iter()
+                .filter_map(|id| {
+                    gate_store
+                        .primary_and_subgate_registry()
+                        .peek()
+                        .get(id)
+                        .map(|g| (id.clone(), g.clone()))
+                })
+                .collect();
+
+            if arcs.is_empty() { None } else { Some(arcs) }
+        } else {
             None
-         } else { 
-            Some(arcs) 
-        }
-    } else {
-        None
-    };
+        };
     let store = use_context::<Store<ParameterStore>>();
-    let settings= store().settings;
+    let settings = store().settings;
 
     task::spawn_blocking(move || -> Result<Vec<(f32, f32)>, anyhow::Error> {
-    if let Some(chain) = gate_chain {
-        let gate_refs: Vec<&Gate> = chain.iter()
-            .filter_map(|(id, gate)| gate.get_gate_ref(Some(&id))) 
+        if let Some(chain) = gate_chain {
+            let gate_refs: Vec<&Gate> = chain
+                .iter()
+                .filter_map(|(id, gate)| gate.get_gate_ref(Some(&id)))
+                .collect();
+
+            // 1. Get the final narrowed mask for the whole hierarchy
+
+            let mask = super::gates::gate_filtering::filter_events_by_hierarchy_to_mask(
+                &df, &gate_refs, settings,
+            )?;
+
+            // 2. Filter the dataframe once at the end
+            df_clone = df.filter(&mask)?.into();
+        }
+
+        // 3. Extract and Transform (The heavy math)
+        let x_series = df_clone.column(&col1_name)?.f32()?;
+        let y_series = df_clone.column(&col2_name)?.f32()?;
+
+        let zipped_cols: Vec<(f32, f32)> = x_series
+            .into_iter()
+            .zip(y_series.into_iter())
+            .filter_map(|(x, y)| match (x, y) {
+                (Some(vx), Some(vy)) => Some((vx, vy)),
+                _ => None,
+            })
             .collect();
 
-        // 1. Get the final narrowed mask for the whole hierarchy
-
-        
-        
-
-        let mask = super::gates::gate_filtering::filter_events_by_hierarchy_to_mask(&df, &gate_refs, settings)?;
-
-        // 2. Filter the dataframe once at the end
-        df_clone = df.filter(&mask)?.into();
-    }
-
-    // 3. Extract and Transform (The heavy math)
-    let x_series = df_clone.column(&col1_name)?.f32()?;
-    let y_series = df_clone.column(&col2_name)?.f32()?;
-
-    let zipped_cols: Vec<(f32, f32)> = x_series.into_iter()
-        .zip(y_series.into_iter())
-        .filter_map(|(x, y)| {
-            match (x, y) {
-                (Some(vx), Some(vy)) => Some((vx, vy)),
-                _ => None
-            }
-        })
-        .collect();
-
-    Ok(zipped_cols)
-})
+        Ok(zipped_cols)
+    })
     .await?
 }
 
@@ -184,29 +194,31 @@ pub fn PlotWindow() -> Element {
 
     let scaled_data = use_resource(move || async move {
         let mut params: Vec<(Arc<str>, f32)> = Vec::new();
-            for (k, v) in parameter_settings.settings().read().read().expect("lock poisoned").iter(){
-                if v.is_arcsinh() {
-                    params.push((k.clone(), v.get_cofactor().unwrap()))
-                }
-            };
-        
+        for (k, v) in parameter_settings
+            .settings()
+            .read()
+            .read()
+            .expect("lock poisoned")
+            .iter()
+        {
+            if v.is_arcsinh() {
+                params.push((k.clone(), v.get_cofactor().unwrap()))
+            }
+        }
+
         if let Some(Ok(fcs_file)) = &*fcs_file_resource.read() {
-            
-
             let fcs_clone = fcs_file.clone();
-            let result = tokio::task::spawn_blocking(move || -> Result<Arc<DataFrame>, anyhow::Error> {
-                let param_refs: Vec<(&str, f32)> = params
-                    .iter()
-                    .map(|(k, v)| (k.as_ref(), *v))
-                    .collect();
-                match fcs_clone.apply_arcsinh_transforms(param_refs.as_slice()){
-                    Ok(d) => return Ok(d),
-                    Err(e) => return Err(anyhow!("{e}")),
-                }
+            let result =
+                tokio::task::spawn_blocking(move || -> Result<Arc<DataFrame>, anyhow::Error> {
+                    let param_refs: Vec<(&str, f32)> =
+                        params.iter().map(|(k, v)| (k.as_ref(), *v)).collect();
+                    match fcs_clone.apply_arcsinh_transforms(param_refs.as_slice()) {
+                        Ok(d) => return Ok(d),
+                        Err(e) => return Err(anyhow!("{e}")),
+                    }
+                })
+                .await;
 
-                
-            }).await;
-            
             match result {
                 Ok(d) => d,
                 Err(e) => Err(anyhow::anyhow!("error scaling data")),
@@ -214,8 +226,6 @@ pub fn PlotWindow() -> Element {
         } else {
             Err(anyhow::anyhow!("No data to scale"))
         }
-
-        
     });
 
     let mut x_axis_marker: Signal<Param> = use_signal(|| {
@@ -236,7 +246,13 @@ pub fn PlotWindow() -> Element {
     // fetch the axis limits from the settings dict when axis changed
     let x_axis_limits = use_memo(move || {
         let param = x_axis_marker.read();
-        match parameter_settings.settings().read().read().expect("lock poisoned").get(&param.fluoro) {
+        match parameter_settings
+            .settings()
+            .read()
+            .read()
+            .expect("lock poisoned")
+            .get(&param.fluoro)
+        {
             Some(d) => d.clone(),
             None => AxisInfo::default(),
         }
@@ -244,7 +260,13 @@ pub fn PlotWindow() -> Element {
 
     let y_axis_limits = use_memo(move || {
         let param = y_axis_marker();
-        match parameter_settings.settings().read().read().expect("lock poisoned").get(&param.fluoro) {
+        match parameter_settings
+            .settings()
+            .read()
+            .read()
+            .expect("lock poisoned")
+            .get(&param.fluoro)
+        {
             Some(d) => d.clone(),
             None => AxisInfo::default(),
         }
@@ -281,7 +303,7 @@ pub fn PlotWindow() -> Element {
                     &y_fluoro,
                     // x_transform,
                     // y_transform,
-                    parental_gate
+                    parental_gate,
                 )
                 .await
                 {
@@ -548,7 +570,7 @@ pub fn PlotWindow() -> Element {
                             }
                             None => rsx! {},
                         }
-                    
+
                     }
                 }
                 div { class: "status-message",
@@ -587,9 +609,8 @@ pub fn PlotWindow() -> Element {
                     }
 
                 }
-            
+
             }
         }
     }
-    }
-
+}

@@ -1,8 +1,8 @@
 use dioxus::prelude::*;
-use dioxus_primitives::dioxus_attributes::attributes;
 use dioxus_primitives::collapsible::{
     self, CollapsibleContentProps, CollapsibleProps, CollapsibleTriggerProps,
 };
+use dioxus_primitives::dioxus_attributes::attributes;
 use dioxus_primitives::merge_attributes;
 
 #[component]
@@ -25,7 +25,9 @@ pub fn Collapsible(props: CollapsibleProps) -> Element {
 
 #[component]
 pub fn CollapsibleTrigger(props: CollapsibleTriggerProps) -> Element {
-    let base = attributes!(button { class: "collapsible-trigger" });
+    let base = attributes!(button {
+        class: "collapsible-trigger"
+    });
     let merged = merge_attributes(vec![base, props.attributes]);
 
     let show_icon = props.r#as.is_none();

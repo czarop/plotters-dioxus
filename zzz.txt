@@ -1,6 +1,4 @@
 Ellipse gates are not accounting for scaling
-Some issue when swapped axis on skewed quadrant is not updating cofactor
-Swapping axis should not chnage the underlying geometry, just a flag in draw_self
 
 
 Add filter Cache

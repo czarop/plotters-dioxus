@@ -1,21 +1,18 @@
 use std::sync::RwLock;
 
+use dioxus::prelude::*;
 use flow_fcs::{Fcs, Transformable};
 use flow_gates::{EventIndex, Gate, GateGeometry};
 use polars::prelude::*;
-use dioxus::prelude::*;
 
-
-pub fn filter_events_to_mask(df: &DataFrame, gate: &Gate, 
-    axis_settings: Arc<RwLock<rustc_hash::FxHashMap<Arc<str>, crate::plotters_dioxus::AxisInfo>>>
-
+pub fn filter_events_to_mask(
+    df: &DataFrame,
+    gate: &Gate,
+    axis_settings: Arc<RwLock<rustc_hash::FxHashMap<Arc<str>, crate::plotters_dioxus::AxisInfo>>>,
 ) -> anyhow::Result<BooleanChunked> {
-    
-    
     let (x_param, y_param) = gate.parameters.clone();
     // let x_transform = axis_settings.read().expect("lock poisoned").get(&x_param).ok_or_else(|| anyhow::anyhow!("axis info not found for {}", x_param.clone()))?.transform.clone();
     // let y_transform = axis_settings.read().expect("lock poisoned").get(&y_param).ok_or_else(|| anyhow::anyhow!("axis info not found for {}", y_param.clone()))?.transform.clone();
-
 
     match &gate.geometry {
         GateGeometry::Rectangle { min, max } => {
@@ -178,7 +175,8 @@ pub fn filter_events_to_mask(df: &DataFrame, gate: &Gate,
             let x_series = df.column(&x_param)?.f32()?;
             let y_series = df.column(&y_param)?.f32()?;
 
-            let indices = filter_events_by_gate(x_series, y_series, gate).map_err(|e| anyhow::anyhow!("failed to gate events"))?;
+            let indices = filter_events_by_gate(x_series, y_series, gate)
+                .map_err(|e| anyhow::anyhow!("failed to gate events"))?;
 
             // Convert indices to mask (slightly slower, but necessary for complex shapes)
             let mut mask_vec = vec![false; df.height()];
@@ -193,7 +191,7 @@ pub fn filter_events_to_mask(df: &DataFrame, gate: &Gate,
 pub fn filter_events_by_hierarchy_to_mask(
     scaled_data: &DataFrame,
     gate_chain: &[&Gate],
-    axis_settings: Arc<RwLock<rustc_hash::FxHashMap<Arc<str>, crate::plotters_dioxus::AxisInfo>>>
+    axis_settings: Arc<RwLock<rustc_hash::FxHashMap<Arc<str>, crate::plotters_dioxus::AxisInfo>>>,
 ) -> Result<BooleanChunked, anyhow::Error> {
     let event_count = scaled_data.height();
     let mut final_mask = BooleanChunked::full("mask".into(), true, event_count);
@@ -209,15 +207,13 @@ pub fn filter_events_by_hierarchy_to_mask(
 pub fn filter_events_by_gate(
     // x_events: &[f32],
     // y_events: &[f32],
-    x_ca: &Float32Chunked, 
+    x_ca: &Float32Chunked,
     y_ca: &Float32Chunked,
     gate: &Gate,
 ) -> Result<Vec<usize>> {
-
-        // Build index from slices (zero-copy)
-        let index = build_event_index_from_polars(x_ca, y_ca)?;
-        let indices = index.filter_by_gate(gate)?;
-    
+    // Build index from slices (zero-copy)
+    let index = build_event_index_from_polars(x_ca, y_ca)?;
+    let indices = index.filter_by_gate(gate)?;
 
     Ok(indices)
 }
@@ -226,28 +222,28 @@ pub fn filter_events_by_gate_with_index(
     gate: &Gate,
     spatial_index: &EventIndex,
 ) -> Result<Vec<usize>> {
-
     // Use provided index or build one
-    let indices = 
-        spatial_index.filter_by_gate(gate)?;
-    
+    let indices = spatial_index.filter_by_gate(gate)?;
 
     Ok(indices)
 }
 
-pub fn build_event_index_from_polars(x_ca: &Float32Chunked, y_ca: &Float32Chunked) -> anyhow::Result<EventIndex> {
-        // Ensure both are contiguous and get the slices
-        // We rechunk here to be safe, in case they come from different DF operations
-        let x_rechunked = x_ca.rechunk();
-        let y_rechunked = y_ca.rechunk();
-        
-        let x_slice = x_rechunked.cont_slice().map_err(|_| 
-            anyhow::anyhow!("Failed to get contiguous slice for X")
-        )?;
-        let y_slice = y_rechunked.cont_slice().map_err(|_| 
-            anyhow::anyhow!("Failed to get contiguous slice for Y")
-        )?;
+pub fn build_event_index_from_polars(
+    x_ca: &Float32Chunked,
+    y_ca: &Float32Chunked,
+) -> anyhow::Result<EventIndex> {
+    // Ensure both are contiguous and get the slices
+    // We rechunk here to be safe, in case they come from different DF operations
+    let x_rechunked = x_ca.rechunk();
+    let y_rechunked = y_ca.rechunk();
 
-        // Delegate to your existing slice-based build fn
-        EventIndex::build(x_slice, y_slice).map_err(|e| anyhow::anyhow!("{e}"))
-    }
+    let x_slice = x_rechunked
+        .cont_slice()
+        .map_err(|_| anyhow::anyhow!("Failed to get contiguous slice for X"))?;
+    let y_slice = y_rechunked
+        .cont_slice()
+        .map_err(|_| anyhow::anyhow!("Failed to get contiguous slice for Y"))?;
+
+    // Delegate to your existing slice-based build fn
+    EventIndex::build(x_slice, y_slice).map_err(|e| anyhow::anyhow!("{e}"))
+}

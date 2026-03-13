@@ -3,8 +3,8 @@ use flow_fcs::TransformType;
 use flow_gates::{Gate, GateGeometry};
 use indexmap::IndexMap;
 use rustc_hash::FxBuildHasher;
-use std::{ops::RangeInclusive, sync::Arc};
 use std::ops::Index;
+use std::{ops::RangeInclusive, sync::Arc};
 
 use crate::plotters_dioxus::{
     gates::{
@@ -26,22 +26,51 @@ struct DataPoints {
     right: (f32, f32),
     top: (f32, f32),
     x_data_range: RangeInclusive<f32>,
-    y_data_range: RangeInclusive<f32>
+    y_data_range: RangeInclusive<f32>,
 }
 
 impl DataPoints {
     fn new_from_click(cx: f32, cy: f32, plot_map: &PlotMapper) -> Self {
-        let (xmin, xmax) = {let axis = plot_map.x_axis_min_max(); (*axis.start(), *axis.end())};
-        let (ymin, ymax) = {let axis = plot_map.y_axis_min_max(); (*axis.start(), *axis.end())};
+        let (xmin, xmax) = {
+            let axis = plot_map.x_axis_min_max();
+            (*axis.start(), *axis.end())
+        };
+        let (ymin, ymax) = {
+            let axis = plot_map.y_axis_min_max();
+            (*axis.start(), *axis.end())
+        };
         let left = (xmin, cy);
         let right = (xmax, cy);
         let bottom = (cx, ymin);
         let top = (cx, ymax);
-        println!("center: {:?} left: {:?}, bottom: {:?}, right: {:?}, top: {:?}", (cx, cy), left, bottom, right, top);
-        Self::new_from_points((cx, cy), left, bottom, right, top, plot_map.x_data_min_max(), plot_map.y_data_min_max())
+        println!(
+            "center: {:?} left: {:?}, bottom: {:?}, right: {:?}, top: {:?}",
+            (cx, cy),
+            left,
+            bottom,
+            right,
+            top
+        );
+        Self::new_from_points(
+            (cx, cy),
+            left,
+            bottom,
+            right,
+            top,
+            plot_map.x_data_min_max(),
+            plot_map.y_data_min_max(),
+        )
     }
 
-    fn new_from_points(center: (f32, f32), left: (f32, f32), bottom: (f32, f32), right: (f32, f32), top: (f32, f32), x_data_range: RangeInclusive<f32>, y_data_range: RangeInclusive<f32>) -> Self {
+    fn new_from_points(
+        center: (f32, f32),
+        left: (f32, f32),
+        bottom: (f32, f32),
+        right: (f32, f32),
+        top: (f32, f32),
+        x_data_range: RangeInclusive<f32>,
+        y_data_range: RangeInclusive<f32>,
+    ) -> Self {
         Self {
             center,
             left,
@@ -49,7 +78,7 @@ impl DataPoints {
             right,
             top,
             x_data_range,
-            y_data_range
+            y_data_range,
         }
     }
 
@@ -62,7 +91,7 @@ impl DataPoints {
                 bottom: (self.left.1, self.left.0),
                 top: (self.right.1, self.right.0),
                 x_data_range: self.y_data_range.clone(),
-                y_data_range: self.x_data_range.clone()
+                y_data_range: self.x_data_range.clone(),
             }
         } else {
             Self {
@@ -72,7 +101,7 @@ impl DataPoints {
                 bottom: (self.left.1, self.left.0),
                 top: (self.right.1, self.right.0),
                 x_data_range: self.y_data_range.clone(),
-                y_data_range: self.x_data_range.clone()
+                y_data_range: self.x_data_range.clone(),
             }
         }
     }
@@ -98,7 +127,14 @@ impl SkewedQuadrantGate {
         let (cx, cy) = plot_map.pixel_to_data(click_loc_raw.0, click_loc_raw.1, None, None);
         let points = DataPoints::new_from_click(cx, cy, plot_map);
 
-        SkewedQuadrantGate::try_new_from_data_points(id, points, x_axis_param, y_axis_param, true, None)
+        SkewedQuadrantGate::try_new_from_data_points(
+            id,
+            points,
+            x_axis_param,
+            y_axis_param,
+            true,
+            None,
+        )
     }
 
     fn try_new_from_data_points(
@@ -115,13 +151,13 @@ impl SkewedQuadrantGate {
         let (
             id_bottom_left,
             id_bottom_right,
-            id_top_right, 
-            id_top_left, 
+            id_top_right,
+            id_top_left,
             id_bottom_left_arc,
             id_bottom_right_arc,
             id_top_right_arc,
-            id_top_left_arc
-         ) = if let Some(subgate_ids) = subgate_ids {
+            id_top_left_arc,
+        ) = if let Some(subgate_ids) = subgate_ids {
             (
                 subgate_ids[0].to_string(),
                 subgate_ids[1].to_string(),
@@ -132,30 +168,26 @@ impl SkewedQuadrantGate {
                 subgate_ids[2].clone(),
                 subgate_ids[3].clone(),
             )
-
         } else {
             let (a, b, c, d) = (
                 format!("{id}_BL"),
                 format!("{id}_BR"),
                 format!("{id}_TR"),
                 format!("{id}_TL"),
-        );
-
-            let (astr, bstr, cstr, dstr) = (
-                a.as_str(),
-                b.as_str(),
-                c.as_str(),
-                d.as_str()
             );
 
-            (a.clone(),
-            b.clone(),
-            c.clone(),
-            d.clone(),
-            Arc::from(astr),
-            Arc::from(bstr),
-            Arc::from(cstr),
-            Arc::from(dstr))
+            let (astr, bstr, cstr, dstr) = (a.as_str(), b.as_str(), c.as_str(), d.as_str());
+
+            (
+                a.clone(),
+                b.clone(),
+                c.clone(),
+                d.clone(),
+                Arc::from(astr),
+                Arc::from(bstr),
+                Arc::from(cstr),
+                Arc::from(dstr),
+            )
         };
         let gate_bottom_left = Gate {
             id: id_bottom_left_arc.clone(),
@@ -272,8 +304,14 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
         drag_point: Option<PointDragData>,
         plot_map: &PlotMapper,
     ) -> Vec<GateRenderShape> {
-        let (xmin, xmax) = {let axis = plot_map.x_axis_min_max(); (*axis.start(), *axis.end())};
-        let (ymin, ymax) = {let axis = plot_map.y_axis_min_max(); (*axis.start(), *axis.end())};
+        let (xmin, xmax) = {
+            let axis = plot_map.x_axis_min_max();
+            (*axis.start(), *axis.end())
+        };
+        let (ymin, ymax) = {
+            let axis = plot_map.y_axis_min_max();
+            (*axis.start(), *axis.end())
+        };
 
         let (mut left, mut right, mut top, mut bottom, mut center) = (
             self.points.left,
@@ -380,13 +418,11 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
         // crate::collate_vecs!(main, selected)
 
         let mut inner_gates = vec![];
-        for (i, (_, shape)) in self.gates.iter().enumerate(){
-            if i == 0{
+        for (i, (_, shape)) in self.gates.iter().enumerate() {
+            if i == 0 {
                 let res = shape.draw_self(false, None, plot_map);
                 inner_gates.extend_from_slice(&res);
             }
-            
-            
         }
 
         crate::collate_vecs!(inner_gates, main, selected)
@@ -410,8 +446,14 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
         tolerance: (f32, f32),
         plot_map: &PlotMapper,
     ) -> Option<f32> {
-        let (xmin, xmax) = {let axis = plot_map.x_axis_min_max(); (*axis.start(), *axis.end())};
-        let (ymin, ymax) = {let axis = plot_map.y_axis_min_max(); (*axis.start(), *axis.end())};
+        let (xmin, xmax) = {
+            let axis = plot_map.x_axis_min_max();
+            (*axis.start(), *axis.end())
+        };
+        let (ymin, ymax) = {
+            let axis = plot_map.y_axis_min_max();
+            (*axis.start(), *axis.end())
+        };
 
         let (left, bottom, right, top, center) = {
             (
@@ -472,7 +514,7 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
         param: std::sync::Arc<str>,
         old_transform: &TransformType,
         new_transform: &TransformType,
-        data_range: (f32, f32)
+        data_range: (f32, f32),
     ) -> anyhow::Result<Box<dyn super::super::gate_traits::DrawableGate>> {
         let (x_param, _) = &self.parameters;
         let is_x = x_param == &param;
@@ -486,32 +528,57 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
 
         let (l, b, r, t) = {
             (
-                rescale_helper_point(self.points.left, &param, x_param, old_transform, new_transform)?,
-                rescale_helper_point(self.points.bottom, &param, x_param, old_transform, new_transform)?,
-                rescale_helper_point(self.points.right, &param, x_param, old_transform, new_transform)?,
-                rescale_helper_point(self.points.top, &param, x_param, old_transform, new_transform)?,
+                rescale_helper_point(
+                    self.points.left,
+                    &param,
+                    x_param,
+                    old_transform,
+                    new_transform,
+                )?,
+                rescale_helper_point(
+                    self.points.bottom,
+                    &param,
+                    x_param,
+                    old_transform,
+                    new_transform,
+                )?,
+                rescale_helper_point(
+                    self.points.right,
+                    &param,
+                    x_param,
+                    old_transform,
+                    new_transform,
+                )?,
+                rescale_helper_point(
+                    self.points.top,
+                    &param,
+                    x_param,
+                    old_transform,
+                    new_transform,
+                )?,
             )
         };
 
-        let new = if is_x{
+        let new = if is_x {
             DataPoints {
-            center: c,
-            left: l,
-            bottom: b,
-            right: r,
-            top: t,
-            x_data_range: RangeInclusive::new(data_range.0, data_range.1),
-            y_data_range:  self.points.y_data_range.clone()
-        }} else {
+                center: c,
+                left: l,
+                bottom: b,
+                right: r,
+                top: t,
+                x_data_range: RangeInclusive::new(data_range.0, data_range.1),
+                y_data_range: self.points.y_data_range.clone(),
+            }
+        } else {
             DataPoints {
-            center: c,
-            left: l,
-            bottom: b,
-            right: r,
-            top: t,
-            x_data_range: self.points.x_data_range.clone(),
-            y_data_range: RangeInclusive::new(data_range.0, data_range.1)
-        }
+                center: c,
+                left: l,
+                bottom: b,
+                right: r,
+                top: t,
+                x_data_range: self.points.x_data_range.clone(),
+                y_data_range: RangeInclusive::new(data_range.0, data_range.1),
+            }
         };
 
         Ok(Box::new(self.clone_with_point(new)?))
@@ -530,8 +597,14 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
         point_index: usize,
         mapper: &PlotMapper,
     ) -> anyhow::Result<Box<dyn super::super::gate_traits::DrawableGate>> {
-        let (xmin, xmax) = {let axis = mapper.x_axis_min_max(); (*axis.start(), *axis.end())};
-        let (ymin, ymax) = {let axis = mapper.y_axis_min_max(); (*axis.start(), *axis.end())};
+        let (xmin, xmax) = {
+            let axis = mapper.x_axis_min_max();
+            (*axis.start(), *axis.end())
+        };
+        let (ymin, ymax) = {
+            let axis = mapper.y_axis_min_max();
+            (*axis.start(), *axis.end())
+        };
 
         let (c, l, r, t, b) = (
             self.points.center,
@@ -541,54 +614,84 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
             self.points.bottom,
         );
 
+        let x_span = (xmax - xmin).abs();
+        let y_span = (ymax - ymin).abs();
+        let x_buffer = x_span * 0.1;
+        let y_buffer = y_span * 0.1;
+
+        let x_min_safe = xmin + x_buffer;
+        let x_max_safe = xmax - x_buffer;
+        let y_min_safe = ymin + y_buffer;
+        let y_max_safe = ymax - y_buffer;
+
         let new = match point_index {
-            0 => DataPoints {
-                center: new_point,
-                left: l,
-                bottom: b,
-                right: r,
-                top: t,
-                x_data_range: self.points.x_data_range.clone(),
-                y_data_range: self.points.y_data_range.clone(),
-            },
-            1 => DataPoints {
-                center: c,
-                left: (xmin, new_point.1),
-                bottom: b,
-                right: r,
-                top: t,
-                x_data_range: self.points.x_data_range.clone(),
-                y_data_range: self.points.y_data_range.clone(),
-            },
-            2 => DataPoints {
-                center: c,
-                left: l,
-                bottom: (new_point.0, ymin),
-                right: r,
-                top: t,
-                x_data_range: self.points.x_data_range.clone(),
-                y_data_range: self.points.y_data_range.clone(),
-            },
-            3 => DataPoints {
-                center: c,
-                left: l,
-                bottom: b,
-                right: (xmax, new_point.1),
-                top: t,
-                x_data_range: self.points.x_data_range.clone(),
-                y_data_range: self.points.y_data_range.clone(),
-            },
-            4 => DataPoints {
-                center: c,
-                left: l,
-                bottom: b,
-                right: r,
-                top: (new_point.0, ymax),
-                x_data_range: self.points.x_data_range.clone(),
-                y_data_range: self.points.y_data_range.clone(),
-            },
+            0 => {
+                // CENTER: Clamp both X and Y to the inner 80%
+                let clamped_c = (
+                    new_point.0.clamp(x_min_safe, x_max_safe),
+                    new_point.1.clamp(y_min_safe, y_max_safe),
+                );
+                DataPoints {
+                    center: clamped_c,
+                    left: l,
+                    bottom: b,
+                    right: r,
+                    top: t,
+                    x_data_range: self.points.x_data_range.clone(),
+                    y_data_range: self.points.y_data_range.clone(),
+                }
+            }
+            1 => {
+                // LEFT handle: Fixed to xmin, clamp Y skew
+                DataPoints {
+                    center: c,
+                    left: (xmin, new_point.1.clamp(y_min_safe, y_max_safe)),
+                    bottom: b,
+                    right: r,
+                    top: t,
+                    x_data_range: self.points.x_data_range.clone(),
+                    y_data_range: self.points.y_data_range.clone(),
+                }
+            }
+            2 => {
+                // BOTTOM handle: Fixed to ymin, clamp X skew
+                DataPoints {
+                    center: c,
+                    left: l,
+                    bottom: (new_point.0.clamp(x_min_safe, x_max_safe), ymin),
+                    right: r,
+                    top: t,
+                    x_data_range: self.points.x_data_range.clone(),
+                    y_data_range: self.points.y_data_range.clone(),
+                }
+            }
+            3 => {
+                // RIGHT handle: Fixed to xmax, clamp Y skew
+                DataPoints {
+                    center: c,
+                    left: l,
+                    bottom: b,
+                    right: (xmax, new_point.1.clamp(y_min_safe, y_max_safe)),
+                    top: t,
+                    x_data_range: self.points.x_data_range.clone(),
+                    y_data_range: self.points.y_data_range.clone(),
+                }
+            }
+            4 => {
+                // TOP handle: Fixed to ymax, clamp X skew
+                DataPoints {
+                    center: c,
+                    left: l,
+                    bottom: b,
+                    right: r,
+                    top: (new_point.0.clamp(x_min_safe, x_max_safe), ymax),
+                    x_data_range: self.points.x_data_range.clone(),
+                    y_data_range: self.points.y_data_range.clone(),
+                }
+            }
             _ => unreachable!(),
         };
+
         Ok(Box::new(self.clone_with_point(new)?))
     }
 
@@ -604,9 +707,8 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
     }
 
     fn get_gate_ref(&self, id: Option<&str>) -> Option<&Gate> {
-
         if let Some(id) = id {
-            if let Some(g) = self.gates.get(id){
+            if let Some(g) = self.gates.get(id) {
                 g.get_gate_ref(None)
             } else {
                 None
@@ -615,97 +717,61 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
             None
         }
     }
-    fn get_inner_gate_ids(&self) -> Vec<Arc<str>>{
-        self.gates.keys().map(|k|k.clone()).collect()
+    fn get_inner_gate_ids(&self) -> Vec<Arc<str>> {
+        self.gates.keys().map(|k| k.clone()).collect()
     }
 
-    // fn recalculate_gate_for_new_axis_limits(
-    //     &self,
-    //     param: std::sync::Arc<str>,
-    //     lower: f32,
-    //     upper: f32,
-    // ) -> anyhow::Result<Option<Box<dyn DrawableGate>>> {
-    //     let is_x = param == self.parameters.0;
-    //     let mut new_points = self.points.clone();
-
-    //     if is_x {
-    //         println!("old lower {} old upper {}. new lower {}, new upper {}", self.points.left.0, self.points.right.0, lower, upper);
-    //         if new_points.center.0 < lower {
-    //             new_points.center.0 = lower;
-    //         }
-    //         if new_points.center.0 > upper {
-    //             new_points.center.0 = upper;
-    //         }
-    //         new_points.left.0 = lower;
-    //         new_points.right.0 =upper;
-    //     } else {
-    //         println!("old lower {} old upper {}. new lower {}, new upper {}", self.points.bottom.1, self.points.top.1, lower, upper);
-    //         if new_points.center.1 < lower {
-    //             new_points.center.1 = lower;
-    //         }
-    //         if new_points.center.1 > upper {
-    //             new_points.center.1 = upper;
-    //         }
-    //         new_points.top.1 = upper;
-    //         new_points.bottom.1 = lower;
-    //     }
-
-    //     let new_self = self.clone_with_point(new_points)?;
-        
-    //     Ok(Some(Box::new(new_self)))
-    // }
     fn recalculate_gate_for_new_axis_limits(
-    &self,
-    param: std::sync::Arc<str>,
-    lower: f32,
-    upper: f32,
-    _transform: &TransformType
-) -> anyhow::Result<Option<Box<dyn DrawableGate>>> {
-    let is_x = param == self.parameters.0;
-    let mut new_points = self.points.clone();
+        &self,
+        param: std::sync::Arc<str>,
+        lower: f32,
+        upper: f32,
+        _transform: &TransformType,
+    ) -> anyhow::Result<Option<Box<dyn DrawableGate>>> {
+        let is_x = param == self.parameters.0;
+        let mut new_points = self.points.clone();
 
-    // Calculate the 10% safety buffers
-    let span = (upper - lower).abs();
-    let buffer = span * 0.1;
-    let min_safe = lower + buffer;
-    let max_safe = upper - buffer;
+        // Calculate the 10% safety buffers
+        let span = (upper - lower).abs();
+        let buffer = span * 0.1;
+        let min_safe = lower + buffer;
+        let max_safe = upper - buffer;
 
-    if is_x {
-        // --- X-AXIS UPDATED ---
-        
-        // 1. Clamp Center X (Keep it in the middle 80%)
-        new_points.center.0 = new_points.center.0.clamp(min_safe, max_safe);
+        if is_x {
+            // --- X-AXIS UPDATED ---
 
-        // 2. Clamp Top and Bottom handles so they don't drift into the X-axis margins
-        // These handles live at the top/bottom Y edges, but their X position 
-        // determines the vertical skew.
-        new_points.top.0 = new_points.top.0.clamp(min_safe, max_safe);
-        new_points.bottom.0 = new_points.bottom.0.clamp(min_safe, max_safe);
+            // 1. Clamp Center X (Keep it in the middle 80%)
+            new_points.center.0 = new_points.center.0.clamp(min_safe, max_safe);
 
-        // 3. Fix Left/Right handles to the new axis edges
-        new_points.left.0 = lower;
-        new_points.right.0 = upper;
+            // 2. Clamp Top and Bottom handles so they don't drift into the X-axis margins
+            // These handles live at the top/bottom Y edges, but their X position
+            // determines the vertical skew.
+            new_points.top.0 = new_points.top.0.clamp(min_safe, max_safe);
+            new_points.bottom.0 = new_points.bottom.0.clamp(min_safe, max_safe);
 
-    } else {
-        // --- Y-AXIS UPDATED ---
+            // 3. Fix Left/Right handles to the new axis edges
+            new_points.left.0 = lower;
+            new_points.right.0 = upper;
+        } else {
+            // --- Y-AXIS UPDATED ---
 
-        // 1. Clamp Center Y (Keep it in the middle 80%)
-        new_points.center.1 = new_points.center.1.clamp(min_safe, max_safe);
+            // 1. Clamp Center Y (Keep it in the middle 80%)
+            new_points.center.1 = new_points.center.1.clamp(min_safe, max_safe);
 
-        // 2. Clamp Left and Right handles so they don't drift into the Y-axis margins
-        // These handles live at the left/right X edges, but their Y position
-        // determines the horizontal skew.
-        new_points.left.1 = new_points.left.1.clamp(min_safe, max_safe);
-        new_points.right.1 = new_points.right.1.clamp(min_safe, max_safe);
+            // 2. Clamp Left and Right handles so they don't drift into the Y-axis margins
+            // These handles live at the left/right X edges, but their Y position
+            // determines the horizontal skew.
+            new_points.left.1 = new_points.left.1.clamp(min_safe, max_safe);
+            new_points.right.1 = new_points.right.1.clamp(min_safe, max_safe);
 
-        // 3. Fix Top/Bottom handles to the new axis edges
-        new_points.top.1 = upper;
-        new_points.bottom.1 = lower;
+            // 3. Fix Top/Bottom handles to the new axis edges
+            new_points.top.1 = upper;
+            new_points.bottom.1 = lower;
+        }
+
+        let new_self = self.clone_with_point(new_points)?;
+        Ok(Some(Box::new(new_self)))
     }
-
-    let new_self = self.clone_with_point(new_points)?;
-    Ok(Some(Box::new(new_self)))
-}
 }
 
 fn create_skewed_quadrant_geos(
@@ -729,14 +795,36 @@ fn create_skewed_quadrant_geos(
     let y_limit_min = data_points.y_data_range.start().min(y_min).min(c.1);
     let y_limit_max = data_points.y_data_range.end().max(y_max).max(c.1);
 
-
-    println!("Data x min: {} axis x min: {x_min} xlimitmin {x_limit_min}", data_points.x_data_range.start());
+    println!(
+        "Data x min: {} axis x min: {x_min} xlimitmin {x_limit_min}",
+        data_points.x_data_range.start()
+    );
 
     // Projected points (Spoke Ends)
-    let p_t = project_to_boundary(c, (t_x, y_max), (x_limit_min, y_limit_min), (x_limit_max, y_limit_max));
-    let p_b = project_to_boundary(c, (b_x, y_min), (x_limit_min, y_limit_min), (x_limit_max, y_limit_max));
-    let p_l = project_to_boundary(c, (x_min, l_y), (x_limit_min, y_limit_min), (x_limit_max, y_limit_max));
-    let p_r = project_to_boundary(c, (x_max, r_y), (x_limit_min, y_limit_min), (x_limit_max, y_limit_max));
+    let p_t = project_to_boundary(
+        c,
+        (t_x, y_max),
+        (x_limit_min, y_limit_min),
+        (x_limit_max, y_limit_max),
+    );
+    let p_b = project_to_boundary(
+        c,
+        (b_x, y_min),
+        (x_limit_min, y_limit_min),
+        (x_limit_max, y_limit_max),
+    );
+    let p_l = project_to_boundary(
+        c,
+        (x_min, l_y),
+        (x_limit_min, y_limit_min),
+        (x_limit_max, y_limit_max),
+    );
+    let p_r = project_to_boundary(
+        c,
+        (x_max, r_y),
+        (x_limit_min, y_limit_min),
+        (x_limit_max, y_limit_max),
+    );
 
     // Universe Corners
     let tl_c = (x_limit_min, y_limit_max);
@@ -752,36 +840,32 @@ fn create_skewed_quadrant_geos(
 
     let bl = vec![c, p_b, bl_c, p_l];
 
-
     // Bottom-Left (BL)
-    let bl = flow_gates::geometry::create_polygon_geometry(
-        bl,
-        x_channel, y_channel,
-    ).map_err(|_| anyhow::anyhow!("failed bl"))?;
+    let bl = flow_gates::geometry::create_polygon_geometry(bl, x_channel, y_channel)
+        .map_err(|_| anyhow::anyhow!("failed bl"))?;
 
     // Bottom-Right (BR)
-    let br = flow_gates::geometry::create_polygon_geometry(
-        br,
-        x_channel, y_channel,
-    ).map_err(|_| anyhow::anyhow!("failed br"))?;
+    let br = flow_gates::geometry::create_polygon_geometry(br, x_channel, y_channel)
+        .map_err(|_| anyhow::anyhow!("failed br"))?;
 
     // Top-Right (TR)
-    let tr = flow_gates::geometry::create_polygon_geometry(
-        tr,
-        x_channel, y_channel,
-    ).map_err(|_| anyhow::anyhow!("failed tr"))?;
+    let tr = flow_gates::geometry::create_polygon_geometry(tr, x_channel, y_channel)
+        .map_err(|_| anyhow::anyhow!("failed tr"))?;
 
     // Top-Left (TL)
-    let tl = flow_gates::geometry::create_polygon_geometry(
-        tl,
-        x_channel, y_channel,
-    ).map_err(|_| anyhow::anyhow!("failed tl"))?;
+    let tl = flow_gates::geometry::create_polygon_geometry(tl, x_channel, y_channel)
+        .map_err(|_| anyhow::anyhow!("failed tl"))?;
 
     println!("gates created");
     Ok((bl, br, tr, tl))
 }
 
-fn project_to_boundary(center: (f32, f32), handle: (f32, f32), min: (f32, f32), max: (f32, f32)) -> (f32, f32) {
+fn project_to_boundary(
+    center: (f32, f32),
+    handle: (f32, f32),
+    min: (f32, f32),
+    max: (f32, f32),
+) -> (f32, f32) {
     let dx = handle.0 - center.0;
     let dy = handle.1 - center.1;
 
@@ -795,8 +879,16 @@ fn project_to_boundary(center: (f32, f32), handle: (f32, f32), min: (f32, f32), 
 
     // Calculate "time" t to hit each of the 4 boundaries
     // Line eq: P = C + t(H - C)
-    let t_x = if dx > 0.0 { (max.0 - center.0) / dx } else { (min.0 - center.0) / dx };
-    let t_y = if dy > 0.0 { (max.1 - center.1) / dy } else { (min.1 - center.1) / dy };
+    let t_x = if dx > 0.0 {
+        (max.0 - center.0) / dx
+    } else {
+        (min.0 - center.0) / dx
+    };
+    let t_y = if dy > 0.0 {
+        (max.1 - center.1) / dy
+    } else {
+        (min.1 - center.1) / dy
+    };
 
     // We want the first boundary hit (the smallest t > 0)
     let t = t_x.min(t_y);

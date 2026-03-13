@@ -48,14 +48,19 @@ fn GateNode(gate_id: Arc<str>, selected: Signal<Option<Arc<str>>>, level: usize)
 
     // Fetch children
     let hierarchy = gate_store.hierarchy();
-    let children = hierarchy.read().get_children(&gate_id).into_iter().cloned().collect::<Vec<_>>();
+    let children = hierarchy
+        .read()
+        .get_children(&gate_id)
+        .into_iter()
+        .cloned()
+        .collect::<Vec<_>>();
     let has_children = !children.is_empty();
 
     // Check if this node is the active one
     let is_selected = selected.read().as_ref() == Some(&gate_id);
 
     // Calculate dynamic padding based on the level (e.g., 16px per level)
-    let padding = format!("{}px", level * 16 + 8); 
+    let padding = format!("{}px", level * 16 + 8);
 
     rsx! {
         div { class: "gate-node-container",
@@ -120,4 +125,3 @@ fn ChevronIcon() -> Element {
         }
     }
 }
-

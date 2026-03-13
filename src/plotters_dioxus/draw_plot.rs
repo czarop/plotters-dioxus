@@ -9,7 +9,6 @@ use plotters::coord::Shift;
 use plotters::prelude::*;
 use plotters_bitmap::BitMapBackend;
 
-
 use flow_plots::{
     BasePlotOptions, ColorMaps, DensityPlot, DensityPlotOptions, Plot, render::RenderConfig,
 };
@@ -24,12 +23,11 @@ pub fn PseudoColourPlot(
     size: ReadSignal<(u32, u32)>,
     x_axis_info: ReadSignal<AxisInfo>,
     y_axis_info: ReadSignal<AxisInfo>,
-    parental_gate_id: ReadSignal<Option<Arc<str>>>
+    parental_gate_id: ReadSignal<Option<Arc<str>>>,
 ) -> Element {
     let mut plot_image_src = use_signal(|| String::new());
     let mut plot_map = use_signal(|| None::<PlotMapper>);
     use_context_provider::<Signal<Option<PlotMapper>>>(|| plot_map);
-
 
     use_effect(move || {
         let x_axis_info = x_axis_info();
@@ -59,15 +57,22 @@ pub fn PseudoColourPlot(
             .expect("axis options failed");
 
         let actual_ranges = flow_plots::create_axis_specs(
-            &x_axis_options.range, 
-        &y_axis_options.range, &x_axis_info.transform, &y_axis_info.transform).expect("should not fail");
+            &x_axis_options.range,
+            &y_axis_options.range,
+            &x_axis_info.transform,
+            &y_axis_info.transform,
+        )
+        .expect("should not fail");
 
-        let(inc_x, inc_y) = {
-            (actual_ranges.0.start..=actual_ranges.0.end, actual_ranges.1.start..=actual_ranges.1.end)           
+        let (inc_x, inc_y) = {
+            (
+                actual_ranges.0.start..=actual_ranges.0.end,
+                actual_ranges.1.start..=actual_ranges.1.end,
+            )
         };
 
         println!("X Bounds are: {}, {}", inc_x.start(), inc_x.end());
-        
+
         let mapper = PlotMapper::new(
             width as f32,
             height as f32,
@@ -87,8 +92,6 @@ pub fn PseudoColourPlot(
             .build()
             .expect("shouldn't fail");
 
-
-
         let mut render_config = RenderConfig::default();
 
         let plot_data = plot
@@ -99,7 +102,6 @@ pub fn PseudoColourPlot(
         plot_image_src.set(format!("data:image/jpeg;base64,{}", base64_str));
 
         plot_map.set(Some(mapper));
-
     });
 
     rsx! {
@@ -114,7 +116,7 @@ pub fn PseudoColourPlot(
                 x_channel: x_axis_info().param.fluoro.clone(),
                 y_channel: y_axis_info().param.fluoro.clone(),
                 parental_gate_id,
-            
+
             }
         }
     }

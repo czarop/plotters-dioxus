@@ -134,10 +134,10 @@ impl PolygonGate {
 }
 
 impl DrawableGate for PolygonGate {
-    fn get_gate_ref(&self, _id: Option<&str>) -> Option<&flow_gates::Gate>  {
+    fn get_gate_ref(&self, _id: Option<&str>) -> Option<&flow_gates::Gate> {
         Some(&self.inner)
     }
-    fn get_inner_gate_ids(&self) -> Vec<Arc<str>>{
+    fn get_inner_gate_ids(&self) -> Vec<Arc<str>> {
         vec![self.inner.id.clone()]
     }
     fn clone_box(&self) -> Box<dyn DrawableGate> {
@@ -167,7 +167,7 @@ impl DrawableGate for PolygonGate {
         plot_x: &str,
         plot_y: &str,
     ) -> anyhow::Result<Option<Box<dyn DrawableGate>>> {
-        match self.clone_polygon_for_axis_swap(plot_x, plot_y)?{
+        match self.clone_polygon_for_axis_swap(plot_x, plot_y)? {
             Some(p) => Ok(Some(Box::new(p))),
             None => Ok(None),
         }
@@ -179,7 +179,11 @@ impl DrawableGate for PolygonGate {
         point_index: usize,
         mapper: &PlotMapper,
     ) -> anyhow::Result<Box<dyn DrawableGate>> {
-        Ok(Box::new(self.clone_polygon_for_new_point(new_point, point_index, mapper)?))
+        Ok(Box::new(self.clone_polygon_for_new_point(
+            new_point,
+            point_index,
+            mapper,
+        )?))
     }
 
     fn replace_points(
@@ -215,12 +219,13 @@ impl DrawableGate for PolygonGate {
         param: Arc<str>,
         old: &TransformType,
         new: &TransformType,
-        _data_range: (f32, f32)
+        _data_range: (f32, f32),
     ) -> anyhow::Result<Box<dyn DrawableGate>> {
-        Ok(Box::new(self.clone_polygon_for_rescaled_axis(param, old, new)?))
+        Ok(Box::new(
+            self.clone_polygon_for_rescaled_axis(param, old, new)?,
+        ))
     }
 
-    
     fn is_finalised(&self) -> bool {
         true
     }
@@ -247,8 +252,6 @@ impl DrawableGate for PolygonGate {
             .and_then(|d| draw_ghost_point_for_polygon(d, &pts));
         crate::collate_vecs!(main, selected, ghost)
     }
-
-
 }
 
 use crate::plotters_dioxus::gates::gate_types::{DRAGGED_LINE, DrawingStyle};

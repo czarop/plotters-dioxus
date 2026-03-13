@@ -322,44 +322,56 @@ impl GateRenderShape {
 
     pub fn is_composite(&self) -> bool {
         let st = match self {
-            GateRenderShape::PolyLine { shape_type, .. } |
-            GateRenderShape::Circle { shape_type, .. } |
-            GateRenderShape::Polygon { shape_type, .. } |
-            GateRenderShape::Ellipse { shape_type, .. } |
-            GateRenderShape::Handle { shape_type, .. } |
-            GateRenderShape::Rectangle { shape_type, .. } |
-            GateRenderShape::Line { shape_type, .. } => shape_type,
+            GateRenderShape::PolyLine { shape_type, .. }
+            | GateRenderShape::Circle { shape_type, .. }
+            | GateRenderShape::Polygon { shape_type, .. }
+            | GateRenderShape::Ellipse { shape_type, .. }
+            | GateRenderShape::Handle { shape_type, .. }
+            | GateRenderShape::Rectangle { shape_type, .. }
+            | GateRenderShape::Line { shape_type, .. } => shape_type,
         };
 
-        matches!(st, ShapeType::CompositeGate { .. } | ShapeType::CompositePoint(..) |  ShapeType::UndraggableLine | ShapeType::UndraggablePoint(..))
+        matches!(
+            st,
+            ShapeType::CompositeGate { .. }
+                | ShapeType::CompositePoint(..)
+                | ShapeType::UndraggableLine
+                | ShapeType::UndraggablePoint(..)
+        )
     }
 
     pub fn is_undraggable(&self) -> bool {
         let st = match self {
-            GateRenderShape::PolyLine { shape_type, .. } |
-            GateRenderShape::Circle { shape_type, .. } |
-            GateRenderShape::Polygon { shape_type, .. } |
-            GateRenderShape::Ellipse { shape_type, .. } |
-            GateRenderShape::Handle { shape_type, .. } |
-            GateRenderShape::Rectangle { shape_type, .. } |
-            GateRenderShape::Line { shape_type, .. } => shape_type,
+            GateRenderShape::PolyLine { shape_type, .. }
+            | GateRenderShape::Circle { shape_type, .. }
+            | GateRenderShape::Polygon { shape_type, .. }
+            | GateRenderShape::Ellipse { shape_type, .. }
+            | GateRenderShape::Handle { shape_type, .. }
+            | GateRenderShape::Rectangle { shape_type, .. }
+            | GateRenderShape::Line { shape_type, .. } => shape_type,
         };
 
-        matches!(st, ShapeType::UndraggableLine | ShapeType::UndraggablePoint(..))
+        matches!(
+            st,
+            ShapeType::UndraggableLine | ShapeType::UndraggablePoint(..)
+        )
     }
 
     pub fn is_axis_matched(&self) -> bool {
         let st = match self {
-            GateRenderShape::PolyLine { shape_type, .. } |
-            GateRenderShape::Circle { shape_type, .. } |
-            GateRenderShape::Polygon { shape_type, .. } |
-            GateRenderShape::Ellipse { shape_type, .. } |
-            GateRenderShape::Handle { shape_type, .. } |
-            GateRenderShape::Rectangle { shape_type, .. } |
-            GateRenderShape::Line { shape_type, .. } => shape_type,
+            GateRenderShape::PolyLine { shape_type, .. }
+            | GateRenderShape::Circle { shape_type, .. }
+            | GateRenderShape::Polygon { shape_type, .. }
+            | GateRenderShape::Ellipse { shape_type, .. }
+            | GateRenderShape::Handle { shape_type, .. }
+            | GateRenderShape::Rectangle { shape_type, .. }
+            | GateRenderShape::Line { shape_type, .. } => shape_type,
         };
 
-        matches!(st, ShapeType::CompositeGate(.. , true ) | ShapeType::CompositePoint(.., true))
+        matches!(
+            st,
+            ShapeType::CompositeGate(.., true) | ShapeType::CompositePoint(.., true)
+        )
     }
 }
 

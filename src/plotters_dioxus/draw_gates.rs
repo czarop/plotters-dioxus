@@ -1,18 +1,24 @@
 use crate::plotters_dioxus::{
     gates::{
-        GateState, gate_draft::GateDraft, gate_drag::{GateDragData, GateDragType, PointDragData, RotationData}, gate_single::rectangle_gate, gate_store::GateStateImplExt, gate_traits::DrawableGate, gate_types::{GateRenderShape, GateType, ShapeType}
+        GateState,
+        gate_draft::GateDraft,
+        gate_drag::{GateDragData, GateDragType, PointDragData, RotationData},
+        gate_single::rectangle_gate,
+        gate_store::GateStateImplExt,
+        gate_traits::DrawableGate,
+        gate_types::{GateRenderShape, GateType, ShapeType},
     },
     plot_helpers::PlotMapper,
 };
 
 use dioxus::prelude::*;
-use std::sync::{Arc};
+use std::sync::Arc;
 
 #[component]
 pub fn GateLayer(
     x_channel: ReadSignal<Arc<str>>,
     y_channel: ReadSignal<Arc<str>>,
-    parental_gate_id: ReadSignal<Option<Arc<str>>>
+    parental_gate_id: ReadSignal<Option<Arc<str>>>,
 ) -> Element {
     let plot_map = use_context::<Signal<Option<PlotMapper>>>();
     let mut gate_store: Store<GateState> = use_context::<Store<GateState>>();
@@ -318,12 +324,12 @@ pub struct RenderGateProps {
 
 impl PartialEq for RenderGateProps {
     fn eq(&self, other: &Self) -> bool {
-        self.is_selected == other.is_selected 
-        && self.gate_index == other.gate_index
-        && Arc::ptr_eq(&self.gate, &other.gate) 
-        && self.drag_data == other.drag_data
-        && self.mapper == other.mapper
-    } 
+        self.is_selected == other.is_selected
+            && self.gate_index == other.gate_index
+            && Arc::ptr_eq(&self.gate, &other.gate)
+            && self.drag_data == other.drag_data
+            && self.mapper == other.mapper
+    }
 }
 
 #[component]
@@ -332,14 +338,9 @@ fn RenderGate(props: RenderGateProps) -> Element {
     let gate_id = g.get_id().clone();
 
     let is_selected = props.is_selected;
-    
+
     let drag_data = if let Some(GateDragType::Point(dd)) = &props.drag_data {
-    
-    if is_selected {
-            Some(dd.clone())
-        } else {
-            None
-        }
+        if is_selected { Some(dd.clone()) } else { None }
     } else {
         None
     };
@@ -364,7 +365,6 @@ fn RenderGate(props: RenderGateProps) -> Element {
             }
         }
     }
-     
 }
 
 fn was_gate_clicked(
@@ -379,9 +379,7 @@ fn was_gate_clicked(
     let tolerance = mapper.get_data_tolerance(5.0);
     let mut closest_dist = std::f32::INFINITY;
     for gate in gates {
-        if let Some(dist) = gate
-            .is_point_on_perimeter((data_x, data_y), tolerance, &mapper)
-        {
+        if let Some(dist) = gate.is_point_on_perimeter((data_x, data_y), tolerance, &mapper) {
             if dist < closest_dist {
                 closest_dist = dist;
                 closest_gate = Some(gate.clone());
@@ -393,9 +391,7 @@ fn was_gate_clicked(
 }
 
 #[component]
-fn RenderDraftGate(
-    gate: GateDraft,
-) -> Element {
+fn RenderDraftGate(gate: GateDraft) -> Element {
     rsx! {
         for (shape_index , shape) in gate.draw_self().into_iter().enumerate() {
             RenderShape {
@@ -431,16 +427,14 @@ fn RenderShape(
                         if shape.is_undraggable() {
                             format!("none")
                         } else if shape.is_composite() {
-                            if shape.is_axis_matched(){
+                            if shape.is_axis_matched() {
                                 format!("translate({} {})", 0, -dy)
                             } else {
                                 format!("translate({} {})", -dx, 0)
                             }
-                            
                         } else {
                             format!("translate({} {})", -dx, -dy)
                         }
-                        
                     } else {
                         format!("none")
                     }
@@ -690,7 +684,8 @@ fn RenderShape(
                 style,
                 shape_type: _,
             } => {
-                let (mx, my, m_width, m_height) = rectangle_gate::map_rect_to_pixels(x, y, width, height, mapper);
+                let (mx, my, m_width, m_height) =
+                    rectangle_gate::map_rect_to_pixels(x, y, width, height, mapper);
                 rsx! {
                     g { transform,
                         rect {

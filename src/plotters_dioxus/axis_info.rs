@@ -65,7 +65,7 @@ impl AxisInfo {
         param: Param,
         lower_raw: f32,
         upper_raw: f32,
-        data_lower:f32,
+        data_lower: f32,
         data_upper: f32,
         transform: TransformType,
     ) -> Self {
@@ -173,7 +173,7 @@ impl AxisInfo {
                 axis_lower: old_lower,
                 axis_upper: old_upper,
                 data_lower: old_dl,
-                data_upper:old_du,
+                data_upper: old_du,
                 transform,
             },
         };

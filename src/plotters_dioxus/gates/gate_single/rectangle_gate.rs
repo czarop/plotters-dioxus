@@ -129,10 +129,10 @@ impl RectangleGate {
 }
 
 impl DrawableGate for RectangleGate {
-    fn get_gate_ref(&self, _id: Option<&str>) -> Option<&flow_gates::Gate>  {
+    fn get_gate_ref(&self, _id: Option<&str>) -> Option<&flow_gates::Gate> {
         Some(&self.inner)
     }
-    fn get_inner_gate_ids(&self) -> Vec<Arc<str>>{
+    fn get_inner_gate_ids(&self) -> Vec<Arc<str>> {
         vec![self.inner.id.clone()]
     }
 
@@ -175,7 +175,11 @@ impl DrawableGate for RectangleGate {
         point_index: usize,
         mapper: &PlotMapper,
     ) -> anyhow::Result<Box<dyn DrawableGate>> {
-        Ok(Box::new(self.clone_rectangle_for_new_point(new_point, point_index, mapper)?))
+        Ok(Box::new(self.clone_rectangle_for_new_point(
+            new_point,
+            point_index,
+            mapper,
+        )?))
     }
 
     fn replace_points(
@@ -211,12 +215,12 @@ impl DrawableGate for RectangleGate {
         param: Arc<str>,
         old: &TransformType,
         new: &TransformType,
-        _data_range: (f32, f32)
+        _data_range: (f32, f32),
     ) -> anyhow::Result<Box<dyn DrawableGate>> {
-        Ok(Box::new(self.clone_rectangle_for_rescaled_axis(param, old, new)?))
+        Ok(Box::new(
+            self.clone_rectangle_for_rescaled_axis(param, old, new)?,
+        ))
     }
-
-
 
     fn is_finalised(&self) -> bool {
         true
@@ -250,8 +254,6 @@ impl DrawableGate for RectangleGate {
             .and_then(|d| draw_ghost_point_for_rectangle(d, &pts));
         crate::collate_vecs!(main, selected, ghost)
     }
-
-
 }
 
 use crate::plotters_dioxus::gates::gate_types::{DRAGGED_LINE, DrawingStyle};
@@ -265,7 +267,6 @@ pub fn create_default_rectangle(
     x_channel: &str,
     y_channel: &str,
 ) -> anyhow::Result<GateGeometry> {
-
     let half_width = width_raw / 2f32;
     let half_height = height_raw / 2f32;
 

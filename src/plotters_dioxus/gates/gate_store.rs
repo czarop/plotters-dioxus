@@ -4,20 +4,31 @@ use flow_fcs::TransformType;
 use flow_gates::{Gate, GateHierarchy};
 use rustc_hash::FxHashMap;
 use std::ops::{Deref, DerefMut};
-use std::{
-    sync::{Arc, LazyLock}
-};
+use std::sync::{Arc, LazyLock};
 
 use crate::plotters_dioxus::{
     AxisInfo,
     gates::{
-        gate_composite::{bisector_gate::BisectorGate, quadrant_gate::QuadrantGate, skewed_quadrant_gate::SkewedQuadrantGate}, gate_drag::GateDragData, gate_single::{ellipse_gate::{EllipseGate, create_default_ellipse}, line_gate::{LineGate, create_default_line}, polygon_gate::PolygonGate, rectangle_gate::{RectangleGate, create_default_rectangle}}, gate_traits::DrawableGate, gate_types::GateType
-    }, plot_helpers::PlotMapper,
+        gate_composite::{
+            bisector_gate::BisectorGate, quadrant_gate::QuadrantGate,
+            skewed_quadrant_gate::SkewedQuadrantGate,
+        },
+        gate_drag::GateDragData,
+        gate_single::{
+            ellipse_gate::{EllipseGate, create_default_ellipse},
+            line_gate::{LineGate, create_default_line},
+            polygon_gate::PolygonGate,
+            rectangle_gate::{RectangleGate, create_default_rectangle},
+        },
+        gate_traits::DrawableGate,
+        gate_types::GateType,
+    },
+    plot_helpers::PlotMapper,
 };
 
 pub type GateId = std::sync::Arc<str>;
 
-pub static ROOTGATE:LazyLock<Arc<str>> = LazyLock::new(|| Arc::from("root"));
+pub static ROOTGATE: LazyLock<Arc<str>> = LazyLock::new(|| Arc::from("root"));
 
 #[derive(Hash, PartialEq, Eq, Clone)]
 pub struct GatesOnPlotKey {
@@ -50,9 +61,7 @@ pub struct GatePositionKey {
     file_id: GateId,
 }
 
-
 pub struct GateMap(pub FxHashMap<GateId, Arc<dyn DrawableGate>>);
-
 
 impl Deref for GateMap {
     type Target = FxHashMap<GateId, Arc<dyn DrawableGate>>;
@@ -68,16 +77,17 @@ impl DerefMut for GateMap {
     }
 }
 
-impl Default for GateMap{
+impl Default for GateMap {
     fn default() -> Self {
         Self(Default::default())
     }
 }
 
-
 impl flow_gates::GateResolver for GateMap {
     fn resolve(&self, id: &str) -> Option<&Gate> {
-        self.0.get(id).map(|drawable| drawable.get_gate_ref(Some(id)))?
+        self.0
+            .get(id)
+            .map(|drawable| drawable.get_gate_ref(Some(id)))?
     }
 }
 
@@ -117,110 +127,98 @@ impl<Lens> Store<GateState, Lens> {
         parental_gate_id: Option<GateId>,
         gate_type: GateType,
     ) -> Result<()> {
-
-        let key = GatesOnPlotKey::new(x_param.clone(), y_param.clone(), parental_gate_id.clone());        
+        let key = GatesOnPlotKey::new(x_param.clone(), y_param.clone(), parental_gate_id.clone());
         let parameters = (x_param.clone(), y_param.clone());
 
         // let mut composite_subgate_ids = vec![];
 
-        let g: Arc<dyn DrawableGate + 'static> = match gate_type{
+        let g: Arc<dyn DrawableGate + 'static> = match gate_type {
             GateType::Polygon => {
                 let geo = flow_gates::geometry::create_polygon_geometry(
-                                            points.ok_or(anyhow!("points not provided for polygon gate"))?,
-                                            &x_param,
-                                            &y_param,
-                                        )
-                                        .map_err(|_| anyhow!("failed to create polygon geometry"))?;
-                                    let gate = Gate{ 
-                                        id: Arc::from(id.as_str()), 
-                                        name: id, 
-                                        geometry: geo, 
-                                        mode: flow_gates::GateMode::Global, 
-                                        parameters, 
-                                        label_position: None 
-                                    };
-                                    Arc::new(PolygonGate::try_new(gate)?)
-                                    },
-            GateType::Ellipse => {
-                let geo = create_default_ellipse(
-                                    &mapper,
-                                    click_x,
-                                    click_y,
-                                    50f32,
-                                    30f32,
-                                    &x_param,
-                                    &y_param,
-                                )?;
-                                let gate = Gate{ 
-                                        id: Arc::from(id.as_str()), 
-                                        name: id, 
-                                        geometry: geo, 
-                                        mode: flow_gates::GateMode::Global, 
-                                        parameters, 
-                                        label_position: None 
-                                    };
-                                Arc::new(EllipseGate::try_new(gate)?)
-            },
-            GateType::Rectangle => {
-                let geo = create_default_rectangle(
-                                    &mapper,
-                                    click_x,
-                                    click_y,
-                                    50f32,
-                                    50f32,
-                                    &x_param,
-                                    &y_param,
-                                )?;
-                                let gate = Gate{ 
-                                        id: Arc::from(id.as_str()), 
-                                        name: id, 
-                                        geometry: geo, 
-                                        mode: flow_gates::GateMode::Global, 
-                                        parameters, 
-                                        label_position: None 
-                                    };
-                                Arc::new(RectangleGate::try_new(gate)?)
-            },
-            GateType::Line(y_coord) => {
-                let geo = create_default_line(
-                    &mapper,
-                    click_x,
-                    50f32,
+                    points.ok_or(anyhow!("points not provided for polygon gate"))?,
                     &x_param,
                     &y_param,
+                )
+                .map_err(|_| anyhow!("failed to create polygon geometry"))?;
+                let gate = Gate {
+                    id: Arc::from(id.as_str()),
+                    name: id,
+                    geometry: geo,
+                    mode: flow_gates::GateMode::Global,
+                    parameters,
+                    label_position: None,
+                };
+                Arc::new(PolygonGate::try_new(gate)?)
+            }
+            GateType::Ellipse => {
+                let geo = create_default_ellipse(
+                    &mapper, click_x, click_y, 50f32, 30f32, &x_param, &y_param,
                 )?;
+                let gate = Gate {
+                    id: Arc::from(id.as_str()),
+                    name: id,
+                    geometry: geo,
+                    mode: flow_gates::GateMode::Global,
+                    parameters,
+                    label_position: None,
+                };
+                Arc::new(EllipseGate::try_new(gate)?)
+            }
+            GateType::Rectangle => {
+                let geo = create_default_rectangle(
+                    &mapper, click_x, click_y, 50f32, 50f32, &x_param, &y_param,
+                )?;
+                let gate = Gate {
+                    id: Arc::from(id.as_str()),
+                    name: id,
+                    geometry: geo,
+                    mode: flow_gates::GateMode::Global,
+                    parameters,
+                    label_position: None,
+                };
+                Arc::new(RectangleGate::try_new(gate)?)
+            }
+            GateType::Line(y_coord) => {
+                let geo = create_default_line(&mapper, click_x, 50f32, &x_param, &y_param)?;
                 if let Some(y_coord) = y_coord {
-                    let gate = Gate{ 
-                                        id: Arc::from(id.as_str()), 
-                                        name: id, 
-                                        geometry: geo, 
-                                        mode: flow_gates::GateMode::Global, 
-                                        parameters, 
-                                        label_position: None 
-                                    };
+                    let gate = Gate {
+                        id: Arc::from(id.as_str()),
+                        name: id,
+                        geometry: geo,
+                        mode: flow_gates::GateMode::Global,
+                        parameters,
+                        label_position: None,
+                    };
                     Arc::new(LineGate::try_new(gate, y_coord)?)
                 } else {
                     Err(anyhow!(
                         "Line gate requires y coordinate for initialization"
                     ))?
                 }
-            },
+            }
 
-        GateType::Bisector => { 
-
-            Arc::new(BisectorGate::try_new(mapper, Arc::from(id.as_str()), (click_x, click_y), x_param, y_param)?)
-        },
-        GateType::Quadrant => {
-            Arc::new(QuadrantGate::try_new_from_raw_coord(mapper, Arc::from(id.as_str()), (click_x, click_y), x_param, y_param)?)
-        },
-        GateType::SkewedQuadrant => Arc::new(SkewedQuadrantGate::try_new_from_raw_coord(mapper, Arc::from(id.as_str()), (click_x, click_y), x_param, y_param)?),
-    };
-
-
-
-
-
-        
+            GateType::Bisector => Arc::new(BisectorGate::try_new(
+                mapper,
+                Arc::from(id.as_str()),
+                (click_x, click_y),
+                x_param,
+                y_param,
+            )?),
+            GateType::Quadrant => Arc::new(QuadrantGate::try_new_from_raw_coord(
+                mapper,
+                Arc::from(id.as_str()),
+                (click_x, click_y),
+                x_param,
+                y_param,
+            )?),
+            GateType::SkewedQuadrant => Arc::new(SkewedQuadrantGate::try_new_from_raw_coord(
+                mapper,
+                Arc::from(id.as_str()),
+                (click_x, click_y),
+                x_param,
+                y_param,
+            )?),
+        };
 
         let gate_key = g.get_id();
 
@@ -230,43 +228,53 @@ impl<Lens> Store<GateState, Lens> {
             .or_insert(vec![])
             .push(gate_key.clone());
 
-        if g.is_composite(){
+        if g.is_composite() {
             let gates = g.get_inner_gate_ids();
-            for sg in gates{
-                println!("Adding composite subgate gate {} with parent {}", sg, parental_gate_id.as_ref().unwrap_or(&ROOTGATE));
+            for sg in gates {
+                println!(
+                    "Adding composite subgate gate {} with parent {}",
+                    sg,
+                    parental_gate_id.as_ref().unwrap_or(&ROOTGATE)
+                );
                 self.hierarchy().write().add_gate_child(
                     parental_gate_id.clone().unwrap_or(ROOTGATE.clone()),
                     sg.clone(),
                 )?;
-                self.primary_and_subgate_registry().write().insert(sg, g.clone());
+                self.primary_and_subgate_registry()
+                    .write()
+                    .insert(sg, g.clone());
             }
         } else {
-            println!("Adding gate {} with parent {}", g.get_id(), parental_gate_id.as_ref().unwrap_or(&ROOTGATE));
-            self.hierarchy().write().add_gate_child(
-                parental_gate_id.unwrap_or(ROOTGATE.clone()),
+            println!(
+                "Adding gate {} with parent {}",
                 g.get_id(),
-            )?;
+                parental_gate_id.as_ref().unwrap_or(&ROOTGATE)
+            );
+            self.hierarchy()
+                .write()
+                .add_gate_child(parental_gate_id.unwrap_or(ROOTGATE.clone()), g.get_id())?;
         }
 
-        self.primary_gate_registry().write().insert(gate_key.clone(), g.clone());
-        self.primary_and_subgate_registry().write().insert(gate_key, g);
-
+        self.primary_gate_registry()
+            .write()
+            .insert(gate_key.clone(), g.clone());
+        self.primary_and_subgate_registry()
+            .write()
+            .insert(gate_key, g);
 
         Ok(())
     }
 
     fn remove_gate(&mut self, gate_id: GateId, parental_gate_id: Option<GateId>) -> Result<()> {
-
-
-        if let Some((id, gate)) = self.primary_gate_registry().write().remove_entry(&gate_id){
+        if let Some((id, gate)) = self.primary_gate_registry().write().remove_entry(&gate_id) {
             let (x_param, y_param) = gate.get_params();
-            let key = GatesOnPlotKey::new(x_param.clone(), y_param.clone(), parental_gate_id.clone());
-        
+            let key =
+                GatesOnPlotKey::new(x_param.clone(), y_param.clone(), parental_gate_id.clone());
+
             self.gate_ids_by_view()
                 .write()
                 .entry(key)
                 .and_modify(|l| l.retain(|name| name != &id));
-
         };
 
         // iteratively do this for all child gates in the hierarchy!
@@ -285,10 +293,11 @@ impl<Lens> Store<GateState, Lens> {
         new_point: (f32, f32),
         plot_map: &PlotMapper,
     ) -> anyhow::Result<()> {
-
         let old_gate = self
-            .primary_gate_registry().deref()
-            .get(gate_id.clone()).ok_or_else(|| anyhow!("Gate {} does not exist", gate_id.clone()))?;
+            .primary_gate_registry()
+            .deref()
+            .get(gate_id.clone())
+            .ok_or_else(|| anyhow!("Gate {} does not exist", gate_id.clone()))?;
 
         let new_gate = old_gate().replace_point(new_point, point_idx, plot_map)?;
         let new_gate_arc: Arc<dyn DrawableGate> = Arc::from(new_gate);
@@ -302,7 +311,6 @@ impl<Lens> Store<GateState, Lens> {
                     .get_mut(&subgate_id)
                 {
                     *gate_ptr = new_gate_arc.clone();
-                    
                 }
             }
         }
@@ -311,17 +319,11 @@ impl<Lens> Store<GateState, Lens> {
             .primary_and_subgate_registry()
             .write()
             .get_mut(&gate_id)
-        {   
+        {
             *gate_ptr = new_gate_arc.clone();
         }
 
-        
-
-        if let Some(gate_ptr) = self
-            .primary_gate_registry()
-            .write()
-            .get_mut(&gate_id)
-        {
+        if let Some(gate_ptr) = self.primary_gate_registry().write().get_mut(&gate_id) {
             *gate_ptr = new_gate_arc.clone();
         }
 
@@ -329,16 +331,14 @@ impl<Lens> Store<GateState, Lens> {
     }
 
     fn move_gate(&mut self, gate_drag_data: GateDragData) -> Result<()> {
-
         let gate_id = &gate_drag_data.gate_id();
         let new_gate = self
             .primary_gate_registry()
             .read()
-            .get(&gate_id.clone()).ok_or_else(|| anyhow!("Gate {} does not exist", gate_id.clone()))?
+            .get(&gate_id.clone())
+            .ok_or_else(|| anyhow!("Gate {} does not exist", gate_id.clone()))?
             .replace_points(gate_drag_data)?;
-        if let Some(new_gate) = new_gate{
-
-        
+        if let Some(new_gate) = new_gate {
             let new_gate_arc: Arc<dyn DrawableGate> = Arc::from(new_gate);
 
             if new_gate_arc.is_composite() {
@@ -350,7 +350,6 @@ impl<Lens> Store<GateState, Lens> {
                         .get_mut(&subgate_id)
                     {
                         *gate_ptr = new_gate_arc.clone();
-                        
                     }
                 }
             }
@@ -359,38 +358,26 @@ impl<Lens> Store<GateState, Lens> {
                 .primary_and_subgate_registry()
                 .write()
                 .get_mut(&gate_id.clone())
-            {   
-                *gate_ptr = new_gate_arc.clone();
-            }
-
-            
-
-            if let Some(gate_ptr) = self
-                .primary_gate_registry()
-                .write()
-                .get_mut(gate_id)
             {
                 *gate_ptr = new_gate_arc.clone();
             }
+
+            if let Some(gate_ptr) = self.primary_gate_registry().write().get_mut(gate_id) {
+                *gate_ptr = new_gate_arc.clone();
+            }
         }
-        
+
         Ok(())
     }
 
-    fn rotate_gate(
-        &mut self,
-        gate_id: GateId,
-        current_position: (f32, f32),
-    ) -> anyhow::Result<()> {
-
+    fn rotate_gate(&mut self, gate_id: GateId, current_position: (f32, f32)) -> anyhow::Result<()> {
         let new_gate = self
             .primary_gate_registry()
             .read()
-            .get(&gate_id).ok_or_else(|| anyhow!("Gate {} does not exist", gate_id.clone()))?
+            .get(&gate_id)
+            .ok_or_else(|| anyhow!("Gate {} does not exist", gate_id.clone()))?
             .rotate_gate(current_position)?;
-        if let Some(new_gate) = new_gate{
-
-        
+        if let Some(new_gate) = new_gate {
             let new_gate_arc: Arc<dyn DrawableGate> = Arc::from(new_gate);
 
             if new_gate_arc.is_composite() {
@@ -402,7 +389,6 @@ impl<Lens> Store<GateState, Lens> {
                         .get_mut(&subgate_id)
                     {
                         *gate_ptr = new_gate_arc.clone();
-                        
                     }
                 }
             }
@@ -411,21 +397,14 @@ impl<Lens> Store<GateState, Lens> {
                 .primary_and_subgate_registry()
                 .write()
                 .get_mut(&gate_id)
-            {   
-                *gate_ptr = new_gate_arc.clone();
-            }
-
-            
-
-            if let Some(gate_ptr) = self
-                .primary_gate_registry()
-                .write()
-                .get_mut(&gate_id)
             {
                 *gate_ptr = new_gate_arc.clone();
             }
+
+            if let Some(gate_ptr) = self.primary_gate_registry().write().get_mut(&gate_id) {
+                *gate_ptr = new_gate_arc.clone();
+            }
         }
-    
 
         Ok(())
     }
@@ -434,12 +413,16 @@ impl<Lens> Store<GateState, Lens> {
         &self,
         x_axis_title: T,
         y_axis_title: T,
-        parental_gate_id: Option<T>
-    ) -> Option<Vec<Arc<dyn DrawableGate>>> 
-    where 
-        T: Into<GateId>
+        parental_gate_id: Option<T>,
+    ) -> Option<Vec<Arc<dyn DrawableGate>>>
+    where
+        T: Into<GateId>,
     {
-        let key = GatesOnPlotKey::new(x_axis_title.into(), y_axis_title.into(), parental_gate_id.map(|id| id.into()));
+        let key = GatesOnPlotKey::new(
+            x_axis_title.into(),
+            y_axis_title.into(),
+            parental_gate_id.map(|id| id.into()),
+        );
         let key_options = self.gate_ids_by_view().get(key);
         let mut gate_list = vec![];
         if let Some(key_store) = key_options {
@@ -475,121 +458,120 @@ impl<Lens> Store<GateState, Lens> {
                 let new_gate = self
                     .primary_gate_registry()
                     .read()
-                    .get(&k).ok_or_else(|| anyhow!("Gate {} does not exist", k.clone()))?
+                    .get(&k)
+                    .ok_or_else(|| anyhow!("Gate {} does not exist", k.clone()))?
                     .match_to_plot_axis(x, y)?;
 
                 if let Some(new_gate) = new_gate {
-                let new_gate_arc: Arc<dyn DrawableGate> = Arc::from(new_gate);
+                    let new_gate_arc: Arc<dyn DrawableGate> = Arc::from(new_gate);
 
+                    if new_gate_arc.is_composite() {
+                        let subgate_ids = new_gate_arc.get_inner_gate_ids();
+                        for subgate_id in subgate_ids {
+                            if let Some(gate_ptr) = self
+                                .primary_and_subgate_registry()
+                                .write()
+                                .get_mut(&subgate_id)
+                            {
+                                *gate_ptr = new_gate_arc.clone();
+                            }
+                        }
+                    }
+
+                    if let Some(gate_ptr) = self.primary_and_subgate_registry().write().get_mut(&k)
+                    {
+                        *gate_ptr = new_gate_arc.clone();
+                    }
+
+                    if let Some(gate_ptr) = self.primary_gate_registry().write().get_mut(&k) {
+                        *gate_ptr = new_gate_arc.clone();
+                    }
+                }
+            }
+        }
+
+        return Ok(());
+    }
+
+    fn rescale_gates(
+        &mut self,
+        marker: &Arc<str>,
+        old_axis_options: &AxisInfo,
+        new_axis_options: &AxisInfo,
+    ) -> Result<(), Vec<String>> {
+        let mut errors = vec![];
+
+        // 1. Create a temporary storage for the new gates to avoid nested locking
+        let mut updates: Vec<(Arc<str>, Arc<dyn DrawableGate>)> = Vec::new();
+
+        // Scope for the first read/write lock
+        {
+            for (_, gate) in self.primary_gate_registry().read().iter() {
+                let (x_marker, y_marker) = gate.get_params();
+                if marker == &x_marker || marker == &y_marker {
+                    match gate.recalculate_gate_for_rescaled_axis(
+                        marker.clone(),
+                        &old_axis_options.transform,
+                        &new_axis_options.transform,
+                        (new_axis_options.data_lower, new_axis_options.data_upper),
+                    ) {
+                        Ok(new_g) => updates.push((gate.get_id(), Arc::from(new_g))),
+                        Err(e) => errors.push(e.to_string()),
+                    }
+                }
+            }
+        } // First lock drops here!
+
+        // 2. Now apply updates to both registries
+        if !updates.is_empty() {
+            for (gate_id, new_gate_arc) in updates {
+                // Update subgates if composite
                 if new_gate_arc.is_composite() {
-                    let subgate_ids = new_gate_arc.get_inner_gate_ids();
-                    for subgate_id in subgate_ids {
+                    for subgate_id in new_gate_arc.get_inner_gate_ids() {
                         if let Some(gate_ptr) = self
                             .primary_and_subgate_registry()
                             .write()
                             .get_mut(&subgate_id)
                         {
                             *gate_ptr = new_gate_arc.clone();
-                            
                         }
                     }
                 }
 
+                // Update primary and sub registry for the main gate
                 if let Some(gate_ptr) = self
                     .primary_and_subgate_registry()
                     .write()
-                    .get_mut(&k)
-                {   
-                    *gate_ptr = new_gate_arc.clone();
-                }
-
-                
-
-                if let Some(gate_ptr) = self
-                    .primary_gate_registry()
-                    .write()
-                    .get_mut(&k)
+                    .get_mut(&gate_id)
                 {
                     *gate_ptr = new_gate_arc.clone();
                 }
 
-
-            }
-
-            }
-        }
-
-        
-        return Ok(());
-    }
-
-
-    fn rescale_gates(
-    &mut self,
-    marker: &Arc<str>,
-    old_axis_options: &AxisInfo,
-    new_axis_options: &AxisInfo,
-) -> Result<(), Vec<String>> {
-    let mut errors = vec![];
-    
-    // 1. Create a temporary storage for the new gates to avoid nested locking
-    let mut updates: Vec<(Arc<str>, Arc<dyn DrawableGate>)> = Vec::new();
-
-    // Scope for the first read/write lock
-    {
-        
-        for (_, gate) in self.primary_gate_registry().read().iter() {
-            let (x_marker, y_marker) = gate.get_params();
-            if marker == &x_marker || marker == &y_marker {
-                match gate.recalculate_gate_for_rescaled_axis(
-                    marker.clone(),
-                    &old_axis_options.transform,
-                    &new_axis_options.transform,
-                    (new_axis_options.data_lower, new_axis_options.data_upper),
-                ) {
-                    Ok(new_g) => updates.push((gate.get_id(), Arc::from(new_g))),
-                    Err(e) => errors.push(e.to_string()),
+                // Update primary registry
+                if let Some(gate_ptr) = self.primary_gate_registry().write().get_mut(&gate_id) {
+                    *gate_ptr = new_gate_arc.clone();
                 }
             }
         }
-    } // First lock drops here!
 
-    // 2. Now apply updates to both registries
-    if !updates.is_empty() {
-
-
-        for (gate_id, new_gate_arc) in updates {
-            // Update subgates if composite
-            if new_gate_arc.is_composite() {
-                for subgate_id in new_gate_arc.get_inner_gate_ids() {
-                    if let Some(gate_ptr) = self.primary_and_subgate_registry().write().get_mut(&subgate_id) {
-                        *gate_ptr = new_gate_arc.clone();
-                    }
-                }
-            }
-
-            // Update primary and sub registry for the main gate
-            if let Some(gate_ptr) = self.primary_and_subgate_registry().write().get_mut(&gate_id) {
-                *gate_ptr = new_gate_arc.clone();
-            }
-
-            // Update primary registry
-            if let Some(gate_ptr) = self.primary_gate_registry().write().get_mut(&gate_id) {
-                *gate_ptr = new_gate_arc.clone();
-            }
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
         }
     }
 
-    if errors.is_empty() { Ok(()) } else { Err(errors) }
-}
-
-    fn set_current_axis_limits(&mut self, axis_name: Arc<str>, lower: f32, upper: f32, transform: TransformType) -> anyhow::Result<()> {
-
+    fn set_current_axis_limits(
+        &mut self,
+        axis_name: Arc<str>,
+        lower: f32,
+        upper: f32,
+        transform: TransformType,
+    ) -> anyhow::Result<()> {
         let mut updates: Vec<(Arc<str>, Arc<dyn DrawableGate>)> = Vec::new();
         let mut errors = vec![];
         // Scope for the first read/write lock
         {
-            
             for (_, gate) in self.primary_gate_registry().read().iter() {
                 let (x_marker, y_marker) = gate.get_params();
                 if axis_name == x_marker || axis_name == y_marker {
@@ -597,7 +579,7 @@ impl<Lens> Store<GateState, Lens> {
                         axis_name.clone(),
                         lower,
                         upper,
-                        &transform
+                        &transform,
                     ) {
                         Ok(Some(new_g)) => updates.push((gate.get_id(), Arc::from(new_g))),
                         Ok(None) => continue,
@@ -605,49 +587,37 @@ impl<Lens> Store<GateState, Lens> {
                     }
                 }
             }
-        } 
+        }
 
         // 2. Now apply updates to both registries
 
-            for (gate_id, new_gate_arc) in updates {
-
-                if new_gate_arc.is_composite() {
-                    let subgate_ids = new_gate_arc.get_inner_gate_ids();
-                    for subgate_id in subgate_ids {
-                        if let Some(gate_ptr) = self
-                            .primary_and_subgate_registry()
-                            .write()
-                            .get_mut(&subgate_id)
-                        {
-                            *gate_ptr = new_gate_arc.clone();
-                            
-                        }
+        for (gate_id, new_gate_arc) in updates {
+            if new_gate_arc.is_composite() {
+                let subgate_ids = new_gate_arc.get_inner_gate_ids();
+                for subgate_id in subgate_ids {
+                    if let Some(gate_ptr) = self
+                        .primary_and_subgate_registry()
+                        .write()
+                        .get_mut(&subgate_id)
+                    {
+                        *gate_ptr = new_gate_arc.clone();
                     }
                 }
+            }
 
-                if let Some(gate_ptr) = self
-                    .primary_and_subgate_registry()
-                    .write()
-                    .get_mut(&gate_id)
-                {   
-                    *gate_ptr = new_gate_arc.clone();
-                }
+            if let Some(gate_ptr) = self
+                .primary_and_subgate_registry()
+                .write()
+                .get_mut(&gate_id)
+            {
+                *gate_ptr = new_gate_arc.clone();
+            }
 
-                
-
-                if let Some(gate_ptr) = self
-                    .primary_gate_registry()
-                    .write()
-                    .get_mut(&gate_id)
-                {
-                    *gate_ptr = new_gate_arc.clone();
-                }
-            
-
-
+            if let Some(gate_ptr) = self.primary_gate_registry().write().get_mut(&gate_id) {
+                *gate_ptr = new_gate_arc.clone();
+            }
         }
-        
-    
-    Ok(())
-}
+
+        Ok(())
+    }
 }
