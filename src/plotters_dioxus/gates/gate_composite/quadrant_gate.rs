@@ -399,6 +399,7 @@ impl super::super::gate_traits::DrawableGate for QuadrantGate {
         old_transform: &TransformType,
         new_transform: &TransformType,
         data_range: (f32, f32),
+        _axis_range: (f32, f32),
     ) -> anyhow::Result<Box<dyn super::super::gate_traits::DrawableGate>> {
         let (x_param, _) = &self.parameters;
         let is_x = x_param == &param;

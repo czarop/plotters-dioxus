@@ -373,6 +373,7 @@ impl super::super::gate_traits::DrawableGate for BisectorGate {
         old_transform: &TransformType,
         new_transform: &TransformType,
         _data_range: (f32, f32),
+        _axis_range: (f32, f32),
     ) -> anyhow::Result<Box<dyn super::super::gate_traits::DrawableGate>> {
         let (x_param, _) = &self.parameters;
         let (cx, cy) =

@@ -31,56 +31,51 @@ struct DataPoints {
 
 impl DataPoints {
     fn new_from_click(cx: f32, cy: f32, plot_map: &PlotMapper) -> Self {
-        let (xmin, xmax) = {
-            let axis = plot_map.x_axis_min_max();
-            (*axis.start(), *axis.end())
-        };
-        let (ymin, ymax) = {
-            let axis = plot_map.y_axis_min_max();
-            (*axis.start(), *axis.end())
-        };
-        let left = (xmin, cy);
-        let right = (xmax, cy);
-        let bottom = (cx, ymin);
-        let top = (cx, ymax);
-        println!(
-            "center: {:?} left: {:?}, bottom: {:?}, right: {:?}, top: {:?}",
-            (cx, cy),
-            left,
-            bottom,
-            right,
-            top
-        );
-        Self::new_from_points(
-            (cx, cy),
-            left,
-            bottom,
-            right,
-            top,
-            plot_map.x_data_min_max(),
-            plot_map.y_data_min_max(),
-        )
+    let (xmin, xmax) = {
+        let axis = plot_map.x_axis_min_max();
+        (*axis.start(), *axis.end())
+    };
+    let (ymin, ymax) = {
+        let axis = plot_map.y_axis_min_max();
+        (*axis.start(), *axis.end())
+    };
+
+    // 1. Calculate the same 10% visual buffers used in your drag/resize logic
+    let x_span = (xmax - xmin).abs();
+    let y_span = (ymax - ymin).abs();
+    let x_buffer = x_span * 0.1;
+    let y_buffer = y_span * 0.1;
+
+    let x_min_safe = xmin + x_buffer;
+    let x_max_safe = xmax - x_buffer;
+    let y_min_safe = ymin + y_buffer;
+    let y_max_safe = ymax - y_buffer;
+
+    // 2. Clamp the initial click coordinates to the safe zone
+    let safe_cx = cx.clamp(x_min_safe, x_max_safe);
+    let safe_cy = cy.clamp(y_min_safe, y_max_safe);
+
+    // 3. Derive handles from the safe center
+    // Left/Right snap to X-axis edges but use the safe Y
+    let left = (xmin, safe_cy);
+    let right = (xmax, safe_cy);
+    
+    // Bottom/Top snap to Y-axis edges but use the safe X
+    let bottom = (safe_cx, ymin);
+    let top = (safe_cx, ymax);
+
+
+    Self{
+        center: (safe_cx, safe_cy),
+        left,
+        bottom,
+        right,
+        top,
+        x_data_range: plot_map.x_data_min_max(),
+        y_data_range: plot_map.y_data_min_max(),
+    }
     }
 
-    fn new_from_points(
-        center: (f32, f32),
-        left: (f32, f32),
-        bottom: (f32, f32),
-        right: (f32, f32),
-        top: (f32, f32),
-        x_data_range: RangeInclusive<f32>,
-        y_data_range: RangeInclusive<f32>,
-    ) -> Self {
-        Self {
-            center,
-            left,
-            bottom,
-            right,
-            top,
-            x_data_range,
-            y_data_range,
-        }
-    }
 
     fn clone_for_swap_axis(&self, prev_axis_matched: bool) -> Self {
         if !prev_axis_matched {
@@ -322,12 +317,29 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
         );
 
         if let Some(dd) = drag_point {
+            let x_span = (xmax - xmin).abs();
+            let y_span = (ymax - ymin).abs();
+            let x_buffer = x_span * 0.1;
+            let y_buffer = y_span * 0.1;
+
+            let x_min_safe = xmin + x_buffer;
+            let x_max_safe = xmax - x_buffer;
+            let y_min_safe = ymin + y_buffer;
+            let y_max_safe = ymax - y_buffer;
             match dd.point_index() {
-                0 => center = dd.loc(),
-                1 => left.1 = dd.loc().1,
-                2 => bottom.0 = dd.loc().0,
-                3 => right.1 = dd.loc().1,
-                4 => top.0 = dd.loc().0,
+                0 => {
+                    center = (
+                        dd.loc().0.clamp(x_min_safe, x_max_safe),
+                        dd.loc().1.clamp(y_min_safe, y_max_safe),
+                    );
+                }
+                // Left/Right: X is fixed to axis edge, clamp Y skew
+                1 => left.1 = dd.loc().1.clamp(y_min_safe, y_max_safe),
+                3 => right.1 = dd.loc().1.clamp(y_min_safe, y_max_safe),
+                
+                // Bottom/Top: Y is fixed to axis edge, clamp X skew
+                2 => bottom.0 = dd.loc().0.clamp(x_min_safe, x_max_safe),
+                4 => top.0 = dd.loc().0.clamp(x_min_safe, x_max_safe),
                 _ => unreachable!(),
             }
         };
@@ -515,10 +527,11 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
         old_transform: &TransformType,
         new_transform: &TransformType,
         data_range: (f32, f32),
+        axis_range: (f32, f32),
     ) -> anyhow::Result<Box<dyn super::super::gate_traits::DrawableGate>> {
         let (x_param, _) = &self.parameters;
         let is_x = x_param == &param;
-        let c = crate::plotters_dioxus::gates::gate_single::rescale_helper_point(
+        let mut c = crate::plotters_dioxus::gates::gate_single::rescale_helper_point(
             self.points.center,
             &param,
             x_param,
@@ -526,7 +539,7 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
             new_transform,
         )?;
 
-        let (l, b, r, t) = {
+        let (mut l, mut b, mut r, mut t) = {
             (
                 rescale_helper_point(
                     self.points.left,
@@ -558,28 +571,82 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
                 )?,
             )
         };
+        
 
-        let new = if is_x {
-            DataPoints {
-                center: c,
-                left: l,
-                bottom: b,
-                right: r,
-                top: t,
-                x_data_range: RangeInclusive::new(data_range.0, data_range.1),
-                y_data_range: self.points.y_data_range.clone(),
+        let x_spec = match new_transform {
+            TransformType::Linear => {
+                let min = axis_range.0;
+                let max = axis_range.1;
+                let (nice_min, nice_max) = nice_bounds(min, max);
+                nice_min..nice_max
             }
-        } else {
-            DataPoints {
-                center: c,
-                left: l,
-                bottom: b,
-                right: r,
-                top: t,
-                x_data_range: self.points.x_data_range.clone(),
-                y_data_range: RangeInclusive::new(data_range.0, data_range.1),
+            TransformType::Arcsinh { cofactor: _ } | TransformType::Biexponential { .. } => {
+                // Keep the transformed range but we'll format nicely in the formatter
+                axis_range.0..axis_range.1
             }
         };
+
+        let new_lower = x_spec.start;
+        let new_upper = x_spec.end;
+
+        let span = (new_upper - new_lower).abs();
+        let buffer = span * 0.1;
+        let min_safe = new_lower + buffer;
+        let max_safe = new_upper - buffer;
+
+        // 3. Apply the Clamping Logic
+        if is_x {
+            // Center and Skew handles must stay in the middle 80% of the NEW X-scale
+            c.0 = c.0.clamp(min_safe, max_safe);
+            t.0 = t.0.clamp(min_safe, max_safe);
+            b.0 = b.0.clamp(min_safe, max_safe);
+
+            // Snap edge handles strictly to the new axis limits
+            l.0 = new_lower;
+            r.0 = new_upper;
+        } else {
+            // Center and Skew handles must stay in the middle 80% of the NEW Y-scale
+            c.1 = c.1.clamp(min_safe, max_safe);
+            l.1 = l.1.clamp(min_safe, max_safe);
+            r.1 = r.1.clamp(min_safe, max_safe);
+
+            // Snap edge handles strictly to the new axis limits
+            t.1 = new_upper;
+            b.1 = new_lower;
+        }
+
+        let new = DataPoints {
+            center: c,
+            left: l,
+            bottom: b,
+            right: r,
+            top: t,
+            // Update the data ranges (raw space)
+            x_data_range: if is_x { RangeInclusive::new(data_range.0, data_range.1) } else { self.points.x_data_range.clone() },
+            y_data_range: if !is_x { RangeInclusive::new(data_range.0, data_range.1) } else { self.points.y_data_range.clone() },
+        };
+
+        // let new = if is_x {
+        //     DataPoints {
+        //         center: c,
+        //         left: l,
+        //         bottom: b,
+        //         right: r,
+        //         top: t,
+        //         x_data_range: RangeInclusive::new(data_range.0, data_range.1),
+        //         y_data_range: self.points.y_data_range.clone(),
+        //     }
+        // } else {
+        //     DataPoints {
+        //         center: c,
+        //         left: l,
+        //         bottom: b,
+        //         right: r,
+        //         top: t,
+        //         x_data_range: self.points.x_data_range.clone(),
+        //         y_data_range: RangeInclusive::new(data_range.0, data_range.1),
+        //     }
+        // };
 
         Ok(Box::new(self.clone_with_point(new)?))
     }
@@ -894,4 +961,22 @@ fn project_to_boundary(
     let t = t_x.min(t_y);
 
     (center.0 + t * dx, center.1 + t * dy)
+}
+
+fn nice_bounds(min: f32, max: f32) -> (f32, f32) {
+    if min.is_infinite() || max.is_infinite() || min.is_nan() || max.is_nan() {
+        return (0.0, 1.0); // Fallback for invalid ranges
+    }
+
+    let range = max - min;
+    if range == 0.0 {
+        return (min - 0.5, min + 0.5); // Handle single-point case
+    }
+
+    // Find nice step size
+    let step_size = 10_f32.powf((range.log10()).floor());
+    let nice_min = (min / step_size).floor() * step_size;
+    let nice_max = (max / step_size).ceil() * step_size;
+
+    (nice_min, nice_max)
 }

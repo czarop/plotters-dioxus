@@ -216,6 +216,7 @@ impl DrawableGate for RectangleGate {
         old: &TransformType,
         new: &TransformType,
         _data_range: (f32, f32),
+        _axis_range: (f32, f32),
     ) -> anyhow::Result<Box<dyn DrawableGate>> {
         Ok(Box::new(
             self.clone_rectangle_for_rescaled_axis(param, old, new)?,

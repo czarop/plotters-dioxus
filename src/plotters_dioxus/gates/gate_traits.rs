@@ -84,14 +84,15 @@ pub trait DrawableGate: Send + Sync {
         old_transform: &TransformType,
         new_transform: &TransformType,
         data_range: (f32, f32),
+        axis_range: (f32, f32)
     ) -> anyhow::Result<Box<dyn DrawableGate>>;
 
     fn recalculate_gate_for_new_axis_limits(
         &self,
-        param: std::sync::Arc<str>,
-        lower: f32,
-        upper: f32,
-        transform: &TransformType,
+        _param: std::sync::Arc<str>,
+        _lower: f32,
+        _upper: f32,
+        _transform: &TransformType,
     ) -> anyhow::Result<Option<Box<dyn DrawableGate>>> {
         Ok(None)
     }

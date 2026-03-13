@@ -247,6 +247,7 @@ impl DrawableGate for EllipseGate {
         old: &TransformType,
         new: &TransformType,
         _data_range: (f32, f32),
+        _axis_range: (f32, f32),
     ) -> anyhow::Result<Box<dyn DrawableGate>> {
         let points = rescale_helper(
             &self.get_points(),

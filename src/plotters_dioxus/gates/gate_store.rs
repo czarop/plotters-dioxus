@@ -514,6 +514,7 @@ impl<Lens> Store<GateState, Lens> {
                         &old_axis_options.transform,
                         &new_axis_options.transform,
                         (new_axis_options.data_lower, new_axis_options.data_upper),
+                        (new_axis_options.axis_lower, new_axis_options.axis_upper)
                     ) {
                         Ok(new_g) => updates.push((gate.get_id(), Arc::from(new_g))),
                         Err(e) => errors.push(e.to_string()),

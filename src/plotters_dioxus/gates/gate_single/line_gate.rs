@@ -261,6 +261,7 @@ impl DrawableGate for LineGate {
         old: &TransformType,
         new: &TransformType,
         _data_range: (f32, f32),
+        _axis_range: (f32, f32),
     ) -> anyhow::Result<Box<dyn DrawableGate>> {
         let line = self.clone_line_for_rescaled_axis(param, old, new)?;
         Ok(Box::new(line))
