@@ -1,12 +1,13 @@
 Ellipse gates are not accounting for scaling
+Some issue when swapped axis on skewed quadrant is not updating cofactor
+Swapping axis should not chnage the underlying geometry, just a flag in draw_self
 
-Skewed quadrants don't update properly on axis limit setting - you need to tell the gate the axis limits have changed
 
 Add filter Cache
 
-changes to composite gates create new arcs for the subgates whereas they should be cloned
 name gates smth sensible
 context menu on gates + renaming + deleting
+Gates should display default params - not what they were gated on, but what
 
 
 

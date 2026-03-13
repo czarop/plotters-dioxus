@@ -187,6 +187,13 @@ impl AxisInfo {
         }
     }
 
+    pub fn is_arcsinh(&self) -> bool {
+        match self.transform {
+            TransformType::Arcsinh { .. } => true,
+            _ => false,
+        }
+    }
+
     pub fn get_untransformed_bounds(&self) -> (f32, f32) {
         match self.transform {
             TransformType::Arcsinh { cofactor } => (

@@ -1,5 +1,7 @@
+use anyhow::anyhow;
 use dioxus::prelude::*;
 use flow_gates::Gate;
+use polars::frame::DataFrame;
 
 use crate::{
     file_load::FcsFiles,
@@ -23,15 +25,16 @@ async fn get_flow_data(path: std::path::PathBuf) -> Result<Arc<Fcs>, Arc<anyhow:
 }
 
 
-async fn get_scaled_data_to_display(
-    fs: Arc<Fcs>,
+async fn get_filtered_data_to_display(
+    df: Arc<DataFrame>,
+    // fs: Arc<Fcs>,
     col1_name: &str,
     col2_name: &str,
-    transform_1: TransformType,
-    transform_2: TransformType,
+    // transform_1: TransformType,
+    // transform_2: TransformType,
     parental_gate_id: &Option<Arc<str>>
 ) -> Result<Vec<(f32, f32)>, anyhow::Error> {
-    let fs_clone = fs.clone();
+    let mut df_clone = df.clone();
     let col1_name = col1_name.to_string();
     let col2_name = col2_name.to_string();
     let gate_store: Store<GateState> = use_context::<Store<GateState>>();
@@ -55,19 +58,6 @@ async fn get_scaled_data_to_display(
     let settings= store().settings;
 
     task::spawn_blocking(move || -> Result<Vec<(f32, f32)>, anyhow::Error> {
-    let mut df ;
-    ////!!!!! do this when rescaling and use this df - currently doesn't work for chains as it only scales the current parameters!
-    let mut transforms = vec![];
-        match transform_1 {
-            TransformType::Arcsinh { cofactor } => transforms.push((col1_name.as_str(), cofactor)),
-            _ => {}
-        }
-        match transform_2 {
-            TransformType::Arcsinh { cofactor } => transforms.push((col2_name.as_str(), cofactor)),
-            _ => {}
-        }
-    df = fs_clone.apply_arcsinh_transforms(&transforms)?;
-
     if let Some(chain) = gate_chain {
         let gate_refs: Vec<&Gate> = chain.iter()
             .filter_map(|(id, gate)| gate.get_gate_ref(Some(&id))) 
@@ -81,12 +71,12 @@ async fn get_scaled_data_to_display(
         let mask = super::gates::gate_filtering::filter_events_by_hierarchy_to_mask(&df, &gate_refs, settings)?;
 
         // 2. Filter the dataframe once at the end
-        df = df.filter(&mask)?.into();
+        df_clone = df.filter(&mask)?.into();
     }
 
     // 3. Extract and Transform (The heavy math)
-    let x_series = df.column(&col1_name)?.f32()?;
-    let y_series = df.column(&col2_name)?.f32()?;
+    let x_series = df_clone.column(&col1_name)?.f32()?;
+    let y_series = df_clone.column(&col2_name)?.f32()?;
 
     let zipped_cols: Vec<(f32, f32)> = x_series.into_iter()
         .zip(y_series.into_iter())
@@ -192,6 +182,42 @@ pub fn PlotWindow() -> Element {
         }
     });
 
+    let scaled_data = use_resource(move || async move {
+        let mut params: Vec<(Arc<str>, f32)> = Vec::new();
+            for (k, v) in parameter_settings.settings().read().read().expect("lock poisoned").iter(){
+                if v.is_arcsinh() {
+                    params.push((k.clone(), v.get_cofactor().unwrap()))
+                }
+            };
+        
+        if let Some(Ok(fcs_file)) = &*fcs_file_resource.read() {
+            
+
+            let fcs_clone = fcs_file.clone();
+            let result = tokio::task::spawn_blocking(move || -> Result<Arc<DataFrame>, anyhow::Error> {
+                let param_refs: Vec<(&str, f32)> = params
+                    .iter()
+                    .map(|(k, v)| (k.as_ref(), *v))
+                    .collect();
+                match fcs_clone.apply_arcsinh_transforms(param_refs.as_slice()){
+                    Ok(d) => return Ok(d),
+                    Err(e) => return Err(anyhow!("{e}")),
+                }
+
+                
+            }).await;
+            
+            match result {
+                Ok(d) => d,
+                Err(e) => Err(anyhow::anyhow!("error scaling data")),
+            }
+        } else {
+            Err(anyhow::anyhow!("No data to scale"))
+        }
+
+        
+    });
+
     let mut x_axis_marker: Signal<Param> = use_signal(|| {
         let p: Arc<str> = Arc::from("FSC-A");
         Param {
@@ -233,28 +259,28 @@ pub fn PlotWindow() -> Element {
         let y_fluoro = y_axis_marker.read().fluoro.clone();
         async move {
             let parental_gate = &*parental_gate.read();
-            let x_transform = parameter_settings
-                .settings()
-                .read().read().expect("lock poisoned")
-                .get(&x_fluoro)
-                .ok_or_else(|| anyhow::anyhow!("No data yet"))?
-            .transform
-            .clone();
-            let y_transform = parameter_settings
-                .settings()
-                .read().read().expect("lock poisoned")
-                .get(&y_fluoro)
-                .ok_or_else(|| anyhow::anyhow!("No data yet"))?
-            .transform
-            .clone();
+            // let x_transform = parameter_settings
+            //     .settings()
+            //     .read().read().expect("lock poisoned")
+            //     .get(&x_fluoro)
+            //     .ok_or_else(|| anyhow::anyhow!("No data yet"))?
+            // .transform
+            // .clone();
+            // let y_transform = parameter_settings
+            //     .settings()
+            //     .read().read().expect("lock poisoned")
+            //     .get(&y_fluoro)
+            //     .ok_or_else(|| anyhow::anyhow!("No data yet"))?
+            // .transform
+            // .clone();
 
-            if let Some(Ok(fcs_file)) = &*fcs_file_resource.read() {
-                match get_scaled_data_to_display(
-                    fcs_file.clone(),
+            if let Some(Ok(d)) = &*scaled_data.read() {
+                match get_filtered_data_to_display(
+                    d.clone(),
                     &x_fluoro,
                     &y_fluoro,
-                    x_transform,
-                    y_transform,
+                    // x_transform,
+                    // y_transform,
                     parental_gate
                 )
                 .await
@@ -278,12 +304,9 @@ pub fn PlotWindow() -> Element {
     rsx! {
         document::Stylesheet { href: CSS_STYLE }
         div { class: "sidebar-local",
-            // SidebarProvider {
-            //     Sidebar { variant: SidebarVariant::Sidebar,
-            //         SidebarContent {
+
             GateSidebar { selected_id: parental_gate }
-            //     }
-            // }
+
             main { class: "main-content",
 
                 div { class: "gate-window",
@@ -340,9 +363,14 @@ pub fn PlotWindow() -> Element {
                                     if let Ok(lower) = e.value().parse::<i32>() {
                                         let param = x_axis_marker.peek();
                                         match parameter_settings.update_lower(&param.fluoro, lower as f32) {
-                                            Ok(l_u) => {
+                                            Ok(l_u_t) => {
                                                 match gate_store
-                                                    .set_current_axis_limits(param.fluoro.clone(), l_u.0, l_u.1)
+                                                    .set_current_axis_limits(
+                                                        param.fluoro.clone(),
+                                                        l_u_t.0,
+                                                        l_u_t.1,
+                                                        l_u_t.2,
+                                                    )
                                                 {
                                                     Ok(_) => {}
                                                     Err(e) => println!("{e}"),
@@ -363,9 +391,14 @@ pub fn PlotWindow() -> Element {
                                     if let Ok(upper) = e.value().parse::<i32>() {
                                         let param = x_axis_marker.peek();
                                         match parameter_settings.update_upper(&param.fluoro, upper as f32) {
-                                            Ok(l_u) => {
+                                            Ok(l_u_t) => {
                                                 match gate_store
-                                                    .set_current_axis_limits(param.fluoro.clone(), l_u.0, l_u.1)
+                                                    .set_current_axis_limits(
+                                                        param.fluoro.clone(),
+                                                        l_u_t.0,
+                                                        l_u_t.1,
+                                                        l_u_t.2,
+                                                    )
                                                 {
                                                     Ok(_) => {}
                                                     Err(e) => println!("{e}"),
@@ -429,9 +462,14 @@ pub fn PlotWindow() -> Element {
                                     if let Ok(lower) = e.value().parse::<i32>() {
                                         let param = y_axis_marker.peek();
                                         match parameter_settings.update_lower(&param.fluoro, lower as f32) {
-                                            Ok(l_u) => {
+                                            Ok(l_u_t) => {
                                                 match gate_store
-                                                    .set_current_axis_limits(param.fluoro.clone(), l_u.0, l_u.1)
+                                                    .set_current_axis_limits(
+                                                        param.fluoro.clone(),
+                                                        l_u_t.0,
+                                                        l_u_t.1,
+                                                        l_u_t.2,
+                                                    )
                                                 {
                                                     Ok(_) => {}
                                                     Err(e) => println!("{e}"),
@@ -452,9 +490,14 @@ pub fn PlotWindow() -> Element {
                                     if let Ok(upper) = e.value().parse::<i32>() {
                                         let param = y_axis_marker.peek();
                                         match parameter_settings.update_upper(&param.fluoro, upper as f32) {
-                                            Ok(l_u) => {
+                                            Ok(l_u_t) => {
                                                 match gate_store
-                                                    .set_current_axis_limits(param.fluoro.clone(), l_u.0, l_u.1)
+                                                    .set_current_axis_limits(
+                                                        param.fluoro.clone(),
+                                                        l_u_t.0,
+                                                        l_u_t.1,
+                                                        l_u_t.2,
+                                                    )
                                                 {
                                                     Ok(_) => {}
                                                     Err(e) => println!("{e}"),

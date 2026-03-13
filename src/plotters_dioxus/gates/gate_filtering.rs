@@ -215,7 +215,7 @@ pub fn filter_events_by_gate(
 ) -> Result<Vec<usize>> {
 
         // Build index from slices (zero-copy)
-        let index = build_event_index_from_polars(x_ca, y_ca``)?;
+        let index = build_event_index_from_polars(x_ca, y_ca)?;
         let indices = index.filter_by_gate(gate)?;
     
 

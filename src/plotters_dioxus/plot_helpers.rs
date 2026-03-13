@@ -281,10 +281,11 @@ impl<Lens> Store<ParameterStore, Lens> {
         Err(anyhow!("Could not find axis"))
     }
 
-    fn update_lower(&mut self, id: &GateId, lower: f32) -> anyhow::Result<(f32, f32)> {
+    fn update_lower(&mut self, id: &GateId, lower: f32) -> anyhow::Result<(f32, f32, TransformType)> {
 
         let mut old_upper = None;
         let mut new_lower = None;
+        let mut transform = None;
         self.settings()
         .write()
         .write()
@@ -294,18 +295,20 @@ impl<Lens> Store<ParameterStore, Lens> {
             old_upper = Some(axis_arc.axis_upper);
             let new_axis_data = axis_arc.into_new_lower(lower);
             new_lower = Some(new_axis_data.axis_lower);
+            transform = Some(new_axis_data.transform.clone());
             *axis_arc = new_axis_data;
         });
 
-        if let (Some(upper), Some(lower)) = (old_upper, new_lower) {
-            Ok((lower, upper))
+        if let (Some(upper), Some(lower), Some(transform)) = (old_upper, new_lower, transform) {
+            Ok((lower, upper, transform))
         } else {
             Err(anyhow!("error modifying axis for {}", id.clone()))
         }
     }
-    fn update_upper(&mut self, id: &GateId, upper: f32) -> anyhow::Result<(f32, f32)> {
+    fn update_upper(&mut self, id: &GateId, upper: f32) -> anyhow::Result<(f32, f32, TransformType)> {
         let mut new_upper = None;
         let mut old_lower = None;
+        let mut transform = None;
 
         self.settings()
         .write()
@@ -316,11 +319,12 @@ impl<Lens> Store<ParameterStore, Lens> {
             old_lower = Some(axis_arc.axis_lower);
             let new_axis_data = axis_arc.into_new_upper(upper);
             new_upper = Some(new_axis_data.axis_upper);
+            transform = Some(new_axis_data.transform.clone());
             *axis_arc = new_axis_data;
         });
 
-        if let (Some(upper), Some(lower)) = (new_upper, old_lower) {
-            Ok((lower, upper))
+        if let (Some(upper), Some(lower), Some(transform)) = (new_upper, old_lower, transform) {
+            Ok((lower, upper, transform))
         } else {
             Err(anyhow!("error modifying axis for {}", id.clone()))
         }

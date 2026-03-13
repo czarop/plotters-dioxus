@@ -1,5 +1,6 @@
 use anyhow::anyhow;
 use dioxus::prelude::*;
+use flow_fcs::TransformType;
 use flow_gates::{Gate, GateHierarchy};
 use rustc_hash::FxHashMap;
 use std::ops::{Deref, DerefMut};
@@ -582,7 +583,7 @@ impl<Lens> Store<GateState, Lens> {
     if errors.is_empty() { Ok(()) } else { Err(errors) }
 }
 
-    fn set_current_axis_limits(&mut self, axis_name: Arc<str>, lower: f32, upper: f32) -> anyhow::Result<()> {
+    fn set_current_axis_limits(&mut self, axis_name: Arc<str>, lower: f32, upper: f32, transform: TransformType) -> anyhow::Result<()> {
 
         let mut updates: Vec<(Arc<str>, Arc<dyn DrawableGate>)> = Vec::new();
         let mut errors = vec![];
@@ -596,6 +597,7 @@ impl<Lens> Store<GateState, Lens> {
                         axis_name.clone(),
                         lower,
                         upper,
+                        &transform
                     ) {
                         Ok(Some(new_g)) => updates.push((gate.get_id(), Arc::from(new_g))),
                         Ok(None) => continue,

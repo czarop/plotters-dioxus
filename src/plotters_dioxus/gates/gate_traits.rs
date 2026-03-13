@@ -83,7 +83,10 @@ pub trait DrawableGate: Send + Sync {
         param: std::sync::Arc<str>,
         lower: f32,
         upper: f32,
-    ) -> anyhow::Result<Option<Box<dyn DrawableGate>>>;
+        transform: &TransformType
+    ) -> anyhow::Result<Option<Box<dyn DrawableGate>>> {
+        Ok(None)
+    }
 
     fn rotate_gate(
         &self,

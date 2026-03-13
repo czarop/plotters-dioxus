@@ -493,14 +493,25 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
             )
         };
 
-        let new = DataPoints {
+        let new = if is_x{
+            DataPoints {
             center: c,
             left: l,
             bottom: b,
             right: r,
             top: t,
-            x_data_range: if is_x {RangeInclusive::new(data_range.0, data_range.1)} else {self.points.x_data_range.clone()},
-            y_data_range: if !is_x {RangeInclusive::new(data_range.0, data_range.1)} else {self.points.y_data_range.clone()}
+            x_data_range: RangeInclusive::new(data_range.0, data_range.1),
+            y_data_range:  self.points.y_data_range.clone()
+        }} else {
+            DataPoints {
+            center: c,
+            left: l,
+            bottom: b,
+            right: r,
+            top: t,
+            x_data_range: self.points.x_data_range.clone(),
+            y_data_range: RangeInclusive::new(data_range.0, data_range.1)
+        }
         };
 
         Ok(Box::new(self.clone_with_point(new)?))
@@ -608,21 +619,93 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
         self.gates.keys().map(|k|k.clone()).collect()
     }
 
-    fn recalculate_gate_for_new_axis_limits(
-        &self,
-        param: std::sync::Arc<str>,
-        lower: f32,
-        upper: f32,
-    ) -> anyhow::Result<Option<Box<dyn DrawableGate>>> {
-        let is_x = param == self.parameters.0;
-        if is_x {
-            println!("old lower {} old upper {}. new lower {}, new upper {}", self.points.left.0, self.points.right.0, lower, upper);
-        } else {
-            println!("old lower {} old upper {}. new lower {}, new upper {}", self.points.bottom.1, self.points.top.1, lower, upper);
-        }
+    // fn recalculate_gate_for_new_axis_limits(
+    //     &self,
+    //     param: std::sync::Arc<str>,
+    //     lower: f32,
+    //     upper: f32,
+    // ) -> anyhow::Result<Option<Box<dyn DrawableGate>>> {
+    //     let is_x = param == self.parameters.0;
+    //     let mut new_points = self.points.clone();
+
+    //     if is_x {
+    //         println!("old lower {} old upper {}. new lower {}, new upper {}", self.points.left.0, self.points.right.0, lower, upper);
+    //         if new_points.center.0 < lower {
+    //             new_points.center.0 = lower;
+    //         }
+    //         if new_points.center.0 > upper {
+    //             new_points.center.0 = upper;
+    //         }
+    //         new_points.left.0 = lower;
+    //         new_points.right.0 =upper;
+    //     } else {
+    //         println!("old lower {} old upper {}. new lower {}, new upper {}", self.points.bottom.1, self.points.top.1, lower, upper);
+    //         if new_points.center.1 < lower {
+    //             new_points.center.1 = lower;
+    //         }
+    //         if new_points.center.1 > upper {
+    //             new_points.center.1 = upper;
+    //         }
+    //         new_points.top.1 = upper;
+    //         new_points.bottom.1 = lower;
+    //     }
+
+    //     let new_self = self.clone_with_point(new_points)?;
         
-        Ok(None)
+    //     Ok(Some(Box::new(new_self)))
+    // }
+    fn recalculate_gate_for_new_axis_limits(
+    &self,
+    param: std::sync::Arc<str>,
+    lower: f32,
+    upper: f32,
+    _transform: &TransformType
+) -> anyhow::Result<Option<Box<dyn DrawableGate>>> {
+    let is_x = param == self.parameters.0;
+    let mut new_points = self.points.clone();
+
+    // Calculate the 10% safety buffers
+    let span = (upper - lower).abs();
+    let buffer = span * 0.1;
+    let min_safe = lower + buffer;
+    let max_safe = upper - buffer;
+
+    if is_x {
+        // --- X-AXIS UPDATED ---
+        
+        // 1. Clamp Center X (Keep it in the middle 80%)
+        new_points.center.0 = new_points.center.0.clamp(min_safe, max_safe);
+
+        // 2. Clamp Top and Bottom handles so they don't drift into the X-axis margins
+        // These handles live at the top/bottom Y edges, but their X position 
+        // determines the vertical skew.
+        new_points.top.0 = new_points.top.0.clamp(min_safe, max_safe);
+        new_points.bottom.0 = new_points.bottom.0.clamp(min_safe, max_safe);
+
+        // 3. Fix Left/Right handles to the new axis edges
+        new_points.left.0 = lower;
+        new_points.right.0 = upper;
+
+    } else {
+        // --- Y-AXIS UPDATED ---
+
+        // 1. Clamp Center Y (Keep it in the middle 80%)
+        new_points.center.1 = new_points.center.1.clamp(min_safe, max_safe);
+
+        // 2. Clamp Left and Right handles so they don't drift into the Y-axis margins
+        // These handles live at the left/right X edges, but their Y position
+        // determines the horizontal skew.
+        new_points.left.1 = new_points.left.1.clamp(min_safe, max_safe);
+        new_points.right.1 = new_points.right.1.clamp(min_safe, max_safe);
+
+        // 3. Fix Top/Bottom handles to the new axis edges
+        new_points.top.1 = upper;
+        new_points.bottom.1 = lower;
     }
+
+    let new_self = self.clone_with_point(new_points)?;
+    Ok(Some(Box::new(new_self)))
+}
 }
 
 fn create_skewed_quadrant_geos(
@@ -641,53 +724,82 @@ fn create_skewed_quadrant_geos(
     let y_min = data_points.bottom.1;
     let y_max = data_points.top.1;
 
-    let (x_data_min, x_data_max) = (data_points.x_data_range.start().min(x_min), data_points.x_data_range.end().max(x_max));
-    let (y_data_min, y_data_max) = (data_points.y_data_range.start().min(y_min), data_points.y_data_range.end().max(y_max));
+    let x_limit_min = data_points.x_data_range.start().min(x_min).min(c.0);
+    let x_limit_max = data_points.x_data_range.end().max(x_max).max(c.0);
+    let y_limit_min = data_points.y_data_range.start().min(y_min).min(c.1);
+    let y_limit_max = data_points.y_data_range.end().max(y_max).max(c.1);
+
+
+    println!("Data x min: {} axis x min: {x_min} xlimitmin {x_limit_min}", data_points.x_data_range.start());
+
+    // Projected points (Spoke Ends)
+    let p_t = project_to_boundary(c, (t_x, y_max), (x_limit_min, y_limit_min), (x_limit_max, y_limit_max));
+    let p_b = project_to_boundary(c, (b_x, y_min), (x_limit_min, y_limit_min), (x_limit_max, y_limit_max));
+    let p_l = project_to_boundary(c, (x_min, l_y), (x_limit_min, y_limit_min), (x_limit_max, y_limit_max));
+    let p_r = project_to_boundary(c, (x_max, r_y), (x_limit_min, y_limit_min), (x_limit_max, y_limit_max));
+
+    // Universe Corners
+    let tl_c = (x_limit_min, y_limit_max);
+    let tr_c = (x_limit_max, y_limit_max);
+    let bl_c = (x_limit_min, y_limit_min);
+    let br_c = (x_limit_max, y_limit_min);
+
+    let tl = vec![c, p_l, tl_c, p_t];
+
+    let tr = vec![c, p_t, tr_c, p_r];
+
+    let br = vec![c, p_r, br_c, p_b];
+
+    let bl = vec![c, p_b, bl_c, p_l];
+
 
     // Bottom-Left (BL)
     let bl = flow_gates::geometry::create_polygon_geometry(
-        vec![
-            (x_data_min, y_data_min), 
-            (b_x, y_data_min),        // Vertical spoke projected to bottom
-            c,                       // Center
-            (x_data_min, l_y)         // Horizontal spoke projected to left
-        ],
+        bl,
         x_channel, y_channel,
     ).map_err(|_| anyhow::anyhow!("failed bl"))?;
 
     // Bottom-Right (BR)
     let br = flow_gates::geometry::create_polygon_geometry(
-        vec![
-            (b_x, y_data_min), 
-            (x_data_max, y_data_min), 
-            (x_data_max, r_y),        // Right spoke projected to data max
-            c
-        ],
+        br,
         x_channel, y_channel,
     ).map_err(|_| anyhow::anyhow!("failed br"))?;
 
     // Top-Right (TR)
     let tr = flow_gates::geometry::create_polygon_geometry(
-        vec![
-            c, 
-            (x_data_max, r_y), 
-            (x_data_max, y_data_max), 
-            (t_x, y_data_max)         // Top spoke projected to data max
-        ],
+        tr,
         x_channel, y_channel,
     ).map_err(|_| anyhow::anyhow!("failed tr"))?;
 
     // Top-Left (TL)
     let tl = flow_gates::geometry::create_polygon_geometry(
-        vec![
-            (x_data_min, l_y), 
-            c, 
-            (t_x, y_data_max), 
-            (x_data_min, y_data_max)
-        ],
+        tl,
         x_channel, y_channel,
     ).map_err(|_| anyhow::anyhow!("failed tl"))?;
 
     println!("gates created");
     Ok((bl, br, tr, tl))
+}
+
+fn project_to_boundary(center: (f32, f32), handle: (f32, f32), min: (f32, f32), max: (f32, f32)) -> (f32, f32) {
+    let dx = handle.0 - center.0;
+    let dy = handle.1 - center.1;
+
+    // Avoid division by zero for perfectly vertical/horizontal spokes
+    if dx.abs() < 1e-6 {
+        return (center.0, if dy > 0.0 { max.1 } else { min.1 });
+    }
+    if dy.abs() < 1e-6 {
+        return (if dx > 0.0 { max.0 } else { min.0 }, center.1);
+    }
+
+    // Calculate "time" t to hit each of the 4 boundaries
+    // Line eq: P = C + t(H - C)
+    let t_x = if dx > 0.0 { (max.0 - center.0) / dx } else { (min.0 - center.0) / dx };
+    let t_y = if dy > 0.0 { (max.1 - center.1) / dy } else { (min.1 - center.1) / dy };
+
+    // We want the first boundary hit (the smallest t > 0)
+    let t = t_x.min(t_y);
+
+    (center.0 + t * dx, center.1 + t * dy)
 }
