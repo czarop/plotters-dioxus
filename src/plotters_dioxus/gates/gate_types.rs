@@ -1,35 +1,15 @@
 use std::sync::Arc;
 
+use rustc_hash::FxHashMap;
+
 use crate::plotters_dioxus::gates::gate_store::GateId;
 
-// #[derive(Clone, PartialEq, Hash)]
-// pub enum GateTypeID {
-//     Primary(Arc<str>),
-//     SubGate(Arc<str>, Arc<str>)
-// }
-
-// impl GateID {
-//     pub fn get_primary_id(&self) -> Arc<str> {
-//         match self{
-//             GateID::Primary(i) => i.clone(),
-//             GateID::SubGate(i, _) => i.clone(),
-//         }
-//     }
-
-//     pub fn get_subgate_id(&self) -> Option<Arc<str>> {
-//         match self{
-//             GateID::Primary(_) => None,
-//             GateID::SubGate(_, i) => Some(i.clone()),
-//         }
-//     }
-
-//     pub fn is_subgate(&self) -> bool {
-//         match self{
-//             GateID::Primary(_) => false,
-//             GateID::SubGate(_, _) => true,
-//         }
-//     }
-// }
+#[derive(Clone, PartialEq)]
+pub enum GateText{
+    Name(String),
+    Percent(String),
+    Count(String)
+}
 
 #[derive(Clone, PartialEq, Copy)]
 pub enum GateType {
@@ -117,6 +97,12 @@ pub enum GateRenderShape {
         style: &'static DrawingStyle,
         shape_type: ShapeType,
     },
+    Text {
+        origin: (f32, f32),
+        offset: (f32, f32),
+        fontsize: f32,
+        text: String,
+    }
 }
 
 impl GateRenderShape {
@@ -207,6 +193,7 @@ impl GateRenderShape {
                 style: *style,
                 shape_type: shape_type.clone(),
             },
+            GateRenderShape::Text { .. } => self.clone()
         }
     }
 
@@ -317,6 +304,7 @@ impl GateRenderShape {
                 style: *style,
                 shape_type: shape_type.clone(),
             },
+            GateRenderShape::Text { .. } => self.clone()
         }
     }
 
@@ -329,6 +317,8 @@ impl GateRenderShape {
             | GateRenderShape::Handle { shape_type, .. }
             | GateRenderShape::Rectangle { shape_type, .. }
             | GateRenderShape::Line { shape_type, .. } => shape_type,
+            GateRenderShape::Text { .. } => return false
+            
         };
 
         matches!(
@@ -349,6 +339,7 @@ impl GateRenderShape {
             | GateRenderShape::Handle { shape_type, .. }
             | GateRenderShape::Rectangle { shape_type, .. }
             | GateRenderShape::Line { shape_type, .. } => shape_type,
+            GateRenderShape::Text { .. } => return false
         };
 
         matches!(
@@ -366,6 +357,7 @@ impl GateRenderShape {
             | GateRenderShape::Handle { shape_type, .. }
             | GateRenderShape::Rectangle { shape_type, .. }
             | GateRenderShape::Line { shape_type, .. } => shape_type,
+            GateRenderShape::Text { .. } => return true
         };
 
         matches!(
@@ -424,3 +416,43 @@ pub static GREY_LINE_DASHED: DrawingStyle = DrawingStyle {
     stroke_width: 2.0,
     dashed: true,
 };
+
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum GateStatValue {
+    Single(f32),
+    Composite(FxHashMap<Arc<str>, f32>), 
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct GateStats {
+    pub count: GateStatValue,
+    pub percent_parent: GateStatValue,
+}
+
+impl GateStats {
+    pub fn is_composite(&self) -> bool {
+        match self.percent_parent{
+            GateStatValue::Single(_) => false,
+            GateStatValue::Composite(..) => true,
+        }
+    }
+
+    pub fn get_percent_for_id(&self, id: Arc<str>) -> Option<f32> {
+        match &self.percent_parent{
+            GateStatValue::Single(val) => Some(*val),
+            GateStatValue::Composite(val_map) => {
+                val_map.get(&id).copied()
+            },
+        }
+    }
+
+    pub fn get_count_for_id(&self, id: Arc<str>) -> Option<f32> {
+        match &self.count{
+            GateStatValue::Single(val) => Some(*val),
+            GateStatValue::Composite(val_map) => {
+                val_map.get(&id).copied()
+            },
+        }
+    }
+}

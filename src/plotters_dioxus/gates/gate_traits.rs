@@ -5,7 +5,7 @@ use flow_fcs::TransformType;
 use crate::plotters_dioxus::{
     gates::{
         gate_drag::{GateDragData, PointDragData},
-        gate_types::GateRenderShape,
+        gate_types::{GateRenderShape, GateStats},
     },
     plots::parameters::PlotMapper,
 };
@@ -22,6 +22,7 @@ pub trait DrawableGate: Send + Sync {
         is_selected: bool,
         drag_point: Option<PointDragData>,
         plot_map: &PlotMapper,
+        gate_stats: &Option<GateStats>
     ) -> Vec<GateRenderShape>;
 
     fn is_near_segment(

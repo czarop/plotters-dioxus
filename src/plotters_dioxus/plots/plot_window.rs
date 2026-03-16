@@ -1,7 +1,11 @@
 use dioxus::prelude::*;
 use polars::frame::DataFrame;
+use rustc_hash::FxHashMap;
 
+use crate::plotters_dioxus::gates::GatesOnPlotKey;
 use crate::plotters_dioxus::gates::gate_buttons::NewGateButtons;
+use crate::plotters_dioxus::gates::gate_store::GateStateStoreExt;
+use crate::plotters_dioxus::gates::gate_types::{GateStatValue, GateStats};
 use crate::plotters_dioxus::plots::data_helpers::{get_event_mask_from_scaled_df, get_filtered_dataframe, get_flow_data, zip_cols_from_filtered_df};
 use crate::plotters_dioxus::plots::parameters::EventIndexMapped;
 use crate::{
@@ -239,7 +243,7 @@ pub fn PlotWindow() -> Element {
             Some(Ok(df)) => Some(df.clone()),
             _ => None,
         };
-        let x_name = x_axis_marker.read().marker.clone();
+        let x_name = x_axis_marker.read().fluoro.clone();
         let y_name = y_axis_marker.read().fluoro.clone();
         async move {
             let df = match df_arc {
@@ -266,8 +270,14 @@ pub fn PlotWindow() -> Element {
 
             match join_result {
                 Ok(Ok(index)) => Ok(Some(index)),
-                Ok(Err(e)) => Err(e),
-                Err(join_err) => Err(anyhow::anyhow!("Task panicked: {join_err}")),
+                Ok(Err(e)) => {
+                    println!("{e}");
+                    Err(e)
+                },
+                Err(join_err) => {
+                    println!("{join_err}");
+                    Err(anyhow::anyhow!("Task panicked: {join_err}"))
+                },
             }
         }
     });
@@ -275,18 +285,75 @@ pub fn PlotWindow() -> Element {
     // for the actual gating, we just use df filtering. however for the currently displayed events we use an EventIndex
     // to get real time % for child gates
     use_effect(move || {
-        if let Some(Ok(index)) = &*event_index.read(){
-            parameter_settings().event_index_map = index.clone();
-            if index.is_some(){
-                let i = index.clone().unwrap();
-                println!("got the event index with len {} and index map with length {}", i.event_index.len(), i.index_map.len());
-            } else {
-                println!("effect called but no index map");
+
+        let data = event_index.read()
+        .as_ref()
+        .and_then(|res| res.as_ref().ok())
+        .and_then(|opt| opt.clone());
+
+        *parameter_settings.event_index_map().write() = data;
+    });
+
+    // determine the percent positive for each child gate
+    let _ = use_resource(move || async move {
+        let x_key = x_axis_marker.read().fluoro.clone();
+        let y_key = y_axis_marker.read().fluoro.clone();
+        let event_index_option = parameter_settings.event_index_map()();
+        if let Some(gates_on_plot) = gate_store.get_gates_for_plot(x_key, y_key, parental_gate()){
+            if let Some(event_index_map) = event_index_option{
+                let join_result = tokio::task::spawn_blocking(move || -> anyhow::Result<FxHashMap<Arc<str>, GateStats>> {
+                    let mut stat_map = FxHashMap::default();
+                    let parental_events = event_index_map.event_index.len() as f32;
+                    for gate in gates_on_plot{
+                        let id = gate.get_id();
+                        if !gate.is_composite(){
+                            let inner = gate.get_gate_ref(None).unwrap();
+                            let events = event_index_map.event_index.filter_by_gate(inner)?;
+                            let count = events.len() as f32;
+                            let percent_parent = GateStatValue::Single((count as f32 / parental_events) * 100f32);
+                            let stats = GateStats{ count: GateStatValue::Single(count), percent_parent };
+                            stat_map.insert(id, stats);
+                        } else {
+                            let inner_ids = gate.get_inner_gate_ids();
+                            let capacity = inner_ids.len();
+                            let mut temp_counts = FxHashMap::with_capacity_and_hasher(capacity, rustc_hash::FxBuildHasher::default());
+                            let mut temp_percents = FxHashMap::with_capacity_and_hasher(capacity, rustc_hash::FxBuildHasher::default());
+                            for inner_id in inner_ids {
+                                let inner = gate.get_gate_ref(Some(&inner_id)).unwrap();
+                                let events = event_index_map.event_index.filter_by_gate(inner)?;
+                                let count = events.len() as f32;
+                                let percent_parent = (count as f32 / parental_events) * 100f32;
+                                temp_counts.insert(inner_id.clone(), count);
+                                temp_percents.insert(inner_id.clone(), percent_parent);
+                            }
+                            let counts = GateStatValue::Composite(temp_counts);
+                            let percents = GateStatValue::Composite(temp_percents);
+                            let stats = GateStats { count: counts, percent_parent: percents };
+                            stat_map.insert(id, stats);
+                        }
+                    }
+
+                    Ok(stat_map)
+                }).await;
+                
+                match join_result {
+                    Ok(Ok(index)) => *gate_store.gate_stats().write() = index,
+                    Ok(Err(e)) => {
+                        println!("{e}");
+                        *gate_store.gate_stats().write() = FxHashMap::default();
+                    },
+                    Err(e) => {
+                        println!("{e}");
+                        *gate_store.gate_stats().write() = FxHashMap::default();
+                    },
+                }
             }
-            
         } else {
-            parameter_settings().event_index_map = None;
-        };
+            println!("no gates to show for {:?}, {:?}, {:?}", x_axis_marker().fluoro.clone(), y_axis_marker().fluoro.clone(), parental_gate());
+        }
+
+        
+
     });
 
     rsx! {

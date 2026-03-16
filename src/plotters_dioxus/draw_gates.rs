@@ -4,12 +4,13 @@ use crate::plotters_dioxus::{
         gate_draft::GateDraft,
         gate_drag::{GateDragData, GateDragType, PointDragData, RotationData},
         gate_single::rectangle_gate,
-        gate_store::GateStateImplExt,
+        gate_store::{GateStateImplExt},
         gate_traits::DrawableGate,
-        gate_types::{GateRenderShape, GateType, ShapeType},
+        gate_types::{GateRenderShape, GateStats, GateType, ShapeType},
     },
-    plots::parameters::PlotMapper,
+    plots::parameters::{ PlotMapper, PlotStore},
 };
+use crate::plotters_dioxus::gates::gate_store::GateStateStoreExt;
 
 use dioxus::prelude::*;
 use std::sync::Arc;
@@ -27,7 +28,10 @@ pub fn GateLayer(
     let mut selected_gate_id = use_signal(|| None::<Arc<str>>);
     let current_gate_type = use_context::<Signal<GateType>>();
 
+    let plot_store = use_context::<Store<PlotStore>>();
+
     let mut gates = use_signal(|| Vec::<Arc<dyn DrawableGate>>::new());
+
 
     // convert clicked coords into a draft gate
     let draft_gate = use_memo(move || {
@@ -283,6 +287,7 @@ pub fn GateLayer(
                                     None
                                 };
 
+                                let gate_stats = gate_store.gate_stats().read().get(&gate.get_id()).cloned();
                                 rsx! {
                                     RenderGate {
                                         gate: gate.clone(),
@@ -290,6 +295,7 @@ pub fn GateLayer(
                                         is_selected,
                                         drag_data: dd,
                                         mapper: plot_map,
+                                        gate_stats,
                                     }
                                 }
                             }
@@ -320,6 +326,7 @@ pub struct RenderGateProps {
     is_selected: bool,
     drag_data: Option<GateDragType>,
     mapper: ReadSignal<Option<PlotMapper>>,
+    gate_stats: Option<GateStats>
 }
 
 impl PartialEq for RenderGateProps {
@@ -327,8 +334,17 @@ impl PartialEq for RenderGateProps {
         self.is_selected == other.is_selected
             && self.gate_index == other.gate_index
             && Arc::ptr_eq(&self.gate, &other.gate)
+            && match (&self.gate_stats, &other.gate_stats) {
+                (Some(a), Some(b)) => {
+                    a == b
+                },
+                (None, None) => true,
+                _ => false,
+            }
+            
             && self.drag_data == other.drag_data
             && self.mapper == other.mapper
+            
     }
 }
 
@@ -350,10 +366,14 @@ fn RenderGate(props: RenderGateProps) -> Element {
     } else {
         (false, 0)
     };
+    
 
     rsx! {
         if let Some(mapper) = &*props.mapper.read() {
-            for (shape_index , shape) in g.draw_self(is_selected, drag_data.clone(), mapper).into_iter().enumerate() {
+            for (shape_index , shape) in g.draw_self(is_selected, drag_data.clone(), mapper, &props.gate_stats)
+                .into_iter()
+                .enumerate()
+            {
                 RenderShape {
                     key: "{gate_id}-{shape_index}",
                     shape,
@@ -727,6 +747,15 @@ fn RenderShape(
                         }
                     }
 
+                }
+            }
+            GateRenderShape::Text { origin, offset,  fontsize, text } => {
+                
+                let loc = mapper.data_to_pixel(origin.0 + offset.0, origin.1 + offset.1, None, None);
+                rsx!{
+                    g { transform,
+                        text { x: loc.0, y: loc.1, "{text}" }
+                    }
                 }
             }
         }

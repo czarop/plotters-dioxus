@@ -9,7 +9,7 @@ use crate::plotters_dioxus::{
         gate_drag::{GateDragData, PointDragData},
         gate_single::{draw_circles_for_selected_gate, rescale_helper},
         gate_traits::DrawableGate,
-        gate_types::{DEFAULT_LINE, GateRenderShape, SELECTED_LINE, ShapeType},
+        gate_types::{DEFAULT_LINE, GateRenderShape, GateStats, SELECTED_LINE, ShapeType},
     },
     plots::parameters::PlotMapper,
 };
@@ -231,7 +231,8 @@ impl DrawableGate for RectangleGate {
         &self,
         is_selected: bool,
         drag_point: Option<PointDragData>,
-        _plot_map: &PlotMapper,
+        plot_map: &PlotMapper,
+        gate_stats: &Option<GateStats>
     ) -> Vec<GateRenderShape> {
         let style = if is_selected {
             &SELECTED_LINE
@@ -253,7 +254,43 @@ impl DrawableGate for RectangleGate {
         let ghost = drag_point
             .as_ref()
             .and_then(|d| draw_ghost_point_for_rectangle(d, &pts));
-        crate::collate_vecs!(main, selected, ghost)
+
+
+        let mut labels = vec![];
+        
+        if let Some(gate_stats) = gate_stats {
+            let x_offset = {
+                let axis = plot_map.x_axis_min_max();
+                let xrange = *axis.end() - *axis.start();
+                if let Some(label_pos) = &self.inner.label_position{
+                    xrange * label_pos.offset_x
+                } else {
+                    0f32
+                }
+            };
+            let y_offset = {
+                let axis = plot_map.y_axis_min_max();
+                let yrange = *axis.end() - *axis.start();
+                if let Some(label_pos) = &self.inner.label_position{
+                    yrange * label_pos.offset_y
+                } else {
+                    yrange * 0.02
+                }
+            };
+            let offset = (x_offset, y_offset);
+            match gate_stats.get_percent_for_id(self.inner.id.clone()){
+                Some(percent) => {
+                    let shape = GateRenderShape::Text { origin: self.points[3], offset: offset, fontsize: 10f32, text: format!("{:.2}%", percent) };
+                    labels.push(shape)
+            },
+                None => {},
+            }
+        }
+
+
+        let labels = Some(labels);
+
+        crate::collate_vecs!(main, selected, ghost, labels)
     }
 }
 
@@ -490,3 +527,15 @@ pub fn update_rectangle_geometry(
     flow_gates::geometry::create_rectangle_geometry(current_points, x_param, y_param)
         .map_err(|_| anyhow::anyhow!("failed to update rectangle geometry"))
 }
+
+
+
+    // pub fn determine_percent_in_gate(&self, event_index: &flow_gates::EventIndex, gate: &flow_gates::Gate) -> anyhow::Result<String> {
+    //     let len = event_index.len() as f32;
+    //     let filtered = event_index.filter_by_gate(gate)?.len() as f32;
+    //     let percent = (filtered / len) * 100f32;
+    //     let formatted = format!("{:.2}%", percent);
+    //     println!("{formatted}");
+    //     Ok(formatted)
+    // }
+

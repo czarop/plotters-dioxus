@@ -6,6 +6,7 @@ use rustc_hash::FxHashMap;
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, LazyLock};
 
+use crate::plotters_dioxus::gates::gate_types::GateStats;
 use crate::plotters_dioxus::{
     AxisInfo,
     gates::{
@@ -30,7 +31,7 @@ pub type GateId = std::sync::Arc<str>;
 
 pub static ROOTGATE: LazyLock<Arc<str>> = LazyLock::new(|| Arc::from("root"));
 
-#[derive(Hash, PartialEq, Eq, Clone)]
+#[derive(Hash, PartialEq, Eq, Clone, Debug)]
 pub struct GatesOnPlotKey {
     param_1: GateId,
     param_2: GateId,
@@ -111,6 +112,8 @@ pub struct GateState {
     pub hierarchy: GateHierarchy,
     // are there file-specific overrides for gate positions
     pub position_overrides: FxHashMap<GatePositionKey, flow_gates::GateGeometry>,
+
+    pub gate_stats: FxHashMap<Arc<str>, GateStats>
 }
 
 #[store(pub name = GateStateImplExt)]
@@ -128,6 +131,7 @@ impl<Lens> Store<GateState, Lens> {
         gate_type: GateType,
     ) -> Result<()> {
         let key = GatesOnPlotKey::new(x_param.clone(), y_param.clone(), parental_gate_id.clone());
+        println!("{:?}", key);
         let parameters = (x_param.clone(), y_param.clone());
 
         // let mut composite_subgate_ids = vec![];

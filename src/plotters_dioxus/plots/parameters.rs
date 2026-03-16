@@ -191,6 +191,13 @@ pub struct EventIndexMapped {
     pub index_map: Arc<Vec<usize>>
 }
 
+impl PartialEq for EventIndexMapped {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.event_index, &other.event_index) 
+        &&  Arc::ptr_eq(&self.index_map, &other.index_map) 
+    }
+}
+
 #[derive(Default, Store, Clone)]
 pub struct PlotStore {
     pub settings: Arc<RwLock<FxHashMap<Arc<str>, AxisInfo>>>,

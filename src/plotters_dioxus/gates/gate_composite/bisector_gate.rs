@@ -10,7 +10,7 @@ use crate::plotters_dioxus::{
         gate_drag::PointDragData,
         gate_single::{line_gate::LineGate, rescale_helper_point},
         gate_traits::DrawableGate,
-        gate_types::{DEFAULT_LINE, GREY_LINE_DASHED, GateRenderShape, SELECTED_LINE, ShapeType},
+        gate_types::{DEFAULT_LINE, GREY_LINE_DASHED, GateRenderShape, GateStats, SELECTED_LINE, ShapeType},
     },
     plots::parameters::PlotMapper,
 };
@@ -186,6 +186,7 @@ impl super::super::gate_traits::DrawableGate for BisectorGate {
         is_selected: bool,
         drag_point: Option<PointDragData>,
         plot_map: &PlotMapper,
+        gate_stats: &Option<GateStats>
     ) -> Vec<GateRenderShape> {
         let (min, max) = {
             let (xmin, xmax) = {

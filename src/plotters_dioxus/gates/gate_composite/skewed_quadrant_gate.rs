@@ -6,6 +6,7 @@ use rustc_hash::FxBuildHasher;
 use std::ops::Index;
 use std::{ops::RangeInclusive, sync::Arc};
 
+use crate::plotters_dioxus::gates::gate_types::GateStats;
 use crate::plotters_dioxus::{
     gates::{
         gate_drag::PointDragData,
@@ -296,6 +297,7 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
         is_selected: bool,
         drag_point: Option<PointDragData>,
         plot_map: &PlotMapper,
+        gate_stats: &Option<GateStats>
     ) -> Vec<GateRenderShape> {
         let (xmin, xmax) = {
             let axis = plot_map.x_axis_min_max();

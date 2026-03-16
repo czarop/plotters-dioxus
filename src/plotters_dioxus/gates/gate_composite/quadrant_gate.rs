@@ -6,7 +6,7 @@ use crate::plotters_dioxus::{
         gate_drag::{GateDragData, PointDragData},
         gate_single::{polygon_gate::PolygonGate, rescale_helper_point},
         gate_traits::DrawableGate,
-        gate_types::{DEFAULT_LINE, GateRenderShape, SELECTED_LINE, ShapeType},
+        gate_types::{DEFAULT_LINE, GateRenderShape, GateStats, SELECTED_LINE, ShapeType},
     },
     plots::parameters::PlotMapper,
 };
@@ -166,6 +166,7 @@ impl DrawableGate for QuadrantGate {
         is_selected: bool,
         drag_point: Option<PointDragData>,
         plot_map: &PlotMapper,
+        gate_stats: &Option<GateStats>
     ) -> Vec<GateRenderShape> {
         let (xmin, xmax) = {
             let a = plot_map.x_axis_min_max();

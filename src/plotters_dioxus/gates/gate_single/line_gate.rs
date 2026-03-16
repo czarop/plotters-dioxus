@@ -9,7 +9,7 @@ use crate::plotters_dioxus::{
         gate_drag::{GateDragData, PointDragData},
         gate_single::rescale_helper,
         gate_traits::DrawableGate,
-        gate_types::{DEFAULT_LINE, GateRenderShape, SELECTED_LINE, ShapeType},
+        gate_types::{DEFAULT_LINE, GateRenderShape, GateStats, SELECTED_LINE, ShapeType},
     },
     plots::parameters::PlotMapper,
 };
@@ -275,6 +275,7 @@ impl DrawableGate for LineGate {
         is_selected: bool,
         drag_point: Option<PointDragData>,
         plot_map: &PlotMapper,
+        gate_stats: &Option<GateStats>
     ) -> Vec<GateRenderShape> {
         let (min, max) = {
             let (xmin, xmax) = {
@@ -330,7 +331,40 @@ impl DrawableGate for LineGate {
         } else {
             None
         };
-        crate::collate_vecs!(main, selected)
+        let mut labels = vec![];
+        
+        if let Some(gate_stats) = gate_stats {
+            let x_offset = {
+                let axis = plot_map.x_axis_min_max();
+                let xrange = *axis.end() - *axis.start();
+                if let Some(label_pos) = &self.inner.label_position{
+                    xrange * label_pos.offset_x
+                } else {
+                    0f32
+                }
+            };
+            let y_offset = {
+                let axis = plot_map.y_axis_min_max();
+                let yrange = *axis.end() - *axis.start();
+                if let Some(label_pos) = &self.inner.label_position{
+                    yrange * label_pos.offset_y
+                } else {
+                    yrange * 0.02
+                }
+            };
+            let offset = (x_offset, y_offset);
+            match gate_stats.get_percent_for_id(self.inner.id.clone()){
+                Some(percent) => {
+                    let shape = GateRenderShape::Text { origin: (self.points[0].0, self.height), offset: offset, fontsize: 10f32, text: format!("{:.2}%", percent) };
+                    labels.push(shape)
+            },
+                None => {},
+            }
+        }
+
+
+        let labels = Some(labels);
+        crate::collate_vecs!(main, selected, labels)
     }
 }
 
