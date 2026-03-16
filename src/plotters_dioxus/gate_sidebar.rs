@@ -55,6 +55,15 @@ fn GateNode(gate_id: Arc<str>, selected: Signal<Option<Arc<str>>>, level: usize)
         .cloned()
         .collect::<Vec<_>>();
     let has_children = !children.is_empty();
+    
+    let parent = {
+        if hierarchy.read().is_root(&gate_id){
+            gate_id.clone()
+        } else {
+            hierarchy.read().get_parent(&gate_id).unwrap().clone()
+        }
+        
+    };
 
     // Check if this node is the active one
     let is_selected = selected.read().as_ref() == Some(&gate_id);
@@ -62,18 +71,21 @@ fn GateNode(gate_id: Arc<str>, selected: Signal<Option<Arc<str>>>, level: usize)
     // Calculate dynamic padding based on the level (e.g., 16px per level)
     let padding = format!("{}px", level * 16 + 8);
 
+
     rsx! {
         div { class: "gate-node-container",
             // 1. The Row (Clickable)
             div {
                 class: format!("gate-node-row{}", if is_selected { " selected" } else { "" }),
                 style: "padding-left: {padding};",
-                onclick: move |e| {
+                onclick: move |e: Event<MouseData>| {
+
                     e.stop_propagation();
-                    selected.set(Some(gate_id.clone()));
+                    // Immediately cancel any existing timer (prevents spamming)
+                    selected.set(Some(parent.clone()));
+
                 },
 
-                // 2. The Toggle Icon (or a spacer if it's a leaf)
                 if has_children {
                     div {
                         class: format!("toggle-icon{}", if is_expanded() { " expanded" } else { "" }),
@@ -90,6 +102,19 @@ fn GateNode(gate_id: Arc<str>, selected: Signal<Option<Arc<str>>>, level: usize)
 
                 // 3. The Label
                 span { class: "gate-name", "{gate_id}" }
+                button {
+                    class: "auto-pos-btn",
+                    title: "Auto-position gate to 50% density",
+                    onclick: move |e| {
+                        // IMPORTANT: Stop the row's onclick from firing
+                        e.stop_propagation();
+
+                        // Trigger your "Clever Math" logic here
+                        selected.set(Some(gate_id.clone()));
+
+                    },
+                    "🎯"
+                }
             }
 
             // 4. The Children (Recursive call)

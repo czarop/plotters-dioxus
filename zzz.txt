@@ -1,11 +1,11 @@
 Gates:
 
-Get % shown on gates - implement for composite gates and not working on scaled params??
+Get % shown on gates - implement for composite gates 
 Gates should display default params
 
 
 Add filter Cache
-
+label positions
 
 
 
