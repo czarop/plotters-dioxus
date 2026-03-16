@@ -1,5 +1,9 @@
 Gates:
 
+Get % shown on gates
+
+
+
 Add filter Cache
 
 

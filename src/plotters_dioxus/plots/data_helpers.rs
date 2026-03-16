@@ -4,9 +4,10 @@ use crate::plotters_dioxus::gates::gate_store::GateStateStoreExt;
 use crate::plotters_dioxus::gates::{GateState, gate_traits::DrawableGate};
 use dioxus::prelude::*;
 use dioxus::stores::Store;
-use flow_fcs::Fcs;
+use flow_fcs::{Fcs};
 use flow_gates::{EventIndex, Gate};
-use polars::frame::DataFrame;
+
+use polars::prelude::*;
 use tokio::task;
 
 pub async fn get_flow_data(path: std::path::PathBuf) -> Result<Arc<Fcs>, Arc<anyhow::Error>> {
@@ -18,15 +19,11 @@ pub async fn get_flow_data(path: std::path::PathBuf) -> Result<Arc<Fcs>, Arc<any
     .map_err(|e| Arc::new(e.into()))?
 }
 
-pub async fn get_filtered_data_to_display(
+pub async fn get_filtered_dataframe(
     df: Arc<DataFrame>,
-    col1_name: Arc<str>,
-    col2_name: Arc<str>,
     parental_gate_id: &Option<Arc<str>>,
-) -> Result<Vec<(f32, f32)>, anyhow::Error> {
-    let mut df_clone = df.clone();
-    let col1_name = col1_name.clone();
-    let col2_name = col2_name.clone();
+) -> Result<Arc<DataFrame>, anyhow::Error> {
+    let df_clone = df.clone();
     let gate_store: Store<GateState> = use_context::<Store<GateState>>();
     let gate_chain: Option<Vec<(Arc<str>, Arc<dyn DrawableGate>)>> =
         if let Some(parent) = parental_gate_id {
@@ -49,7 +46,7 @@ pub async fn get_filtered_data_to_display(
             None
         };
 
-    task::spawn_blocking(move || -> Result<Vec<(f32, f32)>, anyhow::Error> {
+    task::spawn_blocking(move || -> Result<Arc<DataFrame>, anyhow::Error> {
         if let Some(chain) = gate_chain {
             let gate_refs: Vec<&Gate> = chain
                 .iter()
@@ -61,10 +58,23 @@ pub async fn get_filtered_data_to_display(
                 &df, &gate_refs,
             )?;
             // 2. Filter the dataframe once at the end
-            df_clone = df.filter(&mask)?.into();
+            Ok(df.filter(&mask)?.into())
+        } else {
+            Ok(df_clone)
         }
 
-        // 3. Extract and Transform (The heavy math)
+    })
+    .await?
+}
+
+pub async fn zip_cols_from_filtered_df(
+    df: Arc<DataFrame>,
+    col1_name: Arc<str>,
+    col2_name: Arc<str>,
+) -> Result<Vec<(f32, f32)>, anyhow::Error> {
+    let df_clone = df.clone();
+
+    task::spawn_blocking(move || -> Result<Vec<(f32, f32)>, anyhow::Error> {
         let x_series = df_clone.column(&col1_name)?.f32()?;
         let y_series = df_clone.column(&col2_name)?.f32()?;
 
@@ -78,29 +88,32 @@ pub async fn get_filtered_data_to_display(
             .collect();
 
         Ok(zipped_cols)
-    })
+        })
     .await?
 }
 
-pub async fn get_event_mask_from_scaled_df(
+pub fn get_event_mask_from_scaled_df(
     scaled_df: Arc<DataFrame>,
     col1_name: Arc<str>,
     col2_name: Arc<str>,
-) -> anyhow::Result<EventIndex> {
+) -> anyhow::Result<Arc<EventIndex>> {
     let col1_name = col1_name.clone();
     let col2_name = col2_name.clone();
-    task::spawn_blocking(move || -> Result<EventIndex, anyhow::Error> {
-        let x_rechunked = scaled_df.column(&col1_name)?.f32()?.rechunk();
-        let y_rechunked = scaled_df.column(&col2_name)?.f32()?.rechunk();
-        let x_slice = x_rechunked
-            .cont_slice()
-            .map_err(|_| anyhow::anyhow!("Failed to get contiguous slice for X"))?;
-        let y_slice = y_rechunked
-            .cont_slice()
-            .map_err(|_| anyhow::anyhow!("Failed to get contiguous slice for Y"))?;
 
-        // Delegate to your existing slice-based build fn
-        EventIndex::build(x_slice, y_slice).map_err(|e| anyhow::anyhow!("{e}"))
-    })
-    .await?
+    let x_rechunked = scaled_df.column(&col1_name)?.f32()?.rechunk();
+    let y_rechunked = scaled_df.column(&col2_name)?.f32()?.rechunk();
+    let x_slice = x_rechunked
+        .cont_slice()
+        .map_err(|_| anyhow::anyhow!("Failed to get contiguous slice for X"))?;
+    let y_slice = y_rechunked
+        .cont_slice()
+        .map_err(|_| anyhow::anyhow!("Failed to get contiguous slice for Y"))?;
+
+
+    match EventIndex::build(x_slice, y_slice){
+        Ok(index) => Ok(Arc::new(index)),
+        Err(e) => Err(anyhow::anyhow!("{e}")),
+    }
+
 }
+

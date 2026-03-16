@@ -1,9 +1,9 @@
-use anyhow::anyhow;
 use dioxus::prelude::*;
 use polars::frame::DataFrame;
 
 use crate::plotters_dioxus::gates::gate_buttons::NewGateButtons;
-use crate::plotters_dioxus::plots::data_helpers::{get_filtered_data_to_display, get_flow_data};
+use crate::plotters_dioxus::plots::data_helpers::{get_event_mask_from_scaled_df, get_filtered_dataframe, get_flow_data, zip_cols_from_filtered_df};
+use crate::plotters_dioxus::plots::parameters::EventIndexMapped;
 use crate::{
     file_load::FcsFiles,
     plotters_dioxus::{
@@ -15,7 +15,7 @@ use crate::{
             gate_types::GateType,
         },
         plots::parameters::{
-            Param, ParameterStore, ParameterStoreImplExt, ParameterStoreStoreExt as _,
+            Param, PlotStore, PlotStoreImplExt, PlotStoreStoreExt as _,
         },
     },
     searchable_select::SearchableSelect,
@@ -55,7 +55,7 @@ pub fn PlotWindow() -> Element {
     });
 
     let mut sample_index = use_signal(|| 0);
-    let mut parameter_settings = use_store(|| ParameterStore::default());
+    let mut parameter_settings = use_store(|| PlotStore::default());
     use_context_provider(|| parameter_settings);
 
     let current_sample = use_memo(move || {
@@ -111,6 +111,7 @@ pub fn PlotWindow() -> Element {
         }
     });
 
+    // this is currently scaling the data but filtering is done elsewhere! 
     let scaled_data = use_resource(move || async move {
         let mut params: Vec<(Arc<str>, f32)> = Vec::new();
         for (k, v) in parameter_settings
@@ -131,10 +132,10 @@ pub fn PlotWindow() -> Element {
                 tokio::task::spawn_blocking(move || -> Result<Arc<DataFrame>, anyhow::Error> {
                     let param_refs: Vec<(&str, f32)> =
                         params.iter().map(|(k, v)| (k.as_ref(), *v)).collect();
-                    match fcs_clone.apply_arcsinh_transforms(param_refs.as_slice()) {
-                        Ok(d) => return Ok(d),
-                        Err(e) => return Err(anyhow!("{e}")),
-                    }
+                    let scaled_df = fcs_clone.apply_arcsinh_transforms(param_refs.as_slice())?;
+                    let df_with_index = scaled_df.with_row_index("original_index".into(), None)?;
+                    
+                    Ok(Arc::new(df_with_index))
                 })
                 .await;
 
@@ -146,6 +147,8 @@ pub fn PlotWindow() -> Element {
             Err(anyhow::anyhow!("No data to scale"))
         }
     });
+
+    
 
     let mut x_axis_marker: Signal<Param> = use_signal(|| {
         let p: Arc<str> = Arc::from("FSC-A");
@@ -191,34 +194,99 @@ pub fn PlotWindow() -> Element {
         }
     });
 
-    // this should be set when smth is selected in the sidebar
     let parental_gate: Signal<Option<Arc<str>>> = use_signal(|| Some(ROOTGATE.clone()));
 
     let mut plot_data_signal = use_signal(|| vec![]);
-    let processed_data_resource = use_resource(move || {
+    
+    let filtered_dataframe = use_resource(move || {
         let x_fluoro = x_axis_marker.read().fluoro.clone();
         let y_fluoro = y_axis_marker.read().fluoro.clone();
         async move {
             let parental_gate = &*parental_gate.read();
 
             if let Some(Ok(d)) = &*scaled_data.read() {
-                match get_filtered_data_to_display(d.clone(), x_fluoro, y_fluoro, parental_gate)
+                // separate filtering and selecting params - 
+                // hold the full scaled df
+                // filter events to the current gate
+                // then select params and make the eventmask and zipped vec
+                // any child gates calulate the % from the eventmask
+                let filtered_data = match get_filtered_dataframe(d.clone(), parental_gate)
                     .await
                 {
-                    Ok(d) => {
-                        plot_data_signal.set(d);
-                        Ok(())
-                    }
+                    Ok(d) => d.clone(),
                     Err(e) => {
                         plot_data_signal.set(vec![]);
-                        Err(anyhow::anyhow!(e.to_string()))
+                        return Err(anyhow::anyhow!("No data to display {}", e.to_string()));
                     }
-                }
+                };
+
+                match zip_cols_from_filtered_df(filtered_data.clone(), x_fluoro, y_fluoro).await{
+                    Ok(d) => plot_data_signal.set(d),
+                    Err(_) => plot_data_signal.set(vec![]),
+                };
+
+                Ok(filtered_data)
             } else {
                 plot_data_signal.set(vec![]);
                 Err(anyhow::anyhow!("No data yet"))
             }
         }
+    });
+
+        let event_index = use_resource(move || {
+
+        let df_arc = match &*filtered_dataframe.read() {
+            Some(Ok(df)) => Some(df.clone()),
+            _ => None,
+        };
+        let x_name = x_axis_marker.read().marker.clone();
+        let y_name = y_axis_marker.read().fluoro.clone();
+        async move {
+            let df = match df_arc {
+                Some(d) => d,
+                None => return Ok(None),
+            };
+
+            let join_result = tokio::task::spawn_blocking(move || -> anyhow::Result<EventIndexMapped> {
+                // Build the R-Tree
+                let ei = get_event_mask_from_scaled_df(df.clone(), x_name, y_name)
+                    .map_err(|e| anyhow::anyhow!("R-Tree build failed: {e}"))?;
+                // Extract the mapping
+                let map: Vec<usize> = df.column("original_index")?
+                    .u32()?
+                    .into_iter()
+                    .flatten()
+                    .map(|v| v as usize)
+                    .collect();
+                Ok(EventIndexMapped { 
+                    event_index: ei,
+                    index_map: Arc::new(map) 
+                })
+            }).await;
+
+            match join_result {
+                Ok(Ok(index)) => Ok(Some(index)),
+                Ok(Err(e)) => Err(e),
+                Err(join_err) => Err(anyhow::anyhow!("Task panicked: {join_err}")),
+            }
+        }
+    });
+
+    // for the actual gating, we just use df filtering. however for the currently displayed events we use an EventIndex
+    // to get real time % for child gates
+    use_effect(move || {
+        if let Some(Ok(index)) = &*event_index.read(){
+            parameter_settings().event_index_map = index.clone();
+            if index.is_some(){
+                let i = index.clone().unwrap();
+                println!("got the event index with len {} and index map with length {}", i.event_index.len(), i.index_map.len());
+            } else {
+                println!("effect called but no index map");
+            }
+            
+        } else {
+            parameter_settings().event_index_map = None;
+        };
     });
 
     rsx! {
@@ -468,12 +536,12 @@ pub fn PlotWindow() -> Element {
                             }
                             None => rsx! {},
                         }
-
+                    
                     }
                 }
                 div { class: "status-message",
                     {
-                        match &*processed_data_resource.read() {
+                        match &*filtered_dataframe.read() {
                             Some(Ok(_)) => {
                                 rsx! {}
                             }
@@ -507,7 +575,7 @@ pub fn PlotWindow() -> Element {
                     }
 
                 }
-
+            
             }
         }
     }

@@ -2,9 +2,9 @@ use anyhow::anyhow;
 use core::f32;
 use dioxus::prelude::*;
 use flow_fcs::TransformType;
-use flow_gates::transforms::{
+use flow_gates::{EventIndex, transforms::{
     get_plotting_area, pixel_to_raw, pixel_to_raw_y, raw_to_pixel, raw_to_pixel_y,
-};
+}};
 use rustc_hash::FxHashMap;
 use std::{
     ops::RangeInclusive,
@@ -86,16 +86,9 @@ impl PlotMapper {
         } else {
             yt = y_t.unwrap();
         }
-        // println!("x pixel {} data range start {} end {}, x pixel range start {}, end {}", px, self.x_data_range.start(), self.x_data_range.end(), self.x_pix_range.start, self.x_pix_range.end);
-        // let xt = TransformType::Arcsinh { cofactor: 6000f32 };
         let dx_raw = pixel_to_raw(px, &self.x_data_axis_range, &self.x_pix_range, &xt);
-        // let dx = raw_to_transformed(dx_raw, &xt);
         let dy_raw = pixel_to_raw_y(py, &self.y_data_axis_range, &self.y_pix_range, &yt);
-        // let dy = raw_to_transformed(dy_raw, &yt);
-        let (dx, dy) = (dx_raw, dy_raw);
-        println!("raw: {dx_raw}, {dy_raw} transformed: {dx}, {dy}");
-        println!("raw: {dx_raw}, {dy_raw} transformed: {dx}, {dy}");
-        (dx, dy)
+        (dx_raw, dy_raw)
     }
 
     pub fn pixel_x_to_data(&self, x: f32, t: Option<TransformType>) -> f32 {
@@ -192,13 +185,20 @@ impl std::fmt::Display for Param {
     }
 }
 
-#[derive(Default, Store, Clone)]
-pub struct ParameterStore {
-    pub settings: Arc<RwLock<FxHashMap<Arc<str>, AxisInfo>>>,
+#[derive(Clone)]
+pub struct EventIndexMapped {
+    pub event_index: Arc<EventIndex>,
+    pub index_map: Arc<Vec<usize>>
 }
 
-#[store(pub name = ParameterStoreImplExt)]
-impl<Lens> Store<ParameterStore, Lens> {
+#[derive(Default, Store, Clone)]
+pub struct PlotStore {
+    pub settings: Arc<RwLock<FxHashMap<Arc<str>, AxisInfo>>>,
+    pub event_index_map: Option<EventIndexMapped>
+}
+
+#[store(pub name = PlotStoreImplExt)]
+impl<Lens> Store<PlotStore, Lens> {
     fn add_new_axis_settings(&mut self, p: &Param, fcs_file: &flow_fcs::Fcs) {
         self.settings()
             .write()

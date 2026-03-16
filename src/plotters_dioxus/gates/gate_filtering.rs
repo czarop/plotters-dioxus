@@ -225,18 +225,13 @@ pub fn build_event_index_from_polars(
     x_ca: &Float32Chunked,
     y_ca: &Float32Chunked,
 ) -> anyhow::Result<EventIndex> {
-    // Ensure both are contiguous and get the slices
-    // We rechunk here to be safe, in case they come from different DF operations
     let x_rechunked = x_ca.rechunk();
     let y_rechunked = y_ca.rechunk();
-
     let x_slice = x_rechunked
         .cont_slice()
         .map_err(|_| anyhow::anyhow!("Failed to get contiguous slice for X"))?;
     let y_slice = y_rechunked
         .cont_slice()
         .map_err(|_| anyhow::anyhow!("Failed to get contiguous slice for Y"))?;
-
-    // Delegate to your existing slice-based build fn
     EventIndex::build(x_slice, y_slice).map_err(|e| anyhow::anyhow!("{e}"))
 }
