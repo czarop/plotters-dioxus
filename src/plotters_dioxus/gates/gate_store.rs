@@ -118,6 +118,11 @@ pub struct GateState {
 
 #[store(pub name = GateStateImplExt)]
 impl<Lens> Store<GateState, Lens> {
+
+    fn get_gate_by_id(&self, id: GateId) -> Option<Arc<dyn DrawableGate>> {
+        self.primary_and_subgate_registry().peek().get(&id).cloned()
+    }
+
     fn add_gate(
         &mut self,
         mapper: &PlotMapper,

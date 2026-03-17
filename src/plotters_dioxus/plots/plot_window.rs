@@ -1,13 +1,10 @@
 use dioxus::prelude::*;
 use polars::frame::DataFrame;
-use rustc_hash::FxHashMap;
-
-use crate::plotters_dioxus::gates::GatesOnPlotKey;
+use crate::FxIndexMap;
 use crate::plotters_dioxus::gates::gate_buttons::NewGateButtons;
-use crate::plotters_dioxus::gates::gate_store::GateStateStoreExt;
-use crate::plotters_dioxus::gates::gate_types::{GateStatValue, GateStats};
 use crate::plotters_dioxus::plots::data_helpers::{get_event_mask_from_scaled_df, get_filtered_dataframe, get_flow_data, zip_cols_from_filtered_df};
 use crate::plotters_dioxus::plots::parameters::EventIndexMapped;
+use crate::searchable_select::SearchableSelectMap;
 use crate::{
     file_load::FcsFiles,
     plotters_dioxus::{
@@ -22,7 +19,7 @@ use crate::{
             Param, PlotStore, PlotStoreImplExt, PlotStoreStoreExt as _,
         },
     },
-    searchable_select::SearchableSelect,
+    searchable_select::SearchableSelectList,
 };
 use std::sync::Arc;
 
@@ -87,7 +84,7 @@ pub fn PlotWindow() -> Element {
     let sorted_params = use_memo(move || {
         if let Some(Ok(fcs_file)) = &*fcs_file_resource.read() {
             // pull the parameters from the file
-            let mut sorted_params: Vec<Param> = fcs_file
+            let mut sorted_params: FxIndexMap<Arc<str>, Param> = fcs_file
                 .parameters
                 .iter()
                 .map(|(_, param)| {
@@ -97,11 +94,11 @@ pub fn PlotWindow() -> Element {
                     };
                     // add the parameter to the store if required
                     parameter_settings.add_new_axis_settings(&p, &fcs_file);
-                    p
+                    (param.channel_name.clone(), p)
                 })
                 .collect();
 
-            sorted_params.sort_by_key(|param| {
+            sorted_params.sort_by_key(|_, param| {
                 fcs_file
                     .parameters
                     .get(param.fluoro.as_ref())
@@ -111,9 +108,11 @@ pub fn PlotWindow() -> Element {
 
             sorted_params
         } else {
-            Vec::new()
+            FxIndexMap::default()
         }
     });
+
+    
 
     // this is currently scaling the data but filtering is done elsewhere! 
     let scaled_data = use_resource(move || async move {
@@ -121,8 +120,6 @@ pub fn PlotWindow() -> Element {
         for (k, v) in parameter_settings
             .settings()
             .read()
-            .read()
-            .expect("lock poisoned")
             .iter()
         {
             if v.is_arcsinh() {
@@ -175,8 +172,6 @@ pub fn PlotWindow() -> Element {
         match parameter_settings
             .settings()
             .read()
-            .read()
-            .expect("lock poisoned")
             .get(&param.fluoro)
         {
             Some(d) => d.clone(),
@@ -189,13 +184,20 @@ pub fn PlotWindow() -> Element {
         match parameter_settings
             .settings()
             .read()
-            .read()
-            .expect("lock poisoned")
             .get(&param.fluoro)
         {
             Some(d) => d.clone(),
             None => AxisInfo::default(),
         }
+    });
+
+    let x_axis_selected_index = use_memo(move || {
+        let curr: Arc<str> = (&*x_axis_marker.read()).fluoro.clone();
+        sorted_params.peek().get_index_of(&curr).unwrap_or(0)
+    });
+    let y_axis_selected_index = use_memo(move || {
+        let curr: Arc<str> = (&*y_axis_marker.read()).fluoro.clone();
+        sorted_params.peek().get_index_of(&curr).unwrap_or(0)
     });
 
     let parental_gate: Signal<Option<Arc<str>>> = use_signal(|| Some(ROOTGATE.clone()));
@@ -209,11 +211,6 @@ pub fn PlotWindow() -> Element {
             let parental_gate = &*parental_gate.read();
 
             if let Some(Ok(d)) = &*scaled_data.read() {
-                // separate filtering and selecting params - 
-                // hold the full scaled df
-                // filter events to the current gate
-                // then select params and make the eventmask and zipped vec
-                // any child gates calulate the % from the eventmask
                 let filtered_data = match get_filtered_dataframe(d.clone(), parental_gate)
                     .await
                 {
@@ -294,73 +291,15 @@ pub fn PlotWindow() -> Element {
         *parameter_settings.event_index_map().write() = data;
     });
 
-    // determine the percent positive for each child gate
-    let _ = use_resource(move || async move {
-        let x_key = x_axis_marker.read().fluoro.clone();
-        let y_key = y_axis_marker.read().fluoro.clone();
-        let event_index_option = parameter_settings.event_index_map()();
-        if let Some(gates_on_plot) = gate_store.get_gates_for_plot(x_key, y_key, parental_gate()){
-            if let Some(event_index_map) = event_index_option{
-                let join_result = tokio::task::spawn_blocking(move || -> anyhow::Result<FxHashMap<Arc<str>, GateStats>> {
-                    let mut stat_map = FxHashMap::default();
-                    let parental_events = event_index_map.event_index.len() as f32;
-                    for gate in gates_on_plot{
-                        let id = gate.get_id();
-                        if !gate.is_composite(){
-                            let inner = gate.get_gate_ref(None).unwrap();
-                            let events = event_index_map.event_index.filter_by_gate(inner)?;
-                            let count = events.len() as f32;
-                            let percent_parent = GateStatValue::Single((count as f32 / parental_events) * 100f32);
-                            let stats = GateStats{ count: GateStatValue::Single(count), percent_parent };
-                            stat_map.insert(id, stats);
-                        } else {
-                            let inner_ids = gate.get_inner_gate_ids();
-                            let capacity = inner_ids.len();
-                            let mut temp_counts = FxHashMap::with_capacity_and_hasher(capacity, rustc_hash::FxBuildHasher::default());
-                            let mut temp_percents = FxHashMap::with_capacity_and_hasher(capacity, rustc_hash::FxBuildHasher::default());
-                            for inner_id in inner_ids {
-                                let inner = gate.get_gate_ref(Some(&inner_id)).unwrap();
-                                let events = event_index_map.event_index.filter_by_gate(inner)?;
-                                let count = events.len() as f32;
-                                let percent_parent = (count as f32 / parental_events) * 100f32;
-                                temp_counts.insert(inner_id.clone(), count);
-                                temp_percents.insert(inner_id.clone(), percent_parent);
-                            }
-                            let counts = GateStatValue::Composite(temp_counts);
-                            let percents = GateStatValue::Composite(temp_percents);
-                            let stats = GateStats { count: counts, percent_parent: percents };
-                            stat_map.insert(id, stats);
-                        }
-                    }
-
-                    Ok(stat_map)
-                }).await;
-                
-                match join_result {
-                    Ok(Ok(index)) => *gate_store.gate_stats().write() = index,
-                    Ok(Err(e)) => {
-                        println!("{e}");
-                        *gate_store.gate_stats().write() = FxHashMap::default();
-                    },
-                    Err(e) => {
-                        println!("{e}");
-                        *gate_store.gate_stats().write() = FxHashMap::default();
-                    },
-                }
-            }
-        } else {
-            println!("no gates to show for {:?}, {:?}, {:?}", x_axis_marker().fluoro.clone(), y_axis_marker().fluoro.clone(), parental_gate());
-        }
-
-        
-
-    });
-
     rsx! {
         document::Stylesheet { href: CSS_STYLE }
         div { class: "sidebar-local",
 
-            GateSidebar { selected_id: parental_gate }
+            GateSidebar {
+                selected_id: parental_gate,
+                x_axis_param: x_axis_marker,
+                y_axis_param: y_axis_marker,
+            }
 
             main { class: "main-content",
 
@@ -368,10 +307,11 @@ pub fn PlotWindow() -> Element {
 
                     div { class: "axis-controls-grid", style: "width: 600px;",
                         div { class: "grid-label", "X-Axis" }
-                        SearchableSelect {
+                        SearchableSelectMap {
                             items: sorted_params(),
                             on_select: move |(_, v)| { x_axis_marker.set(v) },
                             placeholder: x_axis_marker.peek().to_string(),
+                            selected_index: Some(x_axis_selected_index.into()),
                         }
 
                         div { class: "input-unit",
@@ -467,10 +407,11 @@ pub fn PlotWindow() -> Element {
                         }
 
                         div { class: "grid-label", "Y-Axis" }
-                        SearchableSelect {
+                        SearchableSelectMap {
                             items: sorted_params(),
                             on_select: move |(_, v)| { y_axis_marker.set(v) },
                             placeholder: y_axis_marker.peek().to_string(),
+                            selected_index: Some(y_axis_selected_index.into()),
                         }
 
                         div { class: "input-unit",
@@ -593,7 +534,7 @@ pub fn PlotWindow() -> Element {
                             Some(fh) => {
                                 let list = fh.get_file_names();
                                 rsx! {
-                                    SearchableSelect {
+                                    SearchableSelectList {
                                         items: list,
                                         on_select: move |(i, _)| { sample_index.set(i) },
                                         placeholder: "Select a file".to_string(),

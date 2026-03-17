@@ -96,8 +96,8 @@ impl RotationData {
             current_loc: new_loc,
         }
     }
-    pub fn gate_id(&self) -> &str {
-        &self.gate_id
+    pub fn gate_id(&self) -> Arc<str> {
+        self.gate_id.clone()
     }
     pub fn start_loc(&self) -> (f32, f32) {
         self.start_loc

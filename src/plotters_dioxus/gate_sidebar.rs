@@ -1,5 +1,6 @@
 use crate::plotters_dioxus::gates::GateState;
-use crate::plotters_dioxus::gates::gate_store::{GateStateStoreExt, ROOTGATE};
+use crate::plotters_dioxus::gates::gate_store::{GateStateImplExt, GateStateStoreExt, ROOTGATE};
+use crate::plotters_dioxus::plots::parameters::{Param, PlotStore, PlotStoreStoreExt};
 use dioxus::prelude::*;
 use std::sync::Arc;
 
@@ -7,7 +8,7 @@ static SIDEBAR_STYLE: Asset = asset!("assets/gate_sidebar.css");
 static ROOT_DEFAULT: &'static str = "root_default";
 
 #[component]
-pub fn GateSidebar(selected_id: Signal<Option<Arc<str>>>) -> Element {
+pub fn GateSidebar(selected_id: Signal<Option<Arc<str>>>, x_axis_param: Signal<Param>, y_axis_param: Signal<Param>) -> Element {
     let gate_store: Store<GateState> = use_context::<Store<GateState>>();
     let hierarchy = gate_store.hierarchy();
     let roots = hierarchy.read().get_roots();
@@ -18,32 +19,29 @@ pub fn GateSidebar(selected_id: Signal<Option<Arc<str>>>) -> Element {
             h3 { class: "sidebar-title", "Gate Hierarchy" }
 
             div { class: "sidebar-tree",
-                if roots.is_empty() {
-                    GateNode {
-                        key: "{ROOT_DEFAULT}",
-                        gate_id: ROOTGATE.clone(),
-                        selected: selected_id,
-                        level: 0,
-                    }
-                } else {
-                    for root_id in roots {
+
+                for root_id in roots {
+                    for child_id in hierarchy.read().get_children(&root_id) {
                         GateNode {
-                            key: "{root_id}",
-                            gate_id: root_id,
+                            key: "{child_id}",
+                            gate_id: child_id.clone(),
                             selected: selected_id,
                             level: 0,
+                            x_axis_param,
+                            y_axis_param,
                         }
                     }
                 }
+            
             }
         }
     }
 }
 
 #[component]
-fn GateNode(gate_id: Arc<str>, selected: Signal<Option<Arc<str>>>, level: usize) -> Element {
+fn GateNode(gate_id: Arc<str>, selected: Signal<Option<Arc<str>>>, level: usize, x_axis_param: Signal<Param>, y_axis_param: Signal<Param>) -> Element {
     let gate_store: Store<GateState> = use_context::<Store<GateState>>();
-    // Local state for expanding/collapsing this specific node
+    let param_store: Store<PlotStore> = use_context::<Store<PlotStore>>();
     let mut is_expanded = use_signal(|| true);
 
     // Fetch children
@@ -71,7 +69,7 @@ fn GateNode(gate_id: Arc<str>, selected: Signal<Option<Arc<str>>>, level: usize)
     // Calculate dynamic padding based on the level (e.g., 16px per level)
     let padding = format!("{}px", level * 16 + 8);
 
-
+    let gate_id_clone = gate_id.clone();
     rsx! {
         div { class: "gate-node-container",
             // 1. The Row (Clickable)
@@ -81,9 +79,27 @@ fn GateNode(gate_id: Arc<str>, selected: Signal<Option<Arc<str>>>, level: usize)
                 onclick: move |e: Event<MouseData>| {
 
                     e.stop_propagation();
-                    // Immediately cancel any existing timer (prevents spamming)
-                    selected.set(Some(parent.clone()));
 
+                    if let Some(gate) = gate_store.get_gate_by_id(gate_id_clone.clone()) {
+                        let (x, y) = gate.get_params();
+                        let (new_x, new_y);
+                        if let Some(x_axis_settings) = param_store.settings().read().get(&x) {
+                            new_x = Some(x_axis_settings.param.clone());
+                        } else {
+                            new_x = None;
+                        }
+                        if let Some(y_axis_settings) = param_store.settings().read().get(&y) {
+                            new_y = Some(y_axis_settings.param.clone());
+                        } else {
+                            new_y = None;
+                        }
+                        if let (Some(new_x), Some(new_y)) = (new_x, new_y) {
+                            x_axis_param.set(new_x);
+                            y_axis_param.set(new_y);
+                            selected.set(Some(parent.clone()));
+                        }
+
+                    }
                 },
 
                 if has_children {
@@ -103,18 +119,36 @@ fn GateNode(gate_id: Arc<str>, selected: Signal<Option<Arc<str>>>, level: usize)
                 // 3. The Label
                 span { class: "gate-name", "{gate_id}" }
                 button {
-                    class: "auto-pos-btn",
-                    title: "Auto-position gate to 50% density",
+                    class: "activate-btn",
+                    title: "Activate gate",
                     onclick: move |e| {
                         // IMPORTANT: Stop the row's onclick from firing
                         e.stop_propagation();
+                        if let Some(gate) = gate_store.get_gate_by_id(gate_id.clone()) {
+                            let (x, y) = gate.get_params();
+                            let (new_x, new_y);
+                            if let Some(x_axis_settings) = param_store.settings().read().get(&x) {
+                                new_x = Some(x_axis_settings.param.clone());
+                            } else {
+                                new_x = None;
+                            }
+                            if let Some(y_axis_settings) = param_store.settings().read().get(&y) {
+                                new_y = Some(y_axis_settings.param.clone());
+                            } else {
+                                new_y = None;
+                            }
+                            if let (Some(new_x), Some(new_y)) = (new_x, new_y) {
+                                x_axis_param.set(new_x);
+                                y_axis_param.set(new_y);
+                                selected.set(Some(gate_id.clone()));
+                            }
 
-                        // Trigger your "Clever Math" logic here
-                        selected.set(Some(gate_id.clone()));
+                        }
 
                     },
                     "🎯"
                 }
+            
             }
 
             // 4. The Children (Recursive call)
@@ -126,6 +160,8 @@ fn GateNode(gate_id: Arc<str>, selected: Signal<Option<Arc<str>>>, level: usize)
                             gate_id: child_id,
                             selected,
                             level: level + 1,
+                            x_axis_param,
+                            y_axis_param,
                         }
                     }
                 }

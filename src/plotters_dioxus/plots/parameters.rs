@@ -200,7 +200,7 @@ impl PartialEq for EventIndexMapped {
 
 #[derive(Default, Store, Clone)]
 pub struct PlotStore {
-    pub settings: Arc<RwLock<FxHashMap<Arc<str>, AxisInfo>>>,
+    pub settings: FxHashMap<Arc<str>, AxisInfo>,
     pub event_index_map: Option<EventIndexMapped>
 }
 
@@ -209,8 +209,6 @@ impl<Lens> Store<PlotStore, Lens> {
     fn add_new_axis_settings(&mut self, p: &Param, fcs_file: &flow_fcs::Fcs) {
         self.settings()
             .write()
-            .write()
-            .expect("Lock poisoned")
             .entry(p.fluoro.clone())
             .or_insert_with(|| {
                 // Determine transform based on channel metadata
@@ -256,9 +254,7 @@ impl<Lens> Store<PlotStore, Lens> {
         let mut old = None;
         let mut new = None;
 
-        match self.settings().write().write() {
-            Ok(mut w) => {
-                w.entry(id.clone()).and_modify(|axis| {
+        self.settings().write().entry(id.clone()).and_modify(|axis| {
                     if let TransformType::Arcsinh { .. } = axis.transform {
                         let old_axis = std::mem::take(axis);
                         let new_axis = (&old_axis)
@@ -269,9 +265,7 @@ impl<Lens> Store<PlotStore, Lens> {
                         *axis = new_axis;
                     }
                 });
-            }
-            Err(_) => return Err(anyhow!("Could not get write lock")),
-        }
+
 
         if new.is_some() && old.is_some() {
             return Ok((old.unwrap(), new.unwrap()));
@@ -290,8 +284,6 @@ impl<Lens> Store<PlotStore, Lens> {
         let mut transform = None;
         self.settings()
             .write()
-            .write()
-            .expect("lock poisoned")
             .entry(id.clone())
             .and_modify(|axis_arc| {
                 old_upper = Some(axis_arc.axis_upper);
@@ -318,8 +310,6 @@ impl<Lens> Store<PlotStore, Lens> {
 
         self.settings()
             .write()
-            .write()
-            .expect("lock poisoned")
             .entry(id.clone())
             .and_modify(|axis_arc| {
                 old_lower = Some(axis_arc.axis_lower);

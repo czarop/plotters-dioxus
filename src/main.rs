@@ -9,6 +9,8 @@ static NAV_STYLE: Asset = asset!("assets/navbar.css");
 static COMPONENTS_STYLE: Asset = asset!("assets/dx-components-theme.css");
 static COMPONENTS_STYLE_2: Asset = asset!("assets/searchable_select.css");
 
+
+
 #[component]
 fn App() -> Element {
     rsx! {

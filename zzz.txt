@@ -1,14 +1,10 @@
 Gates:
 
-Get % shown on gates - implement for composite gates 
-Gates should display default params
-
+Get % shown on gates - implement for composite gates (just need to put the positions and labels on)
+% should really update on drag... - detect this and modify for that gate on the fly
 
 Add filter Cache
 label positions
-
-
-
 
 NOT gates
 AND gates
@@ -42,8 +38,6 @@ Set Comp from omiq Comp
 
 
 Nice to have:
-NAND gates
-NOR gates
 Contourplot
 Histogram
 

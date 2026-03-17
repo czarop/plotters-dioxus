@@ -83,4 +83,21 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    flex: 1;
+    padding-right: 8px;
+}
+
+.activate-btn{
+    /* This ensures the button doesn't shrink if the name is long */
+    flex-shrink: 0;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 4px;
+
+}
+
+.auto-pos-btn:hover {
+    background-color: #cbd5e1;
 }

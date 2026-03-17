@@ -4,16 +4,30 @@ use crate::plotters_dioxus::{
         gate_draft::GateDraft,
         gate_drag::{GateDragData, GateDragType, PointDragData, RotationData},
         gate_single::rectangle_gate,
-        gate_store::{GateStateImplExt},
+        gate_store::GateStateImplExt,
         gate_traits::DrawableGate,
-        gate_types::{GateRenderShape, GateStats, GateType, ShapeType},
+        gate_types::{GateRenderShape, GateStatValue, GateStats, GateType, ShapeType},
     },
     plots::parameters::{ PlotMapper, PlotStore},
 };
 use crate::plotters_dioxus::gates::gate_store::GateStateStoreExt;
-
+use crate::plotters_dioxus::plots::parameters::PlotStoreStoreExt;
 use dioxus::prelude::*;
+use rustc_hash::FxHashMap;
 use std::sync::Arc;
+
+#[derive(Clone, PartialEq)]
+pub struct TempGateStats {
+    pub id: Arc<str>,
+    pub stats: GateStats,
+}
+
+// Manually implement PartialEq based on the ID
+// impl PartialEq for TempGate {
+//     fn eq(&self, other: &Self) -> bool {
+//         self.id == other.id && Arc::ptr_eq(&self.gate, &other.gate)
+//     }
+// }
 
 #[component]
 pub fn GateLayer(
@@ -68,6 +82,120 @@ pub fn GateLayer(
         };
         // next_gate_id.set(g.len());
         gates.set(g);
+    });
+
+    // add a second part to this that modifies the % if the gate is being dragged or edited - perhaps a second use_resouce?
+    let _ = use_resource(move || async move {
+        let x_key = x_channel.read().clone();
+        let y_key = y_channel.read().clone();
+        let event_index_option = plot_store.event_index_map()();
+        if let Some(gates_on_plot) = gate_store.get_gates_for_plot(x_key, y_key, parental_gate_id()){
+            if let Some(event_index_map) = event_index_option{
+                let join_result = tokio::task::spawn_blocking(move || -> anyhow::Result<FxHashMap<Arc<str>, GateStats>> {
+                    let mut stat_map = FxHashMap::default();
+                    let parental_events = event_index_map.event_index.len() as f32;
+                    for gate in gates_on_plot{
+                        let id = gate.get_id();
+                            let stats = crate::plotters_dioxus::gates::gate_stats::get_percent_and_counts_gate(gate, &event_index_map, parental_events)?;
+                            stat_map.insert(id, stats);
+
+                    }
+
+                    Ok(stat_map)
+                }).await;
+                
+                match join_result {
+                    Ok(Ok(index)) => *gate_store.gate_stats().write() = index,
+                    Ok(Err(e)) => {
+                        println!("{e}");
+                        *gate_store.gate_stats().write() = FxHashMap::default();
+                    },
+                    Err(e) => {
+                        println!("{e}");
+                        *gate_store.gate_stats().write() = FxHashMap::default();
+                    },
+                }
+            }
+        } else {
+            println!("no gates to show for {:?}, {:?}, {:?}", x_channel(), y_channel(), parental_gate_id());
+        }
+    });
+
+    let parental_event_count = use_memo(move || {
+        let event_index_option = plot_store.event_index_map()();
+        if let Some(event_index_map) = event_index_option{
+            Some(event_index_map.event_index.len())
+        } else {
+            None
+        }
+    });
+
+    let temp_gate_position = use_memo(move || {
+        let parental_event_count_op = parental_event_count();
+        let event_index_option = plot_store.event_index_map()();
+        let res = match &*drag_data.read(){
+            Some(GateDragType::Gate(dd)) => {
+                let id = dd.gate_id();
+                if let Some(gate) = gate_store.get_gate_by_id(id.clone()){
+                    if let Ok(Some(new_gate)) = gate.replace_points(dd.clone()) {
+                        let new_gate_arc: Arc<dyn DrawableGate> = Arc::from(new_gate);
+                        Some(( id, new_gate_arc ))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            },
+            Some(GateDragType::Point(dd)) => {
+                let id = selected_gate_id.read().cloned();
+                if id.is_none() {
+                    return None;
+                }
+                let id = id.unwrap();
+                let point_idx = dd.point_index();
+                let position = dd.loc();
+                let plot_map = &*plot_map.read();
+                if let Some(plot_map) = plot_map {
+                    if let Some(gate) = gate_store.get_gate_by_id(id.clone()){
+                        if let Ok(new_gate) = gate.replace_point(position, point_idx, plot_map) {
+                            let new_gate_arc: Arc<dyn DrawableGate> = Arc::from(new_gate);
+                            Some(( id, new_gate_arc ))
+                        } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            }},
+            Some(GateDragType::Rotation(dd)) => {
+                let id = dd.gate_id();
+                let mouse_position = dd.current_loc();
+                if let Some(gate) = gate_store.get_gate_by_id(id.clone()){
+                    if let Ok(Some(new_gate)) = gate.rotate_gate(mouse_position) {
+                        let new_gate_arc: Arc<dyn DrawableGate> = Arc::from(new_gate);
+                        Some(( id, new_gate_arc ))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            },
+            None => return None,
+        };
+        if let Some(parental_event_count) = parental_event_count_op{
+        if let Some(event_index_map) = event_index_option {
+            if let Some((id, gate)) = res{
+                if let Some(stats) = crate::plotters_dioxus::gates::gate_stats::get_percent_and_counts_gate(gate, &event_index_map, parental_event_count as f32).ok(){
+                    return Some(TempGateStats{id, stats});
+                }
+            } 
+        }
+    }
+        return None;
     });
 
     let mut dbl_click_lockout = use_signal(|| false);
@@ -164,7 +292,10 @@ pub fn GateLayer(
                             )
                         {
                             Ok(_) => *next_gate_id.write() += 1,
-                            Err(_) => todo!(),
+                            Err(e) => {
+                                draft_gate_coords.set(vec![]);
+                                println!("{e}");
+                            }
                         };
                     },
                     onmousemove: move |evt| {
@@ -287,7 +418,15 @@ pub fn GateLayer(
                                     None
                                 };
 
-                                let gate_stats = gate_store.gate_stats().read().get(&gate.get_id()).cloned();
+                                let gate_stats = if let Some(temp_gate_position) = &*temp_gate_position.read() {
+                                    if temp_gate_position.id == gate.get_id() {
+                                        Some(temp_gate_position.stats.clone())
+                                    } else {
+                                        gate_store.gate_stats().read().get(&gate.get_id()).cloned()
+                                    }
+                                } else {
+                                    gate_store.gate_stats().read().get(&gate.get_id()).cloned()
+                                };
                                 rsx! {
                                     RenderGate {
                                         gate: gate.clone(),

@@ -1,11 +1,9 @@
 use flow_fcs::TransformType;
 
 use flow_gates::{Gate, GateGeometry};
-use indexmap::IndexMap;
-use rustc_hash::FxBuildHasher;
 use std::{ops::Index, sync::Arc};
 
-use crate::plotters_dioxus::{
+use crate::{FxIndexMap, plotters_dioxus::{
     gates::{
         gate_drag::PointDragData,
         gate_single::{line_gate::LineGate, rescale_helper_point},
@@ -13,9 +11,9 @@ use crate::plotters_dioxus::{
         gate_types::{DEFAULT_LINE, GREY_LINE_DASHED, GateRenderShape, GateStats, SELECTED_LINE, ShapeType},
     },
     plots::parameters::PlotMapper,
-};
+}};
 
-type FxIndexMap<K, V> = IndexMap<K, V, FxBuildHasher>;
+
 
 #[derive(PartialEq, Clone)]
 pub struct BisectorGate {
