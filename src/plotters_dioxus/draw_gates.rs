@@ -6,7 +6,7 @@ use crate::plotters_dioxus::{
         gate_single::rectangle_gate,
         gate_store::GateStateImplExt,
         gate_traits::DrawableGate,
-        gate_types::{GateRenderShape, GateStatValue, GateStats, GateType, ShapeType},
+        gate_types::{Direction, GateRenderShape, GateStatValue, GateStats, GateType, ShapeType},
     },
     plots::parameters::{ PlotMapper, PlotStore},
 };
@@ -199,6 +199,7 @@ pub fn GateLayer(
     });
 
     let mut dbl_click_lockout = use_signal(|| false);
+    let mut last_processed_pos = use_signal(|| (0.0f32, 0.0f32));
 
     rsx! {
         match plot_map() {
@@ -301,16 +302,26 @@ pub fn GateLayer(
                     onmousemove: move |evt| {
                         evt.stop_propagation();
                         if let Some(data) = drag_data() {
+                            let (last_x, last_y) = *last_processed_pos.read();
                             let local_coords = &evt.data.coordinates().element();
                             let px = local_coords.x as f32;
                             let py = local_coords.y as f32;
-                            let data_coords = plot_map
-                                .as_ref()
-                                .unwrap()
-                                .pixel_to_data(px, py, None, None);
 
-                            let new_data = data.clone_with_point(data_coords);
-                            drag_data.set(Some(new_data));
+                            let dx = (px - last_x).abs();
+                            let dy = (py - last_y).abs();
+
+                            if dx >= 1.0 || dy >= 1.0 {
+
+                                let data_coords = plot_map
+                                    .as_ref()
+                                    .unwrap()
+                                    .pixel_to_data(px, py, None, None);
+
+                                let new_data = data.clone_with_point(data_coords);
+                                drag_data.set(Some(new_data));
+
+                                last_processed_pos.set((px, py));
+                            }
 
                         }
                     },
@@ -888,12 +899,26 @@ fn RenderShape(
 
                 }
             }
-            GateRenderShape::Text { origin, offset,  fontsize, text } => {
-                
+            GateRenderShape::Text { origin, offset,  fontsize, text , text_anchor, shape_type} => {
+                let transform = match shape_type {
+                    ShapeType::Text => transform,
+                    ShapeType::UndraggableText(direction) => match direction{
+                        Direction::X => todo!(),
+                        Direction::Y => todo!(),
+                        Direction::Both => todo!(),
+                    },
+                    _ => unreachable!()
+                };
                 let loc = mapper.data_to_pixel(origin.0 + offset.0, origin.1 + offset.1, None, None);
                 rsx!{
                     g { transform,
-                        text { x: loc.0, y: loc.1, "{text}" }
+                        text {
+                            x: loc.0,
+                            y: loc.1,
+                            text_anchor,
+                            font_size: fontsize,
+                            "{text}"
+                        }
                     }
                 }
             }

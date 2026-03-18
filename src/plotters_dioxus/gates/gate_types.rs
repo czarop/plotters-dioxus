@@ -36,6 +36,13 @@ impl GateType {
 }
 
 #[derive(PartialEq, Clone)]
+pub enum Direction {
+    X,
+    Y,
+    Both
+}
+
+#[derive(PartialEq, Clone)]
 pub enum ShapeType {
     Gate(GateId),
     CompositeGate(GateId, bool),
@@ -47,6 +54,8 @@ pub enum ShapeType {
     Rotation(f32),
     UndraggableLine,
     UndraggablePoint(usize),
+    Text,
+    UndraggableText(Direction)
 }
 
 #[derive(PartialEq, Clone)]
@@ -102,6 +111,8 @@ pub enum GateRenderShape {
         offset: (f32, f32),
         fontsize: f32,
         text: String,
+        text_anchor: Option<String>,
+        shape_type: ShapeType
     }
 }
 

@@ -279,7 +279,7 @@ impl DrawableGate for PolygonGate {
                 Some(percent) => {
                     let params = self.get_params();
                     let origin = self.inner.geometry.calculate_center(&params.0, &params.1).expect("should not fail");
-                    let shape = GateRenderShape::Text { origin, offset, fontsize: 10f32, text: format!("{:.2}%", percent) };
+                    let shape = GateRenderShape::Text { origin, offset, fontsize: 10f32, text: format!("{:.2}%", percent), text_anchor: None, shape_type: ShapeType::Text};
                     labels.push(shape)
             },
                 None => {},

@@ -280,7 +280,7 @@ impl DrawableGate for RectangleGate {
             let offset = (x_offset, y_offset);
             match gate_stats.get_percent_for_id(self.inner.id.clone()){
                 Some(percent) => {
-                    let shape = GateRenderShape::Text { origin: self.points[3], offset: offset, fontsize: 10f32, text: format!("{:.2}%", percent) };
+                    let shape = GateRenderShape::Text { origin: self.points[3], offset: offset, fontsize: 10f32, text: format!("{:.2}%", percent), text_anchor: None, shape_type: ShapeType::Text };
                     labels.push(shape)
             },
                 None => {},

@@ -1,7 +1,6 @@
 Gates:
 
 Get % shown on gates - implement for composite gates (just need to put the positions and labels on)
-% should really update on drag... - detect this and modify for that gate on the fly
 
 Add filter Cache
 label positions
