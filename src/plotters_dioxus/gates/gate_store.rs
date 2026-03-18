@@ -2,7 +2,7 @@ use anyhow::anyhow;
 use dioxus::prelude::*;
 use flow_fcs::TransformType;
 use flow_gates::{Gate, GateHierarchy};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, LazyLock};
 
@@ -56,11 +56,6 @@ impl GatesOnPlotKey {
     }
 }
 
-#[derive(Hash, PartialEq, Eq, Clone)]
-pub struct GatePositionKey {
-    gate_id: GateId,
-    file_id: GateId,
-}
 
 pub struct GateMap(pub FxHashMap<GateId, Arc<dyn DrawableGate>>);
 
@@ -111,7 +106,7 @@ pub struct GateState {
     // For the Filtering: "How are these gates nested?"
     pub hierarchy: GateHierarchy,
     // are there file-specific overrides for gate positions
-    pub position_overrides: FxHashMap<GatePositionKey, flow_gates::GateGeometry>,
+    pub position_overrides: FxHashMap<GateId, FxHashMap<Arc<str>, Arc<dyn DrawableGate>>>,
 
     pub gate_stats: FxHashMap<Arc<str>, GateStats>
 }
@@ -274,23 +269,54 @@ impl<Lens> Store<GateState, Lens> {
         Ok(())
     }
 
-    fn remove_gate(&mut self, gate_id: GateId, parental_gate_id: Option<GateId>) -> Result<()> {
-        if let Some((id, gate)) = self.primary_gate_registry().write().remove_entry(&gate_id) {
-            let (x_param, y_param) = gate.get_params();
-            let key =
-                GatesOnPlotKey::new(x_param.clone(), y_param.clone(), parental_gate_id.clone());
+    fn remove_gate(&mut self, gate_id: GateId) -> anyhow::Result<()> {
 
-            self.gate_ids_by_view()
-                .write()
-                .entry(key)
-                .and_modify(|l| l.retain(|name| name != &id));
-        };
+        fn collect_gates_to_remove(
+            gate_id: Arc<str>, 
+            to_remove: &mut Vec<Arc<str>>, 
+            hierarchy: &GateHierarchy 
+        ) {
+            for child_id in hierarchy.get_children(&gate_id) {
+                collect_gates_to_remove(child_id.clone(), to_remove, hierarchy);
+            }
+            to_remove.push(gate_id);
+        }
 
-        // iteratively do this for all child gates in the hierarchy!
-        todo!();
-        // let child_gates = self.hierarchy().write().delete_subtree(
-        //     id.clone(),
-        // );
+        // this is not finding composite gates for some reason??
+    
+        let mut gates_to_delete: Vec<Arc<str>> = vec![];
+
+        let mut brothers = vec![];
+        if let Some((_id, temp_g)) = self.primary_and_subgate_registry().peek().get_key_value(&gate_id){
+            if temp_g.is_composite(){
+                brothers.extend_from_slice(&temp_g.get_inner_gate_ids());
+            }
+        }
+
+        for brother in &brothers{
+            collect_gates_to_remove(brother.clone(), &mut gates_to_delete, &*self.hierarchy().peek());
+        }
+        
+
+        let mut state = self.write();
+
+        for child_gate_id in gates_to_delete{
+            if let Some((id, gate)) = state.primary_and_subgate_registry.remove_entry(&child_gate_id){
+                let drawable_gate_id = gate.get_id();
+                let params = gate.get_params();
+                let parent = state.hierarchy.get_parent(&id).unwrap_or_else(|| &ROOTGATE).clone();
+                state.primary_gate_registry.remove(&drawable_gate_id);
+                let key = GatesOnPlotKey::new(params.0, params.1, Some(parent));
+                if let Some(gate_list) = state.gate_ids_by_view.get_mut(&key) {
+                    gate_list.retain(|id| id != &drawable_gate_id);
+                }
+                
+                state.position_overrides.remove(&drawable_gate_id);
+            }
+        }
+        for brother in brothers {
+            state.hierarchy.delete_subtree(&brother);
+        }
 
         Ok(())
     }

@@ -3,7 +3,7 @@ pub mod gate_drag;
 pub mod gate_single;
 pub mod gate_store;
 pub mod gate_types;
-pub use gate_store::{GateId, GatePositionKey, GateState, GatesOnPlotKey};
+pub use gate_store::{GateId, GateState, GatesOnPlotKey};
 pub mod gate_buttons;
 pub mod gate_composite;
 pub mod gate_filtering;

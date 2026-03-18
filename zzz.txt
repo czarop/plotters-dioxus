@@ -1,14 +1,12 @@
 Gates:
 
-Labels interfere with dragging
 NOT gates
 AND gates
 OR gates
 Add filter Cache
 
-context menu on gate sidebar + renaming + deleting
-name gates
-Delete gates
+rename gates
+highlight gates when selected on sidebar?
 
 
 Meta:
