@@ -8,7 +8,7 @@ use crate::{FxIndexMap, plotters_dioxus::{
         gate_drag::PointDragData,
         gate_single::{line_gate::LineGate, rescale_helper_point},
         gate_traits::DrawableGate,
-        gate_types::{DEFAULT_LINE, GREY_LINE_DASHED, GateRenderShape, GateStats, SELECTED_LINE, ShapeType},
+        gate_types::{self, DEFAULT_LINE, GREY_LINE_DASHED, GateRenderShape, GateStats, SELECTED_LINE, ShapeType},
     },
     plots::parameters::PlotMapper,
 }};
@@ -299,6 +299,7 @@ impl super::super::gate_traits::DrawableGate for BisectorGate {
         if let Some(gate_stats) = gate_stats {
             let x_axis_min_max = plot_map.x_axis_min_max();
             let y_axis_min_max = plot_map.y_axis_min_max();
+            let x_axis_offset = ((x_axis_min_max.end() - x_axis_min_max.start()) / 100f32) * 1f32;
             let y_axis_offset = ((y_axis_min_max.end() - y_axis_min_max.start()) / 100f32) * 1f32;
             for (i, (id, _)) in self.gates.iter().enumerate(){
                 
@@ -307,11 +308,20 @@ impl super::super::gate_traits::DrawableGate for BisectorGate {
                         let text = format!("{:.2}%", percent);
                         let (origin, offset, text_anchor) = if i == 0 {
                             // LEFT LABEL
-                            ((*x_axis_min_max.start(), self.points.1 + y_axis_offset), (0.0, 0.0), Some(String::from("start")))
+                            if self.axis_matched{
+                                ((*x_axis_min_max.start() + x_axis_offset, self.points.1 + y_axis_offset), (0.0, 0.0), Some(String::from("start")))
+                            } else {
+                                // BOTTOM LABEL
+                                ((self.points.0 + x_axis_offset, *y_axis_min_max.start() + y_axis_offset), (0.0, 0.0), None)
+                            }   
                         } else {
                             // RIGHT LABEL
-
-                            ((*x_axis_min_max.end(), self.points.1 + y_axis_offset), (0.0, 0.0), Some(String::from("end")))
+                            if self.axis_matched{
+                                ((*x_axis_min_max.end() - y_axis_offset, self.points.1 + y_axis_offset), (0.0, 0.0), Some(String::from("end")))
+                            } else {
+                                // TOP LABEL
+                                ((self.points.0 + x_axis_offset, *y_axis_min_max.end() - 2f32 * y_axis_offset), (0.0, 0.0), None)
+                            }
                         };
                         let shape = GateRenderShape::Text { 
                             origin, 
@@ -319,7 +329,7 @@ impl super::super::gate_traits::DrawableGate for BisectorGate {
                             fontsize: 10f32, 
                             text,
                             text_anchor,
-                            shape_type: ShapeType::UndraggableText(crate::plotters_dioxus::gates::gate_types::Direction::X)
+                            shape_type: if self.axis_matched {ShapeType::UndraggableText(gate_types::Direction::X)} else {ShapeType::UndraggableText(gate_types::Direction::Y)}
                         };
                         labels.push(shape)
                         

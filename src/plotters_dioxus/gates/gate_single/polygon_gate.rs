@@ -131,6 +131,15 @@ impl PolygonGate {
         }
         vec![]
     }
+
+    pub fn get_label_offset(&self) -> (f32, f32) {
+        match &self.inner.label_position {
+            Some(o) => {
+                (o.offset_x, o.offset_y)
+            },
+            None => (0f32, 0f32),
+        }
+    }
 }
 
 impl DrawableGate for PolygonGate {

@@ -6,7 +6,7 @@ use rustc_hash::FxBuildHasher;
 use std::ops::Index;
 use std::{ops::RangeInclusive, sync::Arc};
 
-use crate::plotters_dioxus::gates::gate_types::GateStats;
+use crate::plotters_dioxus::gates::gate_types::{self, GateStats};
 use crate::plotters_dioxus::{
     gates::{
         gate_drag::PointDragData,
@@ -427,7 +427,71 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
             None
         };
 
-        crate::collate_vecs!(main, selected)
+        let mut labels = vec![];
+        if let Some(gate_stats) = gate_stats {
+            let x_axis_min_max = plot_map.x_axis_min_max();
+            let y_axis_min_max = plot_map.y_axis_min_max();
+            let x_axis_offset = ((x_axis_min_max.end() - x_axis_min_max.start()) / 100f32) * 1f32;
+            let y_axis_offset = ((y_axis_min_max.end() - y_axis_min_max.start()) / 100f32) * 1f32;
+            for (i, (id, _)) in self.gates.iter().enumerate(){
+                // order: bl, br, tr, tl
+                match gate_stats.get_percent_for_id(id.clone()){
+                    Some(percent) => {
+                        let text = format!("{:.2}%", percent);
+                        let (origin, offset, text_anchor) = match i {
+                            0 => {
+                                // ALWAYS BOTTOM LEFT
+                                ((*x_axis_min_max.start() + x_axis_offset, *y_axis_min_max.start() + y_axis_offset), self.gates.get(id).expect("").get_label_offset(), Some(String::from("start")))
+                            },
+                            1 => {
+                                // BOTTOM RIGHT LABEL
+                                if self.axis_matched{
+                                    ((*x_axis_min_max.end() - x_axis_offset, *y_axis_min_max.start() + y_axis_offset), self.gates.get(id).expect("").get_label_offset(), Some(String::from("end")))
+                                } else {
+                                // TOP LEFT LABEL
+                                    ((*x_axis_min_max.start() + x_axis_offset, *y_axis_min_max.end() - 2f32 * y_axis_offset), self.gates.get(id).expect("").get_label_offset(), Some(String::from("start")))
+                                }
+                            },
+                            2 => {
+                                // ALWAYS TOP RIGHT
+                                ((*x_axis_min_max.end() - x_axis_offset, *y_axis_min_max.end() - 2f32 * y_axis_offset), self.gates.get(id).expect("").get_label_offset(), Some(String::from("end")))
+                            },
+                            3 => {
+                                // TOP LEFT LABEL
+                                if self.axis_matched{
+                                    ((*x_axis_min_max.start() + x_axis_offset, *y_axis_min_max.end() - 2f32 * y_axis_offset), self.gates.get(id).expect("").get_label_offset(), Some(String::from("start")))
+                                } else {
+                                // BOTTOM RIGHT LABEL
+                                    ((*x_axis_min_max.end() - x_axis_offset, *y_axis_min_max.start() + y_axis_offset), self.gates.get(id).expect("").get_label_offset(), Some(String::from("end")))
+                                }
+
+                            },
+                            _ => unreachable!()
+
+                            
+                        };
+                        let shape = GateRenderShape::Text { 
+                            origin, 
+                            offset, 
+                            fontsize: 10f32, 
+                            text,
+                            text_anchor,
+                            shape_type: ShapeType::UndraggableText(gate_types::Direction::Both)
+                        };
+                        labels.push(shape)
+                        
+                },
+                    None => {},
+                }
+            }
+            
+            
+        }
+
+
+        let labels = if labels.is_empty() {None} else {Some(labels)};
+
+        crate::collate_vecs!(main, selected, labels)
     }
 
     fn is_composite(&self) -> bool {

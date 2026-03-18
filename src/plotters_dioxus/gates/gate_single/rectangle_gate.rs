@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use anyhow::anyhow;
 use flow_fcs::TransformType;
-use flow_gates::{GateGeometry, create_rectangle_geometry};
+use flow_gates::{GateCenter, GateGeometry, create_rectangle_geometry};
 
 use crate::plotters_dioxus::{
     gates::{
@@ -274,13 +274,22 @@ impl DrawableGate for RectangleGate {
                 if let Some(label_pos) = &self.inner.label_position{
                     yrange * label_pos.offset_y
                 } else {
-                    yrange * 0.02
+                    // yrange * 0.02
+                    0f32
                 }
             };
             let offset = (x_offset, y_offset);
             match gate_stats.get_percent_for_id(self.inner.id.clone()){
                 Some(percent) => {
-                    let shape = GateRenderShape::Text { origin: self.points[3], offset: offset, fontsize: 10f32, text: format!("{:.2}%", percent), text_anchor: None, shape_type: ShapeType::Text };
+                    let center = {
+                        let bl = self.points[0];
+                        let tr = self.points[2];
+                        (
+                            (bl.0 + tr.0) / 2.0,
+                            (bl.1 + tr.1) / 2.0
+                        )
+                    };
+                    let shape = GateRenderShape::Text { origin: center, offset: offset, fontsize: 10f32, text: format!("{:.2}%", percent), text_anchor: None, shape_type: ShapeType::Text };
                     labels.push(shape)
             },
                 None => {},
@@ -288,7 +297,7 @@ impl DrawableGate for RectangleGate {
         }
 
 
-        let labels = Some(labels);
+        let labels = if labels.is_empty() {None} else {Some(labels)};
 
         crate::collate_vecs!(main, selected, ghost, labels)
     }
@@ -528,14 +537,96 @@ pub fn update_rectangle_geometry(
         .map_err(|_| anyhow::anyhow!("failed to update rectangle geometry"))
 }
 
+// use dioxus::prelude::*;
+
+// #[component]
+// pub fn RectangleGateComponent(
+//     gate: Arc<RectangleGate>,
+//     is_selected: ReadSignal<bool>,
+//     drag_point: ReadSignal<Option<PointDragData>>,
+//     drag_gate: ReadSignal<Option<GateDragData>>,
+//     plot_map: ReadSignal<PlotMapper>,
+//     gate_stats: ReadSignal<Option<GateStats>>
+// ) -> Element {
+    
+//     let style = if is_selected() {
+//             &SELECTED_LINE
+//         } else {
+//             &DEFAULT_LINE
+//         };
+
+//     let pts = &gate.points;
+
+//     let main = use_memo(move || {
+//         let (min, max) = (gate.points[0], gate.points[2]);
+//         let (x, y, width, height) = bounds_to_svg_rect(min, max);
+//         let gate_id = gate.get_id();
+//         let (mx, my, m_width, m_height) = map_rect_to_pixels(x, y, width, height, &*plot_map.read());
+//         rsx! {
+//             g { transform,
+//                 rect {
+//                     x: mx,
+//                     y: my,
+//                     width: m_width,
+//                     height: m_height,
+//                     stroke: style.stroke,
+//                     stroke_width: style.stroke_width,
+//                     stroke_dasharray: if style.dashed { "4" } else { "none" },
+//                     fill: style.fill,
+//                 }
+//             }
+
+//         }
+//     });
 
 
-    // pub fn determine_percent_in_gate(&self, event_index: &flow_gates::EventIndex, gate: &flow_gates::Gate) -> anyhow::Result<String> {
-    //     let len = event_index.len() as f32;
-    //     let filtered = event_index.filter_by_gate(gate)?.len() as f32;
-    //     let percent = (filtered / len) * 100f32;
-    //     let formatted = format!("{:.2}%", percent);
-    //     println!("{formatted}");
-    //     Ok(formatted)
-    // }
+//     let selected = if is_selected() {
+//         Some(draw_circles_for_selected_gate(&pts, 0))
+//     } else {
+//         None
+//     };
+//     let ghost = drag_point.read()
+//         .as_ref()
+//         .and_then(|d| draw_ghost_point_for_rectangle(d, &pts));
+
+
+//     let mut labels = vec![];
+    
+//     if let Some(gate_stats) = gate_stats() {
+//         let x_offset = {
+//             let axis = plot_map.read().x_axis_min_max();
+//             let xrange = *axis.end() - *axis.start();
+//             if let Some(label_pos) = &gate.inner.label_position{
+//                 xrange * label_pos.offset_x
+//             } else {
+//                 0f32
+//             }
+//         };
+//         let y_offset = {
+//             let axis = plot_map.read().y_axis_min_max();
+//             let yrange = *axis.end() - *axis.start();
+//             if let Some(label_pos) = &gate.inner.label_position{
+//                 yrange * label_pos.offset_y
+//             } else {
+//                 yrange * 0.02
+//             }
+//         };
+//         let offset = (x_offset, y_offset);
+//         match gate_stats.get_percent_for_id(gate.inner.id.clone()){
+//             Some(percent) => {
+//                 let shape = GateRenderShape::Text { origin: gate.points[3], offset: offset, fontsize: 10f32, text: format!("{:.2}%", percent), text_anchor: None, shape_type: ShapeType::Text };
+//                 labels.push(shape)
+//         },
+//             None => {},
+//         }
+//     }
+
+
+//     let labels = Some(labels);
+
+        
+
+    
+//     rsx!()
+// }
 

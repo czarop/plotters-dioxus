@@ -1,13 +1,10 @@
 Gates:
 
-Get % shown on gates - implement for composite gates (just need to put the positions and labels on)
-
-Add filter Cache
-label positions
-
+Labels interfere with dragging
 NOT gates
 AND gates
 OR gates
+Add filter Cache
 
 context menu on gate sidebar + renaming + deleting
 name gates
@@ -39,5 +36,5 @@ Set Comp from omiq Comp
 Nice to have:
 Contourplot
 Histogram
-
+label positions
 

@@ -340,7 +340,12 @@ impl DrawableGate for LineGate {
                 if let Some(label_pos) = &self.inner.label_position{
                     xrange * label_pos.offset_x
                 } else {
-                    0f32
+                    if self.axis_matched{
+                        0f32
+                    } else {
+                        xrange * 0.02
+                    }
+                    
                 }
             };
             let y_offset = {
@@ -349,13 +354,19 @@ impl DrawableGate for LineGate {
                 if let Some(label_pos) = &self.inner.label_position{
                     yrange * label_pos.offset_y
                 } else {
-                    yrange * 0.02
+                    if self.axis_matched{
+                        yrange * 0.02
+                    } else {
+                        0f32
+                    }
+                    
                 }
             };
             let offset = (x_offset, y_offset);
             match gate_stats.get_percent_for_id(self.inner.id.clone()){
                 Some(percent) => {
-                    let shape = GateRenderShape::Text { origin: (self.points[0].0, self.height), offset: offset, fontsize: 10f32, text: format!("{:.2}%", percent), text_anchor: None, shape_type: ShapeType::Text};
+                    let origin = if self.axis_matched {(self.points[0].0, self.height)} else {(self.height, self.points[0].1)};
+                    let shape = GateRenderShape::Text { origin, offset, fontsize: 10f32, text: format!("{:.2}%", percent), text_anchor: None, shape_type: ShapeType::Text};
                     labels.push(shape)
             },
                 None => {},

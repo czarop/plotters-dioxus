@@ -900,15 +900,35 @@ fn RenderShape(
                 }
             }
             GateRenderShape::Text { origin, offset,  fontsize, text , text_anchor, shape_type} => {
+                
                 let transform = match shape_type {
                     ShapeType::Text => transform,
-                    ShapeType::UndraggableText(direction) => match direction{
-                        Direction::X => todo!(),
-                        Direction::Y => todo!(),
-                        Direction::Both => todo!(),
-                    },
-                    _ => unreachable!()
-                };
+                    ShapeType::UndraggableText(direction) => {
+                        
+                    if let Some(GateDragType::Gate(data)) = drag_data {
+                        if *gate_id == *data.gate_id() {
+                            let offset = data.offset();
+                            let p_start = mapper.data_to_pixel(0.0, 0.0, None, None);
+                            let p_current = mapper.data_to_pixel(offset.0, offset.1, None, None);
+                            let dx = p_current.0 - p_start.0;
+                            let dy = p_current.1 - p_start.1;
+                            match direction{
+                                Direction::X => format!("translate({} {})", 0, -dy),
+                                Direction::Y => format!("translate({} {})", -dx, 0),
+                                Direction::Both => format!("none"),
+                            }
+                        } else {
+                            format!("none")
+                        }
+
+                    } else {
+                        format!("none")
+                    }
+                    
+                },
+                _ => unreachable!()
+            };
+
                 let loc = mapper.data_to_pixel(origin.0 + offset.0, origin.1 + offset.1, None, None);
                 rsx!{
                     g { transform,
@@ -917,6 +937,7 @@ fn RenderShape(
                             y: loc.1,
                             text_anchor,
                             font_size: fontsize,
+                            pointer_events: "none",
                             "{text}"
                         }
                     }
