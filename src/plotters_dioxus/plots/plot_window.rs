@@ -13,7 +13,7 @@ use crate::{
         gates::{
             GateState,
             gate_store::{GateStateImplExt, ROOTGATE},
-            gate_types::GateType,
+            gate_types::DrawableGateType,
         },
         plots::parameters::{
             Param, PlotStore, PlotStoreImplExt, PlotStoreStoreExt as _,
@@ -32,7 +32,7 @@ pub fn PlotWindow() -> Element {
     let mut gate_store = use_store(|| GateState::default());
     use_context_provider(|| gate_store);
 
-    let mut current_gate_type = use_signal(|| GateType::Polygon);
+    let mut current_gate_type = use_signal(|| DrawableGateType::Polygon);
     use_context_provider(|| current_gate_type);
 
     let _ = use_resource(move || async move {

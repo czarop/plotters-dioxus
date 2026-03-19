@@ -22,7 +22,7 @@ use crate::plotters_dioxus::{
             rectangle_gate::{RectangleGate, create_default_rectangle},
         },
         gate_traits::DrawableGate,
-        gate_types::GateType,
+        gate_types::DrawableGateType,
     },
     plots::parameters::PlotMapper,
 };
@@ -128,7 +128,7 @@ impl<Lens> Store<GateState, Lens> {
         points: Option<Vec<(f32, f32)>>,
         id: String,
         parental_gate_id: Option<GateId>,
-        gate_type: GateType,
+        gate_type: DrawableGateType,
     ) -> Result<()> {
         let key = GatesOnPlotKey::new(x_param.clone(), y_param.clone(), parental_gate_id.clone());
         println!("{:?}", key);
@@ -137,7 +137,7 @@ impl<Lens> Store<GateState, Lens> {
         // let mut composite_subgate_ids = vec![];
 
         let g: Arc<dyn DrawableGate + 'static> = match gate_type {
-            GateType::Polygon => {
+            DrawableGateType::Polygon => {
                 let geo = flow_gates::geometry::create_polygon_geometry(
                     points.ok_or(anyhow!("points not provided for polygon gate"))?,
                     &x_param,
@@ -154,7 +154,7 @@ impl<Lens> Store<GateState, Lens> {
                 };
                 Arc::new(PolygonGate::try_new(gate)?)
             }
-            GateType::Ellipse => {
+            DrawableGateType::Ellipse => {
                 let geo = create_default_ellipse(
                     &mapper, click_x, click_y, 50f32, 30f32, &x_param, &y_param,
                 )?;
@@ -168,7 +168,7 @@ impl<Lens> Store<GateState, Lens> {
                 };
                 Arc::new(EllipseGate::try_new(gate)?)
             }
-            GateType::Rectangle => {
+            DrawableGateType::Rectangle => {
                 let geo = create_default_rectangle(
                     &mapper, click_x, click_y, 50f32, 50f32, &x_param, &y_param,
                 )?;
@@ -182,7 +182,7 @@ impl<Lens> Store<GateState, Lens> {
                 };
                 Arc::new(RectangleGate::try_new(gate)?)
             }
-            GateType::Line(y_coord) => {
+            DrawableGateType::Line(y_coord) => {
                 let geo = create_default_line(&mapper, click_x, 50f32, &x_param, &y_param)?;
                 if let Some(y_coord) = y_coord {
                     let gate = Gate {
@@ -201,21 +201,21 @@ impl<Lens> Store<GateState, Lens> {
                 }
             }
 
-            GateType::Bisector => Arc::new(BisectorGate::try_new(
+            DrawableGateType::Bisector => Arc::new(BisectorGate::try_new(
                 mapper,
                 Arc::from(id.as_str()),
                 (click_x, click_y),
                 x_param,
                 y_param,
             )?),
-            GateType::Quadrant => Arc::new(QuadrantGate::try_new_from_raw_coord(
+            DrawableGateType::Quadrant => Arc::new(QuadrantGate::try_new_from_raw_coord(
                 mapper,
                 Arc::from(id.as_str()),
                 (click_x, click_y),
                 x_param,
                 y_param,
             )?),
-            GateType::SkewedQuadrant => Arc::new(SkewedQuadrantGate::try_new_from_raw_coord(
+            DrawableGateType::SkewedQuadrant => Arc::new(SkewedQuadrantGate::try_new_from_raw_coord(
                 mapper,
                 Arc::from(id.as_str()),
                 (click_x, click_y),

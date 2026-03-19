@@ -6,7 +6,7 @@ use crate::plotters_dioxus::{
         gate_single::rectangle_gate,
         gate_store::GateStateImplExt,
         gate_traits::DrawableGate,
-        gate_types::{Direction, GateRenderShape, GateStatValue, GateStats, GateType, ShapeType},
+        gate_types::{Direction, GateRenderShape, GateStatValue, GateStats, DrawableGateType, ShapeType},
     },
     plots::parameters::{ PlotMapper, PlotStore},
 };
@@ -40,7 +40,7 @@ pub fn GateLayer(
     let mut draft_gate_coords = use_signal(|| Vec::<(f32, f32)>::new());
     let mut next_gate_id = use_signal(|| 0);
     let mut selected_gate_id = use_signal(|| None::<Arc<str>>);
-    let current_gate_type = use_context::<Signal<GateType>>();
+    let current_gate_type = use_context::<Signal<DrawableGateType>>();
 
     let plot_store = use_context::<Store<PlotStore>>();
 
@@ -49,7 +49,7 @@ pub fn GateLayer(
 
     // convert clicked coords into a draft gate
     let draft_gate = use_memo(move || {
-        if let GateType::Polygon = &*current_gate_type.read() {
+        if let DrawableGateType::Polygon = &*current_gate_type.read() {
             let cur_coords = draft_gate_coords();
             if cur_coords.len() > 0 {
                 let gate_draft = GateDraft::new_polygon(cur_coords, x_channel(), y_channel());
@@ -200,7 +200,6 @@ pub fn GateLayer(
 
     let mut dbl_click_lockout = use_signal(|| false);
     let mut last_processed_pos = use_signal(|| (0.0f32, 0.0f32));
-    let mut svg_rect: Signal<Option<Rect<f64, dioxus_elements::geometry::Pixels>>> = use_signal(|| None);
     let mut svg_data: Signal<Option<std::rc::Rc<MountedData> >> = use_signal(|| None);
 
 
@@ -210,18 +209,8 @@ pub fn GateLayer(
                 div {
                     style: "position: absolute; top: 0; left: 0; width: 100%; height: 100%;",
                     onmounted: move |e| {
-
-                        // svg_data.set(Some(e.data()));
                         let data = e.data();
                         svg_data.set(Some(data));
-                        // spawn(async move {
-                        //     match data.get_client_rect().await {
-                        //         Ok(rect) => svg_rect.set(Some(rect)),
-                        //         Err(e) => println!("{e}"),
-
-                        //     }
-                        // });
-
                     },
                     svg {
                         width: "100%",
@@ -249,7 +238,7 @@ pub fn GateLayer(
                                 }
                                 if clicked_gate.is_none() {
                                     if selected_gate_id.peek().is_none() {
-                                        if &GateType::Polygon == &*current_gate_type.peek() {
+                                        if &DrawableGateType::Polygon == &*current_gate_type.peek() {
                                             draft_gate_coords.write().push((data_x, data_y));
                                         }
                                     } else if drag_data.peek().is_none() {
@@ -270,7 +259,7 @@ pub fn GateLayer(
                             drag_data.set(None);
                         },
                         ondoubleclick: move |evt| {
-                            if selected_gate_id.peek().is_some() || dbl_click_lockout() { // if let Some(data) = drag_data() {  if let Some(data) = drag_data() {  if let Some(data) = drag_data() {  if let Some(data) = drag_data() {  if let Some(data) = drag_data() {  if let Some(data) = drag_data() {  if let Some(data) = drag_data() {  if let Some(data) = drag_data() {  if let Some(data) = drag_data() {  if let Some(data) = drag_data() {  if let Some(data) = drag_data() {  if let Some(data) = drag_data() {  if let Some(data) = drag_data() {  if let Some(data) = drag_data() {  if let Some(data) = drag_data() {  if let Some(data) = drag_data() { // if let Some(data) = drag_data() {  if let Some(data) = drag_data() {  if let Some(data) = drag_data() {  if let Some(data) = drag_data() {  if let Some(data) = drag_data() {  if let Some(data) = drag_data() {  if let Some(data) = drag_data() {  if let Some(data) = drag_data() {  if let Some(data) = drag_data() {  if let Some(data) = drag_data() {  if let Some(data) = drag_data() {  if let Some(data) = drag_data() {  if let Some(data) = drag_data() {  if let Some(data) = drag_data() {  if let Some(data) = drag_data() {  if let Some(data) = drag_data() {
+                            if selected_gate_id.peek().is_some() || dbl_click_lockout() {
                                 return;
                             }
                             let local_coords = evt.data.coordinates().element();
@@ -291,8 +280,8 @@ pub fn GateLayer(
                                 }
                             };
 
-                            let geo = if let GateType::Line(_) = &*current_gate_type.peek() {
-                                GateType::Line(Some(dy))
+                            let geo = if let DrawableGateType::Line(_) = &*current_gate_type.peek() {
+                                DrawableGateType::Line(Some(dy))
                             } else {
                                 current_gate_type.peek().cloned()
                             };

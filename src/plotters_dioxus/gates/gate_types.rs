@@ -4,6 +4,31 @@ use rustc_hash::FxHashMap;
 
 use crate::plotters_dioxus::gates::gate_store::GateId;
 
+#[derive(Clone)]
+pub enum GateType{
+    Drawable(Arc<dyn super::gate_traits::DrawableGate>),
+    Boolean(Arc<super::gate_single::boolean_gates::BooleanGate>)
+}
+
+impl PartialEq for GateType {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Drawable(l0), Self::Drawable(r0)) => Arc::ptr_eq(l0, r0),
+            (Self::Boolean(l0), Self::Boolean(r0)) => Arc::ptr_eq(l0, r0),
+            _ => false,
+        }
+    }
+}
+
+impl GateType {
+    pub fn get_id(&self) -> Arc<str> {
+        match self {
+            GateType::Drawable(drawable_gate) => drawable_gate.get_id(),
+            GateType::Boolean(boolean_gate) => boolean_gate.get_id(),
+        }
+    }
+}
+
 #[derive(Clone, PartialEq)]
 pub enum GateText{
     Name(String),
@@ -12,7 +37,7 @@ pub enum GateText{
 }
 
 #[derive(Clone, PartialEq, Copy)]
-pub enum GateType {
+pub enum DrawableGateType {
     Polygon,
     Ellipse,
     Rectangle,
@@ -22,11 +47,11 @@ pub enum GateType {
     SkewedQuadrant,
 }
 
-impl GateType {
+impl DrawableGateType {
     pub fn is_composite(&self) -> bool {
         matches!(
             self,
-            GateType::Bisector | GateType::Quadrant | GateType::SkewedQuadrant
+            DrawableGateType::Bisector | DrawableGateType::Quadrant | DrawableGateType::SkewedQuadrant
         )
     }
 
