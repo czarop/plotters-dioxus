@@ -27,6 +27,13 @@ impl GateType {
             GateType::Boolean(boolean_gate) => boolean_gate.get_id(),
         }
     }
+
+    pub fn is_composite(&self) -> bool {
+        match self {
+            GateType::Drawable(drawable_gate) => drawable_gate.is_composite(),
+            GateType::Boolean(boolean_gate) => false,
+        }
+    }
 }
 
 #[derive(Clone, PartialEq)]

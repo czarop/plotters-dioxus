@@ -20,7 +20,7 @@ rustc-hash = "2.1"
 indexmap = "2.1"
 polars = {version = "0.53", default-features = false, features = ["lazy", "performant"]}
 rayon = "1"
-
+im = "15"
 
 [features]
 default = ["desktop"]

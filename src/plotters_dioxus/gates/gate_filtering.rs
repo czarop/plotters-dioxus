@@ -5,6 +5,7 @@ use polars::prelude::*;
 pub fn filter_events_to_mask(
     df: &DataFrame,
     gate: &Gate,
+    resolver: & impl flow_gates::GateResolver
 
 ) -> anyhow::Result<BooleanChunked> {
     let (x_param, y_param) = gate.parameters.clone();
@@ -186,13 +187,14 @@ pub fn filter_events_to_mask(
 pub fn filter_events_by_hierarchy_to_mask(
     scaled_data: &DataFrame,
     gate_chain: &[&Gate],
+    resolver: & impl flow_gates::GateResolver
 
 ) -> Result<BooleanChunked, anyhow::Error> {
     let event_count = scaled_data.height();
     let mut final_mask = BooleanChunked::full("mask".into(), true, event_count);
     println!("called with gate chain length {}", gate_chain.len());
     for gate in gate_chain {
-        let gate_mask = filter_events_to_mask(scaled_data, gate)?;
+        let gate_mask = filter_events_to_mask(scaled_data, gate, resolver)?;
         final_mask = final_mask & gate_mask;
     }
 

@@ -55,7 +55,7 @@ pub async fn get_filtered_dataframe(
 
             // 1. Get the final narrowed mask for the whole hierarchy
             let mask = super::super::gates::gate_filtering::filter_events_by_hierarchy_to_mask(
-                &df, &gate_refs,
+                &df, &gate_refs, resolver
             )?;
             // 2. Filter the dataframe once at the end
             Ok(df.filter(&mask)?.into())

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use anyhow::anyhow;
 use flow_fcs::TransformType;
-use flow_gates::{GateCenter, GateGeometry, create_rectangle_geometry};
+use flow_gates::{GateGeometry, create_rectangle_geometry};
 
 use crate::plotters_dioxus::{
     gates::{

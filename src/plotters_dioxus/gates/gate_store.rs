@@ -6,7 +6,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, LazyLock};
 
-use crate::plotters_dioxus::gates::gate_types::GateStats;
+use crate::plotters_dioxus::gates::gate_types::{GateStats, GateType};
 use crate::plotters_dioxus::{
     AxisInfo,
     gates::{
@@ -28,6 +28,7 @@ use crate::plotters_dioxus::{
 };
 
 pub type GateId = std::sync::Arc<str>;
+pub type FileId = std::sync::Arc<str>;
 
 pub static ROOTGATE: LazyLock<Arc<str>> = LazyLock::new(|| Arc::from("root"));
 
@@ -87,6 +88,37 @@ impl flow_gates::GateResolver for GateMap {
     }
 }
 
+#[derive(Clone)]
+struct TrackedGate(Arc<dyn DrawableGate>);
+
+impl PartialEq for TrackedGate {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+pub type PositionOverrideMap = FxHashMap<GateId, FxHashMap<FileId, TrackedGate>>;
+
+#[derive(PartialEq, Clone)]
+pub struct GateOverrides {
+    pub curr_file_id: FileId,
+    pub gate_map: im::HashMap<GateId, FxHashMap<FileId, Arc<GateType>>>,
+    pub position_overrides: PositionOverrideMap,
+}
+
+impl flow_gates::GateResolver for GateOverrides {
+    fn resolve(&self, id: &str) -> Option<&Gate> {
+        let curr_file = self.curr_file_id;
+        let Some(file_map) = self.position_overrides.get(id) {
+            let Some(override) = file_map.get(&curr_file) {
+
+            } else {
+                
+            }
+        }
+    }
+}
+
 /// a plot is selected for a file,
 /// The currently selected (parental) gate id is stored in a signal and accessed.
 /// Create a GatesOnPlotKey with the current params and the parental gate id,
@@ -101,12 +133,11 @@ pub struct GateState {
     pub primary_gate_registry: GateMap,
 
     pub primary_and_subgate_registry: GateMap,
-
     // composite_redirect: FxHashMap<GateId, GateId>,
     // For the Filtering: "How are these gates nested?"
     pub hierarchy: GateHierarchy,
     // are there file-specific overrides for gate positions
-    pub position_overrides: FxHashMap<GateId, FxHashMap<Arc<str>, Arc<dyn DrawableGate>>>,
+    pub position_overrides: FxHashMap<GateId, FxHashMap<FileId, Arc<dyn DrawableGate>>>,
 
     pub gate_stats: FxHashMap<Arc<str>, GateStats>
 }
