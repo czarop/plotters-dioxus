@@ -4,37 +4,47 @@ use rustc_hash::FxHashMap;
 
 use crate::plotters_dioxus::gates::gate_store::GateId;
 
-#[derive(Clone)]
-pub enum GateType{
-    Drawable(Arc<dyn super::gate_traits::DrawableGate>),
-    Boolean(Arc<super::gate_single::boolean_gates::BooleanGate>)
-}
+// #[derive(Clone)]
+// pub enum GateType{
+//     Drawable(Arc<dyn super::gate_traits::DrawableGate>),
+//     Boolean(Arc<super::gate_single::boolean_gates::BooleanGate>)
+// }
 
-impl PartialEq for GateType {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::Drawable(l0), Self::Drawable(r0)) => Arc::ptr_eq(l0, r0),
-            (Self::Boolean(l0), Self::Boolean(r0)) => Arc::ptr_eq(l0, r0),
-            _ => false,
-        }
-    }
-}
+// impl PartialEq for GateType {
+//     fn eq(&self, other: &Self) -> bool {
+//         match (self, other) {
+//             (Self::Drawable(l0), Self::Drawable(r0)) => Arc::ptr_eq(l0, r0),
+//             (Self::Boolean(l0), Self::Boolean(r0)) => Arc::ptr_eq(l0, r0),
+//             _ => false,
+//         }
+//     }
+// }
 
-impl GateType {
-    pub fn get_id(&self) -> Arc<str> {
-        match self {
-            GateType::Drawable(drawable_gate) => drawable_gate.get_id(),
-            GateType::Boolean(boolean_gate) => boolean_gate.get_id(),
-        }
-    }
+// impl GateType {
+//     pub fn get_id(&self) -> Arc<str> {
+//         match self {
+//             GateType::Drawable(drawable_gate) => drawable_gate.get_id(),
+//             GateType::Boolean(boolean_gate) => boolean_gate.get_id(),
+//         }
+//     }
+// }
 
-    pub fn is_composite(&self) -> bool {
-        match self {
-            GateType::Drawable(drawable_gate) => drawable_gate.is_composite(),
-            GateType::Boolean(boolean_gate) => false,
-        }
-    }
-}
+//     pub fn is_composite(&self) -> bool {
+//         match self {
+//             GateType::Drawable(drawable_gate) => drawable_gate.is_composite(),
+//             GateType::DrawableSub(_drawablesub_gate, _parent_id) => true,
+//             GateType::Boolean(_boolean_gate) => false,
+//         }
+//     }
+
+//     pub fn get_subgate_parent_id(&self) -> Option<Arc<str>> {
+//         match self {
+//             GateType::Drawable(..) => None,
+//             GateType::DrawableSub(_drawable_gate, parent_id) => Some(parent_id.clone()),
+//             GateType::Boolean(..) => None,
+//         }
+//     }
+// }
 
 #[derive(Clone, PartialEq)]
 pub enum GateText{
@@ -44,7 +54,7 @@ pub enum GateText{
 }
 
 #[derive(Clone, PartialEq, Copy)]
-pub enum DrawableGateType {
+pub enum PrimaryGateType {
     Polygon,
     Ellipse,
     Rectangle,
@@ -52,13 +62,16 @@ pub enum DrawableGateType {
     Bisector,
     Quadrant,
     SkewedQuadrant,
+    Not,
+    And,
+    Or
 }
 
-impl DrawableGateType {
+impl PrimaryGateType {
     pub fn is_composite(&self) -> bool {
         matches!(
             self,
-            DrawableGateType::Bisector | DrawableGateType::Quadrant | DrawableGateType::SkewedQuadrant
+            PrimaryGateType::Bisector | PrimaryGateType::Quadrant | PrimaryGateType::SkewedQuadrant
         )
     }
 

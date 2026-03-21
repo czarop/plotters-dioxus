@@ -13,7 +13,7 @@ use crate::{
         gates::{
             GateState,
             gate_store::{GateStateImplExt, ROOTGATE},
-            gate_types::DrawableGateType,
+            gate_types::PrimaryGateType,
         },
         plots::parameters::{
             Param, PlotStore, PlotStoreImplExt, PlotStoreStoreExt as _,
@@ -32,7 +32,7 @@ pub fn PlotWindow() -> Element {
     let mut gate_store = use_store(|| GateState::default());
     use_context_provider(|| gate_store);
 
-    let mut current_gate_type = use_signal(|| DrawableGateType::Polygon);
+    let mut current_gate_type = use_signal(|| PrimaryGateType::Polygon);
     use_context_provider(|| current_gate_type);
 
     let _ = use_resource(move || async move {
@@ -56,8 +56,8 @@ pub fn PlotWindow() -> Element {
     });
 
     let mut sample_index = use_signal(|| 0);
-    let mut parameter_settings = use_store(|| PlotStore::default());
-    use_context_provider(|| parameter_settings);
+    let mut plot_store = use_store(|| PlotStore::default());
+    use_context_provider(|| plot_store);
 
     let current_sample = use_memo(move || {
         let handler = filehandler.read();
@@ -73,16 +73,31 @@ pub fn PlotWindow() -> Element {
     });
 
     // RESOURCE 1: Load FCS File
-    let fcs_file_resource = use_resource(move || async move {
+    let mut fcs_file_resource: Signal<Option<flow_fcs::Fcs>> = use_signal(|| None);
+    let _ = use_resource(move || async move {
         if let Some(sample) = current_sample() {
-            get_flow_data(std::path::PathBuf::from(sample.get_filepath())).await
+            match get_flow_data(std::path::PathBuf::from(sample.get_filepath())).await{
+                Ok(mut f) => {
+                    f.metadata.insert_string_keyword(String::from("$GUID"), uuid::Uuid::new_v4().to_string());
+                    *plot_store.current_file_id().write() = f.metadata.get_string_keyword("$GUID").expect("no guid store in the fcs").into();
+                    fcs_file_resource.set(Some(f))
+                },
+                Err(e) => {
+                    fcs_file_resource.set(None);
+                    println!("error generating fcs file {}", e);
+                },
+            }
         } else {
-            Err(Arc::new(anyhow::anyhow!("No file path selected.")))
+            fcs_file_resource.set(None);
+            println!("No file path selected.");
         }
     });
 
     let sorted_params = use_memo(move || {
-        if let Some(Ok(fcs_file)) = &*fcs_file_resource.read() {
+        if let Some(fcs_file) = &*fcs_file_resource.read() {
+
+
+            
             // pull the parameters from the file
             let mut sorted_params: FxIndexMap<Arc<str>, Param> = fcs_file
                 .parameters
@@ -93,7 +108,7 @@ pub fn PlotWindow() -> Element {
                         fluoro: param.channel_name.clone(),
                     };
                     // add the parameter to the store if required
-                    parameter_settings.add_new_axis_settings(&p, &fcs_file);
+                    plot_store.add_new_axis_settings(&p, &fcs_file);
                     (param.channel_name.clone(), p)
                 })
                 .collect();
@@ -117,7 +132,7 @@ pub fn PlotWindow() -> Element {
     // this is currently scaling the data but filtering is done elsewhere! 
     let scaled_data = use_resource(move || async move {
         let mut params: Vec<(Arc<str>, f32)> = Vec::new();
-        for (k, v) in parameter_settings
+        for (k, v) in plot_store
             .settings()
             .read()
             .iter()
@@ -127,7 +142,7 @@ pub fn PlotWindow() -> Element {
             }
         }
 
-        if let Some(Ok(fcs_file)) = &*fcs_file_resource.read() {
+        if let Some(fcs_file) = &*fcs_file_resource.read() {
             let fcs_clone = fcs_file.clone();
             let result =
                 tokio::task::spawn_blocking(move || -> Result<Arc<DataFrame>, anyhow::Error> {
@@ -169,7 +184,7 @@ pub fn PlotWindow() -> Element {
     // fetch the axis limits from the settings dict when axis changed
     let x_axis_limits = use_memo(move || {
         let param = x_axis_marker.read();
-        match parameter_settings
+        match plot_store
             .settings()
             .read()
             .get(&param.fluoro)
@@ -181,7 +196,7 @@ pub fn PlotWindow() -> Element {
 
     let y_axis_limits = use_memo(move || {
         let param = y_axis_marker();
-        match parameter_settings
+        match plot_store
             .settings()
             .read()
             .get(&param.fluoro)
@@ -288,7 +303,7 @@ pub fn PlotWindow() -> Element {
         .and_then(|res| res.as_ref().ok())
         .and_then(|opt| opt.clone());
 
-        *parameter_settings.event_index_map().write() = data;
+        *plot_store.event_index_map().write() = data;
     });
 
     rsx! {
@@ -324,7 +339,7 @@ pub fn PlotWindow() -> Element {
                                     if let Ok(val) = evt.value().parse::<i32>() {
                                         if val >= 1 {
                                             let param = x_axis_marker.peek();
-                                            let res = parameter_settings.update_cofactor(&param.fluoro, val as f32);
+                                            let res = plot_store.update_cofactor(&param.fluoro, val as f32);
                                             match res {
                                                 Ok((old, new)) => {
                                                     match gate_store.rescale_gates(&param.fluoro, &old, &new) {
@@ -357,7 +372,7 @@ pub fn PlotWindow() -> Element {
                                 oninput: move |e| {
                                     if let Ok(lower) = e.value().parse::<i32>() {
                                         let param = x_axis_marker.peek();
-                                        match parameter_settings.update_lower(&param.fluoro, lower as f32) {
+                                        match plot_store.update_lower(&param.fluoro, lower as f32) {
                                             Ok(l_u_t) => {
                                                 match gate_store
                                                     .set_current_axis_limits(
@@ -385,7 +400,7 @@ pub fn PlotWindow() -> Element {
                                 oninput: move |e| {
                                     if let Ok(upper) = e.value().parse::<i32>() {
                                         let param = x_axis_marker.peek();
-                                        match parameter_settings.update_upper(&param.fluoro, upper as f32) {
+                                        match plot_store.update_upper(&param.fluoro, upper as f32) {
                                             Ok(l_u_t) => {
                                                 match gate_store
                                                     .set_current_axis_limits(
@@ -425,7 +440,7 @@ pub fn PlotWindow() -> Element {
                                         if val >= 1 {
                                             message.set(None);
                                             let param = y_axis_marker.peek();
-                                            let res = parameter_settings.update_cofactor(&param.fluoro, val as f32);
+                                            let res = plot_store.update_cofactor(&param.fluoro, val as f32);
                                             match res {
                                                 Ok((old, new)) => {
                                                     match gate_store.rescale_gates(&param.fluoro, &old, &new) {
@@ -457,7 +472,7 @@ pub fn PlotWindow() -> Element {
                                 oninput: move |e| {
                                     if let Ok(lower) = e.value().parse::<i32>() {
                                         let param = y_axis_marker.peek();
-                                        match parameter_settings.update_lower(&param.fluoro, lower as f32) {
+                                        match plot_store.update_lower(&param.fluoro, lower as f32) {
                                             Ok(l_u_t) => {
                                                 match gate_store
                                                     .set_current_axis_limits(
@@ -485,7 +500,7 @@ pub fn PlotWindow() -> Element {
                                 oninput: move |e| {
                                     if let Ok(upper) = e.value().parse::<i32>() {
                                         let param = y_axis_marker.peek();
-                                        match parameter_settings.update_upper(&param.fluoro, upper as f32) {
+                                        match plot_store.update_upper(&param.fluoro, upper as f32) {
                                             Ok(l_u_t) => {
                                                 match gate_store
                                                     .set_current_axis_limits(

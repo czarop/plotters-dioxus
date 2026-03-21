@@ -1,19 +1,19 @@
 use dioxus::prelude::*;
 
-use crate::plotters_dioxus::gates::gate_types::DrawableGateType;
+use crate::plotters_dioxus::gates::gate_types::PrimaryGateType;
 
-const GATE_CONFIG: &[(DrawableGateType, &str)] = &[
-    (DrawableGateType::Polygon, "P"),
-    (DrawableGateType::Ellipse, "E"),
-    (DrawableGateType::Rectangle, "R"),
-    (DrawableGateType::Line(None), "L"),
-    (DrawableGateType::Bisector, "B"),
-    (DrawableGateType::Quadrant, "Q"),
-    (DrawableGateType::SkewedQuadrant, "S"),
+const GATE_CONFIG: &[(PrimaryGateType, &str)] = &[
+    (PrimaryGateType::Polygon, "P"),
+    (PrimaryGateType::Ellipse, "E"),
+    (PrimaryGateType::Rectangle, "R"),
+    (PrimaryGateType::Line(None), "L"),
+    (PrimaryGateType::Bisector, "B"),
+    (PrimaryGateType::Quadrant, "Q"),
+    (PrimaryGateType::SkewedQuadrant, "S"),
 ];
 
 #[component]
-pub fn NewGateButtons(callback: EventHandler<DrawableGateType>) -> Element {
+pub fn NewGateButtons(callback: EventHandler<PrimaryGateType>) -> Element {
     let mut selected_index = use_signal(|| 0);
     let selected_style = "background-color: orange";
 

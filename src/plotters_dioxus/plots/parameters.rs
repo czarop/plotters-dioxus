@@ -11,7 +11,7 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use crate::plotters_dioxus::{AxisInfo, gates::GateId};
+use crate::plotters_dioxus::{AxisInfo, gates::{GateId, gate_store::FileId}};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct PlotMapper {
@@ -188,7 +188,8 @@ impl std::fmt::Display for Param {
 #[derive(Clone)]
 pub struct EventIndexMapped {
     pub event_index: Arc<EventIndex>,
-    pub index_map: Arc<Vec<usize>>
+    pub index_map: Arc<Vec<usize>>,
+
 }
 
 impl PartialEq for EventIndexMapped {
@@ -200,6 +201,7 @@ impl PartialEq for EventIndexMapped {
 
 #[derive(Default, Store, Clone)]
 pub struct PlotStore {
+    pub current_file_id: FileId,
     pub settings: FxHashMap<Arc<str>, AxisInfo>,
     pub event_index_map: Option<EventIndexMapped>
 }

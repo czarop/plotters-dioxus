@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
-use crate::plotters_dioxus::gates::gate_store::GateStateStoreExt;
+use crate::plotters_dioxus::gates::gate_store::{ GateOverrideResolver, GateStateStoreExt};
 use crate::plotters_dioxus::gates::{GateState, gate_traits::DrawableGate};
+use crate::plotters_dioxus::plots::parameters::PlotStore;
 use dioxus::prelude::*;
 use dioxus::stores::Store;
 use flow_fcs::{Fcs};
@@ -10,10 +11,10 @@ use flow_gates::{EventIndex, Gate};
 use polars::prelude::*;
 use tokio::task;
 
-pub async fn get_flow_data(path: std::path::PathBuf) -> Result<Arc<Fcs>, Arc<anyhow::Error>> {
+pub async fn get_flow_data(path: std::path::PathBuf) -> Result<Fcs, Arc<anyhow::Error>> {
     task::spawn_blocking(move || {
         let fcs_file = Fcs::open(path.to_str().unwrap_or_default())?;
-        Ok(Arc::new(fcs_file))
+        Ok(fcs_file)
     })
     .await
     .map_err(|e| Arc::new(e.into()))?
@@ -24,6 +25,7 @@ pub async fn get_filtered_dataframe(
     parental_gate_id: &Option<Arc<str>>,
 ) -> Result<Arc<DataFrame>, anyhow::Error> {
     let df_clone = df.clone();
+    let plot_store: Store<PlotStore> = use_context::<Store<PlotStore>>();
     let gate_store: Store<GateState> = use_context::<Store<GateState>>();
     let gate_chain: Option<Vec<(Arc<str>, Arc<dyn DrawableGate>)>> =
         if let Some(parent) = parental_gate_id {
@@ -45,6 +47,15 @@ pub async fn get_filtered_dataframe(
         } else {
             None
         };
+    
+    let curr_file_id = plot_store.peek().current_file_id.clone();
+    let gates_and_boolean_gates = gate_store.peek().primary_and_subgate_registry.clone();
+    let position_overrides = gate_store.peek().position_overrides.clone();
+    let resolver = GateOverrideResolver{
+        curr_file_id,
+        gates_subgates_and_boolean_gates: gates_and_boolean_gates,
+        position_overrides,
+    };
 
     task::spawn_blocking(move || -> Result<Arc<DataFrame>, anyhow::Error> {
         if let Some(chain) = gate_chain {
@@ -55,7 +66,7 @@ pub async fn get_filtered_dataframe(
 
             // 1. Get the final narrowed mask for the whole hierarchy
             let mask = super::super::gates::gate_filtering::filter_events_by_hierarchy_to_mask(
-                &df, &gate_refs, resolver
+                &df, &gate_refs, &resolver
             )?;
             // 2. Filter the dataframe once at the end
             Ok(df.filter(&mask)?.into())
@@ -65,6 +76,7 @@ pub async fn get_filtered_dataframe(
 
     })
     .await?
+
 }
 
 pub async fn zip_cols_from_filtered_df(

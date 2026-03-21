@@ -6,7 +6,7 @@ use crate::plotters_dioxus::{
         gate_single::rectangle_gate,
         gate_store::GateStateImplExt,
         gate_traits::DrawableGate,
-        gate_types::{Direction, GateRenderShape, GateStatValue, GateStats, DrawableGateType, ShapeType},
+        gate_types::{Direction, GateRenderShape, GateStatValue, GateStats, PrimaryGateType, ShapeType},
     },
     plots::parameters::{ PlotMapper, PlotStore},
 };
@@ -40,7 +40,7 @@ pub fn GateLayer(
     let mut draft_gate_coords = use_signal(|| Vec::<(f32, f32)>::new());
     let mut next_gate_id = use_signal(|| 0);
     let mut selected_gate_id = use_signal(|| None::<Arc<str>>);
-    let current_gate_type = use_context::<Signal<DrawableGateType>>();
+    let current_gate_type = use_context::<Signal<PrimaryGateType>>();
 
     let plot_store = use_context::<Store<PlotStore>>();
 
@@ -49,7 +49,7 @@ pub fn GateLayer(
 
     // convert clicked coords into a draft gate
     let draft_gate = use_memo(move || {
-        if let DrawableGateType::Polygon = &*current_gate_type.read() {
+        if let PrimaryGateType::Polygon = &*current_gate_type.read() {
             let cur_coords = draft_gate_coords();
             if cur_coords.len() > 0 {
                 let gate_draft = GateDraft::new_polygon(cur_coords, x_channel(), y_channel());
@@ -238,7 +238,7 @@ pub fn GateLayer(
                                 }
                                 if clicked_gate.is_none() {
                                     if selected_gate_id.peek().is_none() {
-                                        if &DrawableGateType::Polygon == &*current_gate_type.peek() {
+                                        if &PrimaryGateType::Polygon == &*current_gate_type.peek() {
                                             draft_gate_coords.write().push((data_x, data_y));
                                         }
                                     } else if drag_data.peek().is_none() {
@@ -280,8 +280,8 @@ pub fn GateLayer(
                                 }
                             };
 
-                            let geo = if let DrawableGateType::Line(_) = &*current_gate_type.peek() {
-                                DrawableGateType::Line(Some(dy))
+                            let geo = if let PrimaryGateType::Line(_) = &*current_gate_type.peek() {
+                                PrimaryGateType::Line(Some(dy))
                             } else {
                                 current_gate_type.peek().cloned()
                             };

@@ -166,6 +166,72 @@ pub fn filter_events_to_mask(
 
             Ok(mask.with_name("mask".into()))
         }
+        GateGeometry::Boolean { operation, operands } => {
+            match operation {
+                flow_gates::BooleanOperation::And => {
+                    if operands.len() < 2 {
+                        return Err(anyhow::anyhow!("AND gates must have > 1 operand"));
+                    }
+                    let mut final_mask: Option<BooleanChunked> = None;
+                    for gate in operands {
+                        if let Some(other_gate) = resolver.resolve(gate){
+                            let current_mask = filter_events_to_mask(df, other_gate, resolver)?;
+                            match final_mask {
+                                None => final_mask = Some(current_mask),
+                                Some(ref mut acc) => {
+                                    *acc = &*acc & &current_mask;
+                                    
+                                    if !acc.any() {
+                                        break; 
+                                    }
+                                }
+                            }
+                            
+                        } else {
+                            return Err(anyhow::anyhow!("AND gate operand could not be resolved"));
+                        }
+                    }
+                    match final_mask{
+                        Some(m) => Ok(m),
+                        None => Err(anyhow::anyhow!("AND gate operand could not be resolved")),
+                    }
+                },
+                flow_gates::BooleanOperation::Or => {
+                    if operands.len() < 2 {
+                        return Err(anyhow::anyhow!("OR gates must have > 1 operand"));
+                    }
+                    let mut final_mask: Option<BooleanChunked> = None;
+                    for gate in operands {
+                        if let Some(other_gate) = resolver.resolve(gate){
+                            let current_mask = filter_events_to_mask(df, other_gate, resolver)?;
+                            match final_mask {
+                                None => final_mask = Some(current_mask),
+                                Some(ref mut acc) => *acc = &*acc | &current_mask,
+                            }
+                            
+                        } else {
+                            return Err(anyhow::anyhow!("OR gate operand could not be resolved"));
+                        }
+                    }
+                    match final_mask{
+                        Some(m) => Ok(m),
+                        None => Err(anyhow::anyhow!("OR gate operand could not be resolved")),
+                    }
+                    
+                },
+                flow_gates::BooleanOperation::Not => {
+                    if operands.len() != 1 {
+                        return Err(anyhow::anyhow!("Not gates can only have 1 operand"));
+                    }
+                    if let Some(other_gate) = resolver.resolve(&operands[0]){
+                        let mask = !filter_events_to_mask(df, other_gate, resolver)?;
+                        return Ok(mask);
+                    } else {
+                        return Err(anyhow::anyhow!("NOT gate operand could not be resolved"));
+                    }
+                },
+            }
+        },
         _ => {
             // Fallback for complex polygons where an index actually helps
             let x_series = df.column(&x_param)?.f32()?;

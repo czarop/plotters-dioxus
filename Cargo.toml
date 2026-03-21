@@ -21,6 +21,7 @@ indexmap = "2.1"
 polars = {version = "0.53", default-features = false, features = ["lazy", "performant"]}
 rayon = "1"
 im = "15"
+uuid = { version = "1.0", features = ["v4"] }
 
 [features]
 default = ["desktop"]

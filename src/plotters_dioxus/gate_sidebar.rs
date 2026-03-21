@@ -91,6 +91,12 @@ fn GateNode(gate_id: Arc<str>, selected: Signal<Option<Arc<str>>>, level: usize,
     let gate_id_delete_clone = gate_id.clone();
     let gate_id_rename_clone = gate_id.clone();
     let parent_for_delete = parent.clone();
+    let gate_id_for_not_gate = gate_id.clone();
+    let parent_for_not_gate = parent.clone();
+    let gate_id_for_and_gate = gate_id.clone();
+    let parent_for_and_gate = parent.clone();
+    let gate_id_for_or_gate = gate_id.clone();
+    let parent_for_or_gate = parent.clone();
     rsx! {
 
         // 1. The Row (Clickable)
@@ -197,7 +203,7 @@ fn GateNode(gate_id: Arc<str>, selected: Signal<Option<Arc<str>>>, level: usize,
                 ContextMenuItem {
                     value: "delete".to_string(),
                     index: 0usize,
-                    on_select: move |value| {
+                    on_select: move |_| {
                         match gate_store.remove_gate(gate_id_delete_clone.clone()) {
                             Ok(_) => {
                                 println!("deleted gate");
@@ -208,7 +214,7 @@ fn GateNode(gate_id: Arc<str>, selected: Signal<Option<Arc<str>>>, level: usize,
                                 }
 
                             }
-                            Err(e) => println!("failed to delete gate"),
+                            Err(_) => println!("failed to delete gate"),
                         }
                     },
                     "Delete"
@@ -216,8 +222,77 @@ fn GateNode(gate_id: Arc<str>, selected: Signal<Option<Arc<str>>>, level: usize,
                 ContextMenuItem {
                     value: "rename".to_string(),
                     index: 1usize,
-                    on_select: move |value| {},
+                    on_select: move |_| {},
                     "Rename"
+                }
+                ContextMenuItem {
+                    value: "not".to_string(),
+                    index: 2usize,
+                    on_select: move |_| {
+                        let id = format!("NOT_{}", gate_id_for_not_gate.clone());
+                        let x_axis_param = x_axis_param.peek().fluoro.clone();
+                        let y_axis_param = y_axis_param.peek().fluoro.clone();
+                        match gate_store
+                            .add_boolean_gate(
+                                &id,
+                                flow_gates::BooleanOperation::Not,
+                                vec![gate_id_for_not_gate.clone()],
+                                Some(parent_for_not_gate.clone()),
+                                x_axis_param,
+                                y_axis_param,
+                            )
+                        {
+                            Ok(_) => {}
+                            Err(e) => println!("{e}"),
+                        }
+                    },
+                    "Add NOT Gate"
+                }
+                ContextMenuItem {
+                    value: "and".to_string(),
+                    index: 3usize,
+                    on_select: move |_| {
+                        let id = format!("AND_{}", gate_id_for_and_gate.clone());
+                        let x_axis_param = x_axis_param.peek().fluoro.clone();
+                        let y_axis_param = y_axis_param.peek().fluoro.clone();
+                        match gate_store
+                            .add_boolean_gate(
+                                &id,
+                                flow_gates::BooleanOperation::And,
+                                vec![gate_id_for_and_gate.clone()],
+                                Some(parent_for_and_gate.clone()),
+                                x_axis_param,
+                                y_axis_param,
+                            )
+                        {
+                            Ok(_) => {}
+                            Err(e) => println!("{e}"),
+                        }
+                    },
+                    "Add AND Gate"
+                }
+                ContextMenuItem {
+                    value: "or".to_string(),
+                    index: 4usize,
+                    on_select: move |_| {
+                        let id = format!("OR_{}", gate_id_for_or_gate.clone());
+                        let x_axis_param = x_axis_param.peek().fluoro.clone();
+                        let y_axis_param = y_axis_param.peek().fluoro.clone();
+                        match gate_store
+                            .add_boolean_gate(
+                                &id,
+                                flow_gates::BooleanOperation::Or,
+                                vec![gate_id_for_or_gate.clone()],
+                                Some(parent_for_or_gate.clone()),
+                                x_axis_param,
+                                y_axis_param,
+                            )
+                        {
+                            Ok(_) => {}
+                            Err(e) => println!("{e}"),
+                        }
+                    },
+                    "Add OR Gate"
                 }
             }
         
