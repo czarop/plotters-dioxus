@@ -299,7 +299,9 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
     fn is_finalised(&self) -> bool {
         true
     }
-
+    fn get_name(&self) -> &str {
+        &self.name
+    }
     fn draw_self(
         &self,
         is_selected: bool,

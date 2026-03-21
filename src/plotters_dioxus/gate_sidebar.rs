@@ -59,7 +59,7 @@ fn ChevronIcon() -> Element {
 
 #[component]
 fn GateNode(gate_id: Arc<str>, selected: Signal<Option<Arc<str>>>, level: usize, x_axis_param: Signal<Param>, y_axis_param: Signal<Param>) -> Element {
-    // let mut gate_store: Store<GateState> = use_context::<Store<GateState>>();
+
     let mut gate_store = use_context::<SyncStore<GateState>>();
     let param_store: Store<PlotStore> = use_context::<Store<PlotStore>>();
     let mut is_expanded = use_signal(|| true);
@@ -82,6 +82,14 @@ fn GateNode(gate_id: Arc<str>, selected: Signal<Option<Arc<str>>>, level: usize,
             hierarchy.read().get_parent(&gate_id).unwrap().clone()
         }
         
+    };
+
+    let gate_name = {
+        if let Some(gate) = gate_store.get_gate_by_id(gate_id.clone()){
+            gate.get_name().to_owned()
+        } else {
+            gate_id.to_string()
+        }
     };
 
     // Check if this node is the active one
@@ -151,7 +159,7 @@ fn GateNode(gate_id: Arc<str>, selected: Signal<Option<Arc<str>>>, level: usize,
                         }
 
                         // 3. The Label
-                        span { class: "gate-name", "{gate_id}" }
+                        span { class: "gate-name", "{gate_name}" }
                         button {
                             class: "activate-btn",
                             title: "Activate gate",

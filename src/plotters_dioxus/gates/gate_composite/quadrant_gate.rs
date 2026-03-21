@@ -155,6 +155,9 @@ impl DrawableGate for QuadrantGate {
     fn is_finalised(&self) -> bool {
         true
     }
+    fn get_name(&self) -> &str {
+        &self.name
+    }
     fn is_composite(&self) -> bool {
         true
     }

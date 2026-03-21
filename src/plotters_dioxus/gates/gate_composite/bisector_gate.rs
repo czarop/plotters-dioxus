@@ -505,6 +505,10 @@ impl super::super::gate_traits::DrawableGate for BisectorGate {
     fn get_inner_gate_ids(&self) -> Vec<Arc<str>> {
         self.gates.keys().map(|k| k.clone()).collect()
     }
+    
+    fn get_name(&self) -> &str {
+        &self.name
+    }
 }
 
 fn create_default_bisector(

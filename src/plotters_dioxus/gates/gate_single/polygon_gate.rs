@@ -161,7 +161,9 @@ impl DrawableGate for PolygonGate {
     fn get_params(&self) -> (Arc<str>, Arc<str>) {
         self.inner.parameters.clone()
     }
-
+    fn get_name(&self) -> &str {
+        &self.inner.name
+    }
     fn is_point_on_perimeter(
         &self,
         point: (f32, f32),

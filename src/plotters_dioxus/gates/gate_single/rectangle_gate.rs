@@ -135,7 +135,9 @@ impl DrawableGate for RectangleGate {
     fn get_inner_gate_ids(&self) -> Vec<Arc<str>> {
         vec![self.inner.id.clone()]
     }
-
+    fn get_name(&self) -> &str {
+        &self.inner.name
+    }
     fn clone_box(&self) -> Box<dyn DrawableGate> {
         Box::new(self.clone())
     }

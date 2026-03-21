@@ -47,7 +47,9 @@ impl DrawableGate for BooleanGate {
     fn get_gate_ref(&self, _id: Option<&str>) -> Option<&flow_gates::Gate> {
         Some(&self.inner)
     }
-
+    fn get_name(&self) -> &str {
+        &self.inner.name
+    }
     fn get_inner_gate_ids(&self) -> Vec<Arc<str>> {
         vec![]
     }

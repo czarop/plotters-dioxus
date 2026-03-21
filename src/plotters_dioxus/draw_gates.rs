@@ -209,7 +209,30 @@ pub fn GateLayer(
                             } else {
                                 current_gate_type.peek().cloned()
                             };
+                            let x_p = if let Some(x_param) = plot_store
+                                .settings()
+                                .peek()
+                                .get(&x_param.clone())
+                            {
+                                Some(x_param.param.marker.clone())
+                            } else {
+                                None
+                            };
+                            let y_p = if let Some(y_param) = plot_store
+                                .settings()
+                                .peek()
+                                .get(&y_param.clone())
+                            {
+                                Some(y_param.param.marker.clone())
+                            } else {
+                                None
+                            };
 
+                            let name = if let (Some(x_m), Some(y_m)) = (x_p, y_p) {
+                                Some(format!("{x_m} v {y_m}"))
+                            } else {
+                                None
+                            };
                             match gate_store
                                 .add_gate(
                                     &mapper,
@@ -220,7 +243,7 @@ pub fn GateLayer(
                                     points,
                                     parental_gate_id(),
                                     geo,
-                                    None,
+                                    name,
                                 )
 
                             {
