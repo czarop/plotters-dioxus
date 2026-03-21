@@ -3,6 +3,7 @@ use dioxus::prelude::*;
 use flow_fcs::TransformType;
 use flow_gates::{BooleanOperation, Gate, GateHierarchy};
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet, FxHasher};
+use std::collections::HashSet;
 use std::ops::{Add, Deref, DerefMut};
 use std::sync::{Arc, LazyLock};
 
@@ -344,6 +345,7 @@ impl<Lens> Store<GateState, Lens> {
     }
 
     fn add_boolean_gate(&mut self, id: &str, operation: BooleanOperation, linked_gate_ids: Vec<GateId>, parental_gate_id: Option<GateId>, x_param: Arc<str>, y_param: Arc<str>) -> anyhow::Result<()> {
+
         let gate_id: Arc<str> = Arc::from(id);
         for link in linked_gate_ids.iter(){
             self.boolean_gate_links().write()
@@ -352,9 +354,9 @@ impl<Lens> Store<GateState, Lens> {
                 .push(gate_id.clone());
         } 
         let g = Arc::new(BooleanGate::new(gate_id.clone(), linked_gate_ids, operation, x_param, y_param)?);
-        // let g = GateType::Boolean(Arc::new(g));
         let mut w = self.write();
         w.hierarchy.add_gate_child(parental_gate_id.unwrap_or(ROOTGATE.clone()), gate_id.clone())?;
+        
         w.primary_gate_registry.insert(g.get_id(), g.clone());
         w.primary_and_subgate_registry.insert(g.get_id(), g);
         
@@ -363,32 +365,33 @@ impl<Lens> Store<GateState, Lens> {
 
     fn remove_gate(&mut self, gate_id: GateId) -> anyhow::Result<()> {
 
-        fn collect_gates_to_remove(
-            gate_id: Arc<str>, 
-            to_remove: &mut Vec<Arc<str>>, 
-            hierarchy: &GateHierarchy 
-        ) {
-            for child_id in hierarchy.get_children(&gate_id) {
-                collect_gates_to_remove(child_id.clone(), to_remove, hierarchy);
-            }
-            to_remove.push(gate_id);
-        }
-    
-        let mut gates_to_delete: Vec<Arc<str>> = vec![];
-
         let mut brothers = vec![];
         if let Some((_id, temp_g)) = self.primary_and_subgate_registry().peek().get_key_value(&gate_id){
             if temp_g.is_composite(){
                 brothers.extend_from_slice(&temp_g.get_inner_gate_ids());
+            } else {
+                brothers.push(gate_id.clone());
             }
         }
 
-        for brother in &brothers{
-            collect_gates_to_remove(brother.clone(), &mut gates_to_delete, &*self.hierarchy().peek());
+        let mut state = self.write();
+
+        let mut roots: HashSet<Arc<str>> = HashSet::default();
+
+        while let Some(id) = brothers.pop() {
+            if roots.insert(id.clone()) {
+                if let Some(deps) = state.boolean_gate_links.remove(&id) {
+                    brothers.extend(deps);
+                }
+            }
+        }
+
+        let mut gates_to_delete: HashSet<Arc<str>> = HashSet::default();
+
+        for brother in roots {
+            gates_to_delete.extend(state.hierarchy.delete_subtree(&brother));
         }
         
-
-        let mut state = self.write();
 
         for child_gate_id in gates_to_delete{
 
@@ -403,11 +406,11 @@ impl<Lens> Store<GateState, Lens> {
                 }
                 
                 state.position_overrides.remove(&drawable_gate_id);
+            } else {
+
             }
         }
-        for brother in brothers {
-            state.hierarchy.delete_subtree(&brother);
-        }
+        
 
         Ok(())
     }

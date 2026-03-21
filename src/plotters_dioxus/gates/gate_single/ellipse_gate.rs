@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc};
 
 use anyhow::anyhow;
 use flow_fcs::{TransformType, Transformable};
@@ -149,7 +149,7 @@ impl DrawableGate for EllipseGate {
         &self,
         new_point: (f32, f32),
         point_index: usize,
-        _mapper: &PlotMapper,
+        mapper: &PlotMapper,
     ) -> anyhow::Result<Box<dyn DrawableGate>> {
         let new_geometry;
         if let GateGeometry::Ellipse {
@@ -168,6 +168,7 @@ impl DrawableGate for EllipseGate {
                 point_index,
                 &self.inner.parameters.0,
                 &self.inner.parameters.1,
+                Some(mapper)
             )?;
         } else {
             return Err(anyhow!("Error replacing point in Ellipse"));
@@ -226,6 +227,7 @@ impl DrawableGate for EllipseGate {
                 5,
                 &self.inner.parameters.0,
                 &self.inner.parameters.1,
+                None
             )?;
         } else {
             return Err(anyhow!("Error rotating Ellipse"));
@@ -445,46 +447,6 @@ impl DrawableGate for EllipseGate {
         vec![self.inner.id.clone()]
     }
 
-    //     fn recalculate_gate_for_new_axis_limits(
-    //     &self,
-    //     _param: Arc<str>,
-    //     _lower: f32, // New axis min
-    //     _upper: f32, // New axis max
-    //     _transform: &TransformType,
-    // ) -> anyhow::Result<Option<Box<dyn DrawableGate>>> {
-    //     // 1. Extract the current geometry
-    //     let (cx, cy, rx, ry, angle) = match &self.inner.geometry {
-    //         GateGeometry::Ellipse { center, radius_x, radius_y, angle } => {
-    //             let x = center.get_coordinate(&self.inner.parameters.0).unwrap_or(0.0);
-    //             let y = center.get_coordinate(&self.inner.parameters.1).unwrap_or(0.0);
-    //             (x, y, *radius_x, *radius_y, *angle)
-    //         },
-    //         _ => return Ok(None),
-    //     };
-
-    //     let (x_param, y_param) = self.get_params();
-    //     let center_node = GateNode::new(self.get_id())
-    //         .with_coordinate(x_param.clone(), cx)
-    //         .with_coordinate(y_param.clone(), cy);
-
-    //     let new_geometry = GateGeometry::Ellipse {
-    //         center: center_node,
-    //         radius_x: rx,
-    //         radius_y: ry,
-    //         angle: angle,
-    //     };
-
-    //     let new_gate = flow_gates::Gate {
-    //         id: self.inner.id.clone(),
-    //         parameters: self.inner.parameters.clone(),
-    //         geometry: new_geometry,
-    //         label_position: self.inner.label_position.clone(),
-    //         name: self.inner.name.clone(),
-    //         mode: self.inner.mode.clone(),
-    //     };
-
-    //     Ok(Some(Box::new(EllipseGate::try_new(new_gate)?)))
-    // }
 }
 
 use crate::plotters_dioxus::gates::gate_types::DRAGGED_LINE;
@@ -623,6 +585,7 @@ pub fn draw_ghost_point_for_ellipse(
     None
 }
 
+
 pub fn calculate_projected_radii(
     cursor: (f32, f32),
     center: (f32, f32),
@@ -635,23 +598,25 @@ pub fn calculate_projected_radii(
     let dy = cursor.1 - center.1;
     let (sin_a, cos_a) = current_angle_rad.sin_cos();
 
+    // Use a very small epsilon to prevent 0.0 radii
+    // let eps = 0.1;
+
     match point_index {
         1 | 3 => {
-            // Horizontal Axis (Right/Left)
-            let rx = (dx * cos_a + dy * sin_a).abs();
+            // Project onto Major Axis: (cos, sin)
+            let rx_raw = dx * cos_a + dy * sin_a;
+            let rx = rx_raw.abs(); 
             (rx, current_ry, current_angle_rad)
         }
         2 | 4 => {
-            // Vertical Axis (Top/Bottom)
-            // Projects cursor onto the Minor Axis vector (sin, -cos)
-            let ry = (dx * sin_a - dy * cos_a).abs();
+            // Project onto Minor Axis: (-sin, cos)
+            // Note: swap the signs here to properly project perpendicular to the major axis
+            let ry_raw = dy * cos_a - dx * sin_a; 
+            let ry = ry_raw.abs();
             (current_rx, ry, current_angle_rad)
         }
         5 => {
-            // Rotation Handle
             let mouse_angle = dy.atan2(dx);
-            // In Y-up Data Space, Top is +PI/2.
-            // We subtract PI/2 to align the Ellipse's 0-degree axis.
             let new_angle = mouse_angle - std::f32::consts::FRAC_PI_2;
             (current_rx, current_ry, new_angle)
         }
@@ -668,6 +633,7 @@ pub fn update_ellipse_geometry(
     point_index: usize,
     x_param: &str,
     y_param: &str,
+    plot_map: Option<&PlotMapper>
 ) -> anyhow::Result<GateGeometry> {
     let cx = center.get_coordinate(x_param).unwrap_or(0.0);
     let cy = center.get_coordinate(y_param).unwrap_or(0.0);
@@ -680,9 +646,10 @@ pub fn update_ellipse_geometry(
         (cx, cy, rx, ry, angle)
     };
 
+    
     // CALL THE HELPER HERE
     let sanitized_points =
-        calculate_ellipse_nodes_y_up(final_cx, final_cy, final_rx, final_ry, final_angle);
+        calculate_ellipse_nodes_y_up(final_cx, final_cy, final_rx, final_ry, final_angle, plot_map);
 
     Ok(flow_gates::create_ellipse_geometry(
         sanitized_points,
@@ -691,21 +658,38 @@ pub fn update_ellipse_geometry(
     )?)
 }
 
+
 pub fn calculate_ellipse_nodes_y_up(
     cx: f32,
     cy: f32,
-    rx: f32,
-    ry: f32,
+    mut rx: f32, // Make these mutable
+    mut ry: f32,
     angle_rad: f32,
+    plot_map_op: Option<&PlotMapper>
 ) -> Vec<(f32, f32)> {
+    // 1. Safety Floor: 
+
+    if let Some(plot_map) = plot_map_op {
+        let x_range = plot_map.x_axis_min_max();
+        let y_range = plot_map.y_axis_min_max();
+        let x_span = (*x_range.end() - *x_range.start()).abs();
+        let y_span = (*y_range.end() - *y_range.start()).abs();
+        let x_min_safe = x_span * 0.000001; 
+        let y_min_safe = y_span * 0.000001;
+        if rx < x_min_safe { rx = x_min_safe; }
+        if ry < y_min_safe { ry = y_min_safe; }
+
+    }
+    
+
     let (sin_a, cos_a) = angle_rad.sin_cos();
 
     vec![
-        (cx, cy),                           // 0. Center
-        (cx + rx * cos_a, cy + rx * sin_a), // 1. Right (Local X+)
-        (cx - ry * sin_a, cy + ry * cos_a), // 2. Top (Local Y+)
-        (cx - rx * cos_a, cy - rx * sin_a), // 3. Left (Local X-)
-        (cx + ry * sin_a, cy - ry * cos_a), // 4. Bottom (Local Y-)
+        (cx, cy),                           
+        (cx + rx * cos_a, cy + rx * sin_a), 
+        (cx - ry * sin_a, cy + ry * cos_a), 
+        (cx - rx * cos_a, cy - rx * sin_a), 
+        (cx + ry * sin_a, cy - ry * cos_a), 
     ]
 }
 
