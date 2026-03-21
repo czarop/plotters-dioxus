@@ -19,7 +19,7 @@ impl GateDragData {
     pub fn clone_from_data(new_loc: (f32, f32), old_data: Self) -> Self {
         Self {
             gate_id: old_data.gate_id.clone(),
-            start_loc: old_data.start_loc,
+            start_loc: old_data.current_loc,
             current_loc: new_loc,
         }
     }
@@ -92,7 +92,7 @@ impl RotationData {
         Self {
             gate_id: old_data.gate_id.clone(),
             gate_center_loc: old_data.gate_center_loc.clone(),
-            start_loc: old_data.start_loc,
+            start_loc: old_data.current_loc,
             current_loc: new_loc,
         }
     }

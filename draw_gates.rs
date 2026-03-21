@@ -131,73 +131,73 @@ pub fn GateLayer(
         }
     });
 
-    // let temp_gate_position = use_memo(move || {
-    //     let parental_event_count_op = parental_event_count();
-    //     let event_index_option = plot_store.event_index_map()();
-    //     let res = match &*drag_data.read(){
-    //         Some(GateDragType::Gate(dd)) => {
-    //             let id = dd.gate_id();
-    //             if let Some(gate) = gate_store.get_gate_by_id(id.clone()){
-    //                 if let Ok(Some(new_gate)) = gate.replace_points(dd.clone()) {
-    //                     let new_gate_arc: Arc<dyn DrawableGate> = Arc::from(new_gate);
-    //                     Some(( id, new_gate_arc ))
-    //                 } else {
-    //                     None
-    //                 }
-    //             } else {
-    //                 None
-    //             }
-    //         },
-    //         Some(GateDragType::Point(dd)) => {
-    //             let id = selected_gate_id.read().cloned();
-    //             if id.is_none() {
-    //                 return None;
-    //             }
-    //             let id = id.unwrap();
-    //             let point_idx = dd.point_index();
-    //             let position = dd.loc();
-    //             let plot_map = &*plot_map.read();
-    //             if let Some(plot_map) = plot_map {
-    //                 if let Some(gate) = gate_store.get_gate_by_id(id.clone()){
-    //                     if let Ok(new_gate) = gate.replace_point(position, point_idx, plot_map) {
-    //                         let new_gate_arc: Arc<dyn DrawableGate> = Arc::from(new_gate);
-    //                         Some(( id, new_gate_arc ))
-    //                     } else {
-    //                     None
-    //                 }
-    //             } else {
-    //                 None
-    //             }
-    //         } else {
-    //             None
-    //         }},
-    //         Some(GateDragType::Rotation(dd)) => {
-    //             let id = dd.gate_id();
-    //             let mouse_position = dd.current_loc();
-    //             if let Some(gate) = gate_store.get_gate_by_id(id.clone()){
-    //                 if let Ok(Some(new_gate)) = gate.rotate_gate(mouse_position) {
-    //                     let new_gate_arc: Arc<dyn DrawableGate> = Arc::from(new_gate);
-    //                     Some(( id, new_gate_arc ))
-    //                 } else {
-    //                     None
-    //                 }
-    //             } else {
-    //                 None
-    //             }
-    //         },
-    //         None => return None,
-    //     };
-    //     if let Some(parental_event_count) = parental_event_count_op{
-    //     if let Some(event_index_map) = event_index_option {
-    //         if let Some((id, gate)) = res{
-    //             if let Some(stats) = crate::plotters_dioxus::gates::gate_stats::get_percent_and_counts_gate(gate, &event_index_map, parental_event_count as f32).ok(){
-    //                 return Some(TempGateStats{id, stats});
-    //             }
-    //         } 
-    //     }
-    // }
-    //     return None;
-    // });
+    let temp_gate_position = use_memo(move || {
+        let parental_event_count_op = parental_event_count();
+        let event_index_option = plot_store.event_index_map()();
+        let res = match &*drag_data.read(){
+            Some(GateDragType::Gate(dd)) => {
+                let id = dd.gate_id();
+                if let Some(gate) = gate_store.get_gate_by_id(id.clone()){
+                    if let Ok(Some(new_gate)) = gate.replace_points(dd.clone()) {
+                        let new_gate_arc: Arc<dyn DrawableGate> = Arc::from(new_gate);
+                        Some(( id, new_gate_arc ))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            },
+            Some(GateDragType::Point(dd)) => {
+                let id = selected_gate_id.read().cloned();
+                if id.is_none() {
+                    return None;
+                }
+                let id = id.unwrap();
+                let point_idx = dd.point_index();
+                let position = dd.loc();
+                let plot_map = &*plot_map.read();
+                if let Some(plot_map) = plot_map {
+                    if let Some(gate) = gate_store.get_gate_by_id(id.clone()){
+                        if let Ok(new_gate) = gate.replace_point(position, point_idx, plot_map) {
+                            let new_gate_arc: Arc<dyn DrawableGate> = Arc::from(new_gate);
+                            Some(( id, new_gate_arc ))
+                        } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            }},
+            Some(GateDragType::Rotation(dd)) => {
+                let id = dd.gate_id();
+                let mouse_position = dd.current_loc();
+                if let Some(gate) = gate_store.get_gate_by_id(id.clone()){
+                    if let Ok(Some(new_gate)) = gate.rotate_gate(mouse_position) {
+                        let new_gate_arc: Arc<dyn DrawableGate> = Arc::from(new_gate);
+                        Some(( id, new_gate_arc ))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            },
+            None => return None,
+        };
+        if let Some(parental_event_count) = parental_event_count_op{
+        if let Some(event_index_map) = event_index_option {
+            if let Some((id, gate)) = res{
+                if let Some(stats) = crate::plotters_dioxus::gates::gate_stats::get_percent_and_counts_gate(gate, &event_index_map, parental_event_count as f32).ok(){
+                    return Some(TempGateStats{id, stats});
+                }
+            } 
+        }
+    }
+        return None;
+    });
 
     let mut dbl_click_lockout = use_signal(|| false);
     let mut last_processed_pos = use_signal(|| (0.0f32, 0.0f32));
@@ -339,37 +339,6 @@ pub fn GateLayer(
                                     if dx >= 1.0 || dy >= 1.0 {
                                         let data_coords = map.pixel_to_data(px, py, None, None);
                                         let new_data = data.clone_with_point(data_coords);
-                                        if let Some(selected_gate_id) = &*selected_gate_id.peek() {
-                                            match &new_data {
-                                                GateDragType::Point(point_drag_data) => {
-                                                    if let Some(mapper) = &*plot_map.peek() {
-                                                        gate_store
-                                                            .move_gate_point(
-                                                                selected_gate_id.clone().into(),
-                                                                point_drag_data.point_index(),
-                                                                data_coords,
-                                                                mapper,
-
-                                                            )
-                                                            .expect("Gate Move Failed");
-                                                    }
-
-                                                }
-                                                GateDragType::Gate(gate_drag_data) => {
-                                                    gate_store
-                                                        .move_gate(gate_drag_data.clone())
-                                                        .expect("Gate Move Failed");
-                                                }
-                                                GateDragType::Rotation(rotation_data) => {
-                                                    gate_store
-                                                        .rotate_gate(
-                                                            selected_gate_id.clone().into(),
-                                                            rotation_data.current_loc(),
-                                                        )
-                                                        .expect("Gate Move Failed");
-                                                }
-                                            }
-                                        }
                                         drag_data.set(Some(new_data));
                                         last_processed_pos.set((px, py));
                                     }
@@ -484,16 +453,15 @@ pub fn GateLayer(
                                         None
                                     };
 
-                                    // let gate_stats = if let Some(temp_gate_position) = &*temp_gate_position.read() {
-                                    //     if temp_gate_position.id == gate.get_id() {
-                                    //         Some(temp_gate_position.stats.clone())
-                                    //     } else {
-                                    //         gate_store.gate_stats().read().get(&gate.get_id()).cloned()
-                                    //     }
-                                    // } else {
-                                    //     gate_store.gate_stats().read().get(&gate.get_id()).cloned()
-                                    // };
-                                    let gate_stats = gate_store.gate_stats().read().get(&gate.get_id()).cloned();
+                                    let gate_stats = if let Some(temp_gate_position) = &*temp_gate_position.read() {
+                                        if temp_gate_position.id == gate.get_id() {
+                                            Some(temp_gate_position.stats.clone())
+                                        } else {
+                                            gate_store.gate_stats().read().get(&gate.get_id()).cloned()
+                                        }
+                                    } else {
+                                        gate_store.gate_stats().read().get(&gate.get_id()).cloned()
+                                    };
                                     rsx! {
                                         RenderGate {
                                             gate: gate.clone(),
@@ -643,44 +611,43 @@ fn RenderShape(
     let plot_map = use_context::<Signal<Option<PlotMapper>>>();
     let mut drag_data_signal = use_context::<Signal<Option<GateDragType>>>();
     if let Some(mapper) = &*plot_map.read() {
-        // let transform = {
-        //     match &drag_data {
-        //         Some(GateDragType::Gate(data)) => {
-        //             if *gate_id == *data.gate_id() {
-        //                 let offset = data.offset();
-        //                 let p_start = mapper.data_to_pixel(0.0, 0.0, None, None);
-        //                 let p_current = mapper.data_to_pixel(offset.0, offset.1, None, None);
-        //                 let dx = p_current.0 - p_start.0;
-        //                 let dy = p_current.1 - p_start.1;
-        //                 if shape.is_undraggable() {
-        //                     format!("none")
-        //                 } else if shape.is_composite() {
-        //                     if shape.is_axis_matched() {
-        //                         format!("translate({} {})", 0, -dy)
-        //                     } else {
-        //                         format!("translate({} {})", -dx, 0)
-        //                     }
-        //                 } else {
-        //                     format!("translate({} {})", -dx, -dy)
-        //                 }
-        //             } else {
-        //                 format!("none")
-        //             }
-        //         }
-        //         Some(GateDragType::Rotation(data)) => {
-        //             if *gate_id == *data.gate_id() {
-        //                 let rotation_degs = data.rotation_deg();
-        //                 let c = data.pivot_point();
-        //                 let (cx, cy) = mapper.data_to_pixel(c.0, c.1, None, None);
-        //                 format!("rotate({rotation_degs} {cx} {cy})")
-        //             } else {
-        //                 format!("none")
-        //             }
-        //         }
-        //         _ => format!("none"),
-        //     }
-        // };
-        let transform = format!("none");
+        let transform = {
+            match &drag_data {
+                Some(GateDragType::Gate(data)) => {
+                    if *gate_id == *data.gate_id() {
+                        let offset = data.offset();
+                        let p_start = mapper.data_to_pixel(0.0, 0.0, None, None);
+                        let p_current = mapper.data_to_pixel(offset.0, offset.1, None, None);
+                        let dx = p_current.0 - p_start.0;
+                        let dy = p_current.1 - p_start.1;
+                        if shape.is_undraggable() {
+                            format!("none")
+                        } else if shape.is_composite() {
+                            if shape.is_axis_matched() {
+                                format!("translate({} {})", 0, -dy)
+                            } else {
+                                format!("translate({} {})", -dx, 0)
+                            }
+                        } else {
+                            format!("translate({} {})", -dx, -dy)
+                        }
+                    } else {
+                        format!("none")
+                    }
+                }
+                Some(GateDragType::Rotation(data)) => {
+                    if *gate_id == *data.gate_id() {
+                        let rotation_degs = data.rotation_deg();
+                        let c = data.pivot_point();
+                        let (cx, cy) = mapper.data_to_pixel(c.0, c.1, None, None);
+                        format!("rotate({rotation_degs} {cx} {cy})")
+                    } else {
+                        format!("none")
+                    }
+                }
+                _ => format!("none"),
+            }
+        };
         match shape {
             GateRenderShape::PolyLine {
                 points,
@@ -824,22 +791,22 @@ fn RenderShape(
                 let handle_x = c.0;
                 let handle_y = c.1 - (size + pixel_offset);
 
-                // let translate = {
-                //     if let Some(GateDragType::Gate(data)) = &drag_data {
-                //         if *gate_id == *data.gate_id() {
-                //             let offset = data.offset();
-                //             let p_start = mapper.data_to_pixel(0.0, 0.0, None, None);
-                //             let p_current = mapper.data_to_pixel(offset.0, offset.1, None, None);
-                //             let dx = p_current.0 - p_start.0;
-                //             let dy = p_current.1 - p_start.1;
-                //             Some(format!("translate({} {})", -dx, -dy))
-                //         } else {
-                //             None
-                //         }
-                //     } else {
-                //         None
-                //     }
-                // };
+                let translate = {
+                    if let Some(GateDragType::Gate(data)) = &drag_data {
+                        if *gate_id == *data.gate_id() {
+                            let offset = data.offset();
+                            let p_start = mapper.data_to_pixel(0.0, 0.0, None, None);
+                            let p_current = mapper.data_to_pixel(offset.0, offset.1, None, None);
+                            let dx = p_current.0 - p_start.0;
+                            let dy = p_current.1 - p_start.1;
+                            Some(format!("translate({} {})", -dx, -dy))
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                };
                 let rotate = {
                     if let Some(GateDragType::Rotation(data)) = &drag_data {
                         if let ShapeType::Rotation(handle_angle_rad) = shape_type {
@@ -856,13 +823,11 @@ fn RenderShape(
                     }
                 };
 
-                let transform = [rotate]
+                let transform = [translate, rotate]
                     .into_iter()
                     .flatten()
                     .collect::<Vec<_>>()
                     .join(" ");
-
-
 
                 rsx! {
                     g { transform,

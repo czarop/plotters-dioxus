@@ -234,6 +234,7 @@ impl DrawableGate for RectangleGate {
         plot_map: &PlotMapper,
         gate_stats: &Option<GateStats>
     ) -> Vec<GateRenderShape> {
+        
         let style = if is_selected {
             &SELECTED_LINE
         } else {

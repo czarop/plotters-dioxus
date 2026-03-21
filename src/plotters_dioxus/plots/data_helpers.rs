@@ -4,7 +4,7 @@ use crate::plotters_dioxus::gates::gate_store::{ GateOverrideResolver, GateState
 use crate::plotters_dioxus::gates::{GateState, gate_traits::DrawableGate};
 use crate::plotters_dioxus::plots::parameters::PlotStore;
 use dioxus::prelude::*;
-use dioxus::stores::Store;
+use dioxus::stores::{Store, SyncStore};
 use flow_fcs::{Fcs};
 use flow_gates::{EventIndex, Gate};
 
@@ -22,17 +22,49 @@ pub async fn get_flow_data(path: std::path::PathBuf) -> Result<Fcs, Arc<anyhow::
 
 pub async fn get_filtered_dataframe(
     df: Arc<DataFrame>,
-    parental_gate_id: &Option<Arc<str>>,
+    parental_gate_id: Option<Arc<str>>,
 ) -> Result<Arc<DataFrame>, anyhow::Error> {
     let df_clone = df.clone();
     let plot_store: Store<PlotStore> = use_context::<Store<PlotStore>>();
-    let gate_store: Store<GateState> = use_context::<Store<GateState>>();
-    let gate_chain: Option<Vec<(Arc<str>, Arc<dyn DrawableGate>)>> =
+    let gate_store = use_context::<SyncStore<GateState>>();
+    // let gate_chain: Option<Vec<(Arc<str>, Arc<dyn DrawableGate>)>> =
+    //     if let Some(parent) = parental_gate_id {
+    //         let arcs: Vec<(Arc<str>, Arc<dyn DrawableGate>)> = gate_store
+    //             .hierarchy()
+    //             .peek()
+    //             .get_chain_to_root(parent)
+    //             .iter()
+    //             .filter_map(|id| {
+    //                 gate_store
+    //                     .primary_and_subgate_registry()
+    //                     .peek()
+    //                     .get(id)
+    //                     .map(|g| (id.clone(), g.clone()))
+    //             })
+    //             .collect();
+
+    //         if arcs.is_empty() { None } else { Some(arcs) }
+    //     } else {
+    //         None
+    //     };
+    
+    let curr_file_id = plot_store.peek().current_file_id.clone();
+    let gates_and_boolean_gates = gate_store.peek().primary_and_subgate_registry.clone();
+    let position_overrides = gate_store.peek().position_overrides.clone();
+    let resolver = GateOverrideResolver{
+        curr_file_id,
+        gates_subgates_and_boolean_gates: gates_and_boolean_gates,
+        position_overrides,
+    };
+
+    task::spawn_blocking(move || -> Result<Arc<DataFrame>, anyhow::Error> {
+
+        let gate_chain: Option<Vec<(Arc<str>, Arc<dyn DrawableGate>)>> =
         if let Some(parent) = parental_gate_id {
             let arcs: Vec<(Arc<str>, Arc<dyn DrawableGate>)> = gate_store
                 .hierarchy()
                 .peek()
-                .get_chain_to_root(parent)
+                .get_chain_to_root(&parent)
                 .iter()
                 .filter_map(|id| {
                     gate_store
@@ -47,17 +79,7 @@ pub async fn get_filtered_dataframe(
         } else {
             None
         };
-    
-    let curr_file_id = plot_store.peek().current_file_id.clone();
-    let gates_and_boolean_gates = gate_store.peek().primary_and_subgate_registry.clone();
-    let position_overrides = gate_store.peek().position_overrides.clone();
-    let resolver = GateOverrideResolver{
-        curr_file_id,
-        gates_subgates_and_boolean_gates: gates_and_boolean_gates,
-        position_overrides,
-    };
 
-    task::spawn_blocking(move || -> Result<Arc<DataFrame>, anyhow::Error> {
         if let Some(chain) = gate_chain {
             let gate_refs: Vec<&Gate> = chain
                 .iter()

@@ -1,9 +1,13 @@
 Gates:
 
+File picker not working when typing
+10:00:27 [macos] Gate Move Failed: Invalid geometry: Ellipse radius_x must be positive and finite, got 0
+
 
 Allow choosing other gates at the same level for AND and OR
 Make ID's for boolean gates link to the main store and set from add_gate or add_boolean_gate
 stats for boolean gates??
+use boolean_gate_links to clean up boolean gates when deleting main gates
 
 Add filter Cache
 
@@ -18,7 +22,7 @@ Metadata
 Metadata Groups
 Metadata-specific Gating
 Set Metadata from FCS or Omiq
-Sample-specific gating
+Sample-specific gating - use another resolver in the gate filtering 
 
 Paired samples (FMX FS)
 

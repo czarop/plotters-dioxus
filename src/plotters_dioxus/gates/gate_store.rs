@@ -158,12 +158,15 @@ impl flow_gates::GateResolver for GateOverrideResolver {
 /// to retrieve a list of gate id's shown on the plot.
 /// For each gate id, the actual gates can be retrieved from gate_registry.
 /// Check for file-specific positioning before drawing
+
 #[derive(Default, Store)]
 pub struct GateState {
     // For the Renderer: "What gates do I draw on this Plot?"
     gate_ids_by_view: FxHashMap<GatesOnPlotKey, Vec<GateId>>,
     // For the Logic: "What is the actual data for Gate X?"
     pub primary_gate_registry: GateMap,
+
+
     pub primary_and_subgate_registry: GateMap,
 
     // For the Filtering: "How are these gates nested?"
@@ -171,14 +174,12 @@ pub struct GateState {
     // are there file-specific overrides for gate positions
     pub position_overrides: im::HashMap<GateId, FxHashMap<FileId, Arc<dyn DrawableGate>>, rustc_hash::FxBuildHasher>,
 
-
-    // // a map of id to all gate types incl boolean and subgate - this is for the resolver
-    // pub primary_subgate_and_bool_registry: im::HashMap<GateId, GateType, rustc_hash::FxBuildHasher>,
-
     // when deleting a gate, do you need to delete any boolean gates that depend on it?
     boolean_gate_links: FxHashMap<GateId, Vec<GateId>>,
 
-    pub gate_stats: FxHashMap<Arc<str>, GateStats>
+    pub gate_stats: FxHashMap<Arc<str>, GateStats>,
+
+
 }
 
 #[store(pub name = GateStateImplExt)]

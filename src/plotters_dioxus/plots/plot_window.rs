@@ -1,4 +1,5 @@
 use dioxus::prelude::*;
+use dioxus::stores::use_store_sync;
 use polars::frame::DataFrame;
 use crate::FxIndexMap;
 use crate::plotters_dioxus::gates::gate_buttons::NewGateButtons;
@@ -29,8 +30,9 @@ static CSS_STYLE: Asset = asset!("assets/plot_window.css");
 pub fn PlotWindow() -> Element {
     let mut filehandler: Signal<Option<FcsFiles>> = use_signal(|| None);
     let mut message = use_signal(|| None::<String>);
-    let mut gate_store = use_store(|| GateState::default());
+    let mut gate_store: Store<GateState, CopyValue<GateState, SyncStorage>> = use_store_sync(|| GateState::default());
     use_context_provider(|| gate_store);
+    
 
     let mut current_gate_type = use_signal(|| PrimaryGateType::Polygon);
     use_context_provider(|| current_gate_type);
@@ -223,10 +225,10 @@ pub fn PlotWindow() -> Element {
         let x_fluoro = x_axis_marker.read().fluoro.clone();
         let y_fluoro = y_axis_marker.read().fluoro.clone();
         async move {
-            let parental_gate = &*parental_gate.read();
+            
 
             if let Some(Ok(d)) = &*scaled_data.read() {
-                let filtered_data = match get_filtered_dataframe(d.clone(), parental_gate)
+                let filtered_data = match get_filtered_dataframe(d.clone(), parental_gate())
                     .await
                 {
                     Ok(d) => d.clone(),

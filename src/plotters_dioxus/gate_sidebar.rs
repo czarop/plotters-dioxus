@@ -2,6 +2,7 @@ use crate::plotters_dioxus::gates::GateState;
 use crate::plotters_dioxus::gates::gate_store::{GateStateImplExt, GateStateStoreExt, ROOTGATE};
 use crate::plotters_dioxus::plots::parameters::{Param, PlotStore, PlotStoreStoreExt};
 use dioxus::prelude::*;
+use dioxus::stores::SyncStore;
 use std::sync::Arc;
 use crate::components::context_menu::*;
 static SIDEBAR_STYLE: Asset = asset!("assets/gate_sidebar.css");
@@ -9,7 +10,8 @@ static SIDEBAR_STYLE: Asset = asset!("assets/gate_sidebar.css");
 
 #[component]
 pub fn GateSidebar(selected_id: Signal<Option<Arc<str>>>, x_axis_param: Signal<Param>, y_axis_param: Signal<Param>) -> Element {
-    let gate_store: Store<GateState> = use_context::<Store<GateState>>();
+    // let gate_store: Store<GateState> = use_context::<Store<GateState>>();
+    let gate_store = use_context::<SyncStore<GateState>>();
     let hierarchy = gate_store.hierarchy();
     let roots = hierarchy.read().get_roots();
 
@@ -57,7 +59,8 @@ fn ChevronIcon() -> Element {
 
 #[component]
 fn GateNode(gate_id: Arc<str>, selected: Signal<Option<Arc<str>>>, level: usize, x_axis_param: Signal<Param>, y_axis_param: Signal<Param>) -> Element {
-    let mut gate_store: Store<GateState> = use_context::<Store<GateState>>();
+    // let mut gate_store: Store<GateState> = use_context::<Store<GateState>>();
+    let mut gate_store = use_context::<SyncStore<GateState>>();
     let param_store: Store<PlotStore> = use_context::<Store<PlotStore>>();
     let mut is_expanded = use_signal(|| true);
 

@@ -12,15 +12,15 @@ pub fn SearchableSelectList<T: Clone + PartialEq + std::fmt::Display + 'static>(
     let mut search = use_signal(|| String::new());
     let mut local_selected_value: Signal<Option<(usize, T)>> = use_signal(|| None);
 
-    // Filter logic
     let filtered = use_memo(move || {
         let q = search.read().to_lowercase();
         items
             .read()
             .iter()
-            .filter(|item| item.to_string().to_lowercase().contains(&q))
-            .cloned()
-            .collect::<Vec<T>>()
+            .enumerate() // <--- Get the original index FIRST
+            .filter(|(_, item)| item.to_string().to_lowercase().contains(&q))
+            .map(|(i, item)| (i, item.clone())) // Store both
+            .collect::<Vec<(usize, T)>>()
     });
 
     let mut display_text = use_signal(|| String::new());
@@ -92,17 +92,17 @@ pub fn SearchableSelectList<T: Clone + PartialEq + std::fmt::Display + 'static>(
             if is_open() {
                 div { class: "combobox-list scrollable",
                     // Iterate directly over items. We use enumerate just for the key.
-                    for (i , item) in filtered().into_iter().enumerate() {
+                    for (original_i , item) in filtered().into_iter() {
                         // Capture the item for the closure
                         {
                             let current_item = item.clone();
                             rsx! {
                                 div {
-                                    key: "{i}", // React/Dioxus likes keys
+                                    key: "{original_i}", // React/Dioxus likes keys
                                     class: "combobox-option", // Use the Display implementation
                                     onclick: move |_| {
                                         // Set the actual item, not the index
-                                        local_selected_value.set(Some((i, current_item.clone())));
+                                        local_selected_value.set(Some((original_i, current_item.clone())));
 
                                         // Reset search so the placeholder (selected value) shows again
                                         search.set(String::new());
@@ -139,17 +139,26 @@ pub fn SearchableSelectMap<T: Clone + PartialEq + std::fmt::Display + 'static, S
     let mut local_selected_value: Signal<Option<(usize, T)>> = use_signal(|| None);
 
     // Filter logic
+    // let filtered = use_memo(move || {
+    //     let q = search.read().to_lowercase();
+    //     items
+    //     .read()
+    //     .iter()
+    //     .filter(|&(&ref _k, &ref item)| { 
+    //         item.to_string().to_lowercase().contains(&q) 
+    //     })
+    //     // Manually clone the key and value from the tuple
+    //     .map(|(k, v)| (k.clone(), v.clone())) 
+    //     .collect::<FxIndexMap<S, T>>()
+    // });
     let filtered = use_memo(move || {
         let q = search.read().to_lowercase();
-        items
-        .read()
-        .iter()
-        .filter(|&(&ref _k, &ref item)| { 
-            item.to_string().to_lowercase().contains(&q) 
-        })
-        // Manually clone the key and value from the tuple
-        .map(|(k, v)| (k.clone(), v.clone())) 
-        .collect::<FxIndexMap<S, T>>()
+        items.read()
+            .iter()
+            .enumerate() // Capture the REAL index in the master map
+            .filter(|(_, (_, v))| v.to_string().to_lowercase().contains(&q))
+            .map(|(i, (k, v))| (i, k.clone(), v.clone())) // Store (Index, Key, Value)
+            .collect::<Vec<(usize, S, T)>>()
     });
 
     let mut display_text = use_signal(|| String::new());
@@ -221,17 +230,17 @@ pub fn SearchableSelectMap<T: Clone + PartialEq + std::fmt::Display + 'static, S
             if is_open() {
                 div { class: "combobox-list scrollable",
                     // Iterate directly over items. We use enumerate just for the key.
-                    for (i , (_k , item)) in filtered().into_iter().enumerate() {
+                    for (i , (original_i , _k , item)) in filtered().into_iter().enumerate() {
                         // Capture the item for the closure
                         {
                             let current_item = item.clone();
                             rsx! {
                                 div {
-                                    key: "{i}", // React/Dioxus likes keys
+                                    key: "{original_i}", // React/Dioxus likes keys
                                     class: "combobox-option", // Use the Display implementation
                                     onclick: move |_| {
                                         // Set the actual item, not the index
-                                        local_selected_value.set(Some((i, current_item.clone())));
+                                        local_selected_value.set(Some((original_i, current_item.clone())));
 
                                         // Reset search so the placeholder (selected value) shows again
                                         search.set(String::new());

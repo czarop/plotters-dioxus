@@ -647,11 +647,6 @@ pub fn calculate_projected_radii(
             let ry = (dx * sin_a - dy * cos_a).abs();
             (current_rx, ry, current_angle_rad)
         }
-        // 5 => { // Rotation Handle
-        //     let mouse_angle = dy.atan2(dx);
-        //     let new_angle = mouse_angle + std::f32::consts::FRAC_PI_2;
-        //     (current_rx, current_ry, new_angle)
-        // }
         5 => {
             // Rotation Handle
             let mouse_angle = dy.atan2(dx);
