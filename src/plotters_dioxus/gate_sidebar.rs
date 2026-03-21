@@ -130,6 +130,7 @@ fn GateNode(gate_id: Arc<str>, selected: Signal<Option<Arc<str>>>, level: usize,
                                     x_axis_param.set(new_x);
                                     y_axis_param.set(new_y);
                                     selected.set(Some(parent.clone()));
+                                    *gate_store.selected_gate().write() = Some(gate_id_clone.clone());
                                 }
 
                             }
@@ -232,12 +233,12 @@ fn GateNode(gate_id: Arc<str>, selected: Signal<Option<Arc<str>>>, level: usize,
                     value: "not".to_string(),
                     index: 2usize,
                     on_select: move |_| {
-                        let id = format!("NOT_{}", gate_id_for_not_gate.clone());
+
                         let x_axis_param = x_axis_param.peek().fluoro.clone();
                         let y_axis_param = y_axis_param.peek().fluoro.clone();
                         match gate_store
                             .add_boolean_gate(
-                                &id,
+                                None,
                                 flow_gates::BooleanOperation::Not,
                                 vec![gate_id_for_not_gate.clone()],
                                 Some(parent_for_not_gate.clone()),
@@ -260,7 +261,7 @@ fn GateNode(gate_id: Arc<str>, selected: Signal<Option<Arc<str>>>, level: usize,
                         let y_axis_param = y_axis_param.peek().fluoro.clone();
                         match gate_store
                             .add_boolean_gate(
-                                &id,
+                                None,
                                 flow_gates::BooleanOperation::And,
                                 vec![gate_id_for_and_gate.clone()],
                                 Some(parent_for_and_gate.clone()),
@@ -278,12 +279,12 @@ fn GateNode(gate_id: Arc<str>, selected: Signal<Option<Arc<str>>>, level: usize,
                     value: "or".to_string(),
                     index: 4usize,
                     on_select: move |_| {
-                        let id = format!("OR_{}", gate_id_for_or_gate.clone());
+
                         let x_axis_param = x_axis_param.peek().fluoro.clone();
                         let y_axis_param = y_axis_param.peek().fluoro.clone();
                         match gate_store
                             .add_boolean_gate(
-                                &id,
+                                None,
                                 flow_gates::BooleanOperation::Or,
                                 vec![gate_id_for_or_gate.clone()],
                                 Some(parent_for_or_gate.clone()),

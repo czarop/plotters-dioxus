@@ -36,11 +36,11 @@ pub fn GateLayer(
     parental_gate_id: ReadSignal<Option<Arc<str>>>,
 ) -> Element {
     let plot_map = use_context::<Signal<Option<PlotMapper>>>();
-    // let mut gate_store = use_context::<Store<GateState>>();
+
     let mut gate_store = use_context::<SyncStore<GateState>>();
     let mut draft_gate_coords = use_signal(|| Vec::<(f32, f32)>::new());
-    let mut next_gate_id = use_signal(|| 0);
-    let mut selected_gate_id = use_signal(|| None::<Arc<str>>);
+
+    let mut selected_gate_id = gate_store.selected_gate();
     let current_gate_type = use_context::<Signal<PrimaryGateType>>();
 
     let plot_store = use_context::<Store<PlotStore>>();
@@ -121,83 +121,6 @@ pub fn GateLayer(
             println!("no gates to show for {:?}, {:?}, {:?}", x_channel(), y_channel(), parental_gate_id());
         }
     });
-
-    let parental_event_count = use_memo(move || {
-        let event_index_option = plot_store.event_index_map()();
-        if let Some(event_index_map) = event_index_option{
-            Some(event_index_map.event_index.len())
-        } else {
-            None
-        }
-    });
-
-    // let temp_gate_position = use_memo(move || {
-    //     let parental_event_count_op = parental_event_count();
-    //     let event_index_option = plot_store.event_index_map()();
-    //     let res = match &*drag_data.read(){
-    //         Some(GateDragType::Gate(dd)) => {
-    //             let id = dd.gate_id();
-    //             if let Some(gate) = gate_store.get_gate_by_id(id.clone()){
-    //                 if let Ok(Some(new_gate)) = gate.replace_points(dd.clone()) {
-    //                     let new_gate_arc: Arc<dyn DrawableGate> = Arc::from(new_gate);
-    //                     Some(( id, new_gate_arc ))
-    //                 } else {
-    //                     None
-    //                 }
-    //             } else {
-    //                 None
-    //             }
-    //         },
-    //         Some(GateDragType::Point(dd)) => {
-    //             let id = selected_gate_id.read().cloned();
-    //             if id.is_none() {
-    //                 return None;
-    //             }
-    //             let id = id.unwrap();
-    //             let point_idx = dd.point_index();
-    //             let position = dd.loc();
-    //             let plot_map = &*plot_map.read();
-    //             if let Some(plot_map) = plot_map {
-    //                 if let Some(gate) = gate_store.get_gate_by_id(id.clone()){
-    //                     if let Ok(new_gate) = gate.replace_point(position, point_idx, plot_map) {
-    //                         let new_gate_arc: Arc<dyn DrawableGate> = Arc::from(new_gate);
-    //                         Some(( id, new_gate_arc ))
-    //                     } else {
-    //                     None
-    //                 }
-    //             } else {
-    //                 None
-    //             }
-    //         } else {
-    //             None
-    //         }},
-    //         Some(GateDragType::Rotation(dd)) => {
-    //             let id = dd.gate_id();
-    //             let mouse_position = dd.current_loc();
-    //             if let Some(gate) = gate_store.get_gate_by_id(id.clone()){
-    //                 if let Ok(Some(new_gate)) = gate.rotate_gate(mouse_position) {
-    //                     let new_gate_arc: Arc<dyn DrawableGate> = Arc::from(new_gate);
-    //                     Some(( id, new_gate_arc ))
-    //                 } else {
-    //                     None
-    //                 }
-    //             } else {
-    //                 None
-    //             }
-    //         },
-    //         None => return None,
-    //     };
-    //     if let Some(parental_event_count) = parental_event_count_op{
-    //     if let Some(event_index_map) = event_index_option {
-    //         if let Some((id, gate)) = res{
-    //             if let Some(stats) = crate::plotters_dioxus::gates::gate_stats::get_percent_and_counts_gate(gate, &event_index_map, parental_event_count as f32).ok(){
-    //                 return Some(TempGateStats{id, stats});
-    //             }
-    //         } 
-    //     }
-    // }
-    //     return None;
-    // });
 
     let mut dbl_click_lockout = use_signal(|| false);
     let mut last_processed_pos = use_signal(|| (0.0f32, 0.0f32));
@@ -287,8 +210,6 @@ pub fn GateLayer(
                                 current_gate_type.peek().cloned()
                             };
 
-                            let id = *next_gate_id.peek();
-
                             match gate_store
                                 .add_gate(
                                     &mapper,
@@ -297,13 +218,13 @@ pub fn GateLayer(
                                     x_param.clone(),
                                     y_param.clone(),
                                     points,
-                                    format!("{id}"),
                                     parental_gate_id(),
                                     geo,
+                                    None,
                                 )
 
                             {
-                                Ok(_) => *next_gate_id.write() += 1,
+                                Ok(_) => {}
                                 Err(e) => {
                                     draft_gate_coords.set(vec![]);
                                     println!("{e}");
@@ -484,15 +405,6 @@ pub fn GateLayer(
                                         None
                                     };
 
-                                    // let gate_stats = if let Some(temp_gate_position) = &*temp_gate_position.read() {
-                                    //     if temp_gate_position.id == gate.get_id() {
-                                    //         Some(temp_gate_position.stats.clone())
-                                    //     } else {
-                                    //         gate_store.gate_stats().read().get(&gate.get_id()).cloned()
-                                    //     }
-                                    // } else {
-                                    //     gate_store.gate_stats().read().get(&gate.get_id()).cloned()
-                                    // };
                                     let gate_stats = gate_store.gate_stats().read().get(&gate.get_id()).cloned();
                                     rsx! {
                                         RenderGate {

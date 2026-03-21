@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use flow_gates::{BooleanOperation, GateGeometry, GateMode};
+use flow_gates::{BooleanOperation, GateGeometry};
 
 use crate::plotters_dioxus::gates::gate_traits::DrawableGate;
 
@@ -12,6 +12,7 @@ pub struct BooleanGate {
 impl BooleanGate {
     pub fn new(
         id: Arc<str>,
+        name: String,
         linked_gate_ids: Vec<Arc<str>>,
         operation: BooleanOperation,
         x_param: Arc<str>,
@@ -21,7 +22,7 @@ impl BooleanGate {
             operation,
             operands: linked_gate_ids,
         };
-        let gate = flow_gates::Gate::new(id.clone(), id.to_string(), geom, x_param, y_param);
+        let gate = flow_gates::Gate::new(id.clone(), name, geom, x_param, y_param);
         
         Ok(Self { inner: gate })
     }

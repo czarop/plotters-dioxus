@@ -2,14 +2,12 @@ Gates:
 
 
 Allow choosing other gates at the same level for AND and OR
-Make ID's for boolean gates link to the main store and set from add_gate or add_boolean_gate
 stats for boolean gates??
 
 Add filter Cache
 
 rename gates
 Show names on gates
-highlight gates when selected on sidebar?
 
 
 Meta:

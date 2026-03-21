@@ -21,6 +21,7 @@ type FxIndexMap<K, V> = IndexMap<K, V, FxBuildHasher>;
 pub struct QuadrantGate {
     gates: FxIndexMap<Arc<str>, PolygonGate>,
     id: Arc<str>,
+    name: String,
     points: DataPoints,
     axis_matched: bool,
     parameters: (Arc<str>, Arc<str>),
@@ -30,6 +31,7 @@ impl QuadrantGate {
     pub fn try_new_from_raw_coord(
         plot_map: &PlotMapper,
         id: Arc<str>,
+        name: String,
         click_loc_raw: (f32, f32),
         x_axis_param: Arc<str>,
         y_axis_param: Arc<str>,
@@ -37,11 +39,12 @@ impl QuadrantGate {
         let (cx, cy) = plot_map.pixel_to_data(click_loc_raw.0, click_loc_raw.1, None, None);
         let points = DataPoints::new_from_click(cx, cy, plot_map);
 
-        Self::try_new_from_data_points(id, points, x_axis_param, y_axis_param, true, None)
+        Self::try_new_from_data_points(id, name, points, x_axis_param, y_axis_param, true, None)
     }
 
     fn try_new_from_data_points(
         id: Arc<str>,
+        name: String,
         mut data_points: DataPoints,
         x_axis_param: Arc<str>,
         y_axis_param: Arc<str>,
@@ -99,6 +102,7 @@ impl QuadrantGate {
         Ok(Self {
             gates: gate_map,
             id,
+            name,
             points: data_points,
             axis_matched,
             parameters,
@@ -109,6 +113,7 @@ impl QuadrantGate {
         let gate_ids = self.gates.keys().cloned().collect();
         Self::try_new_from_data_points(
             self.id.clone(),
+            self.name.clone(),
             data_points,
             self.parameters.0.clone(),
             self.parameters.1.clone(),
@@ -128,6 +133,7 @@ impl QuadrantGate {
             Box::new(Self {
                 gates,
                 id: self.id.clone(),
+                name: self.name.clone(),
                 points: new_points,
                 axis_matched: !self.axis_matched,
                 parameters: new_parameters,
@@ -136,6 +142,7 @@ impl QuadrantGate {
             Box::new(Self {
                 gates,
                 id: self.id.clone(),
+                name: self.name.clone(),
                 points: self.points.clone(),
                 axis_matched: self.axis_matched,
                 parameters: self.parameters.clone(),

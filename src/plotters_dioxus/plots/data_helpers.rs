@@ -27,27 +27,7 @@ pub async fn get_filtered_dataframe(
     let df_clone = df.clone();
     let plot_store: Store<PlotStore> = use_context::<Store<PlotStore>>();
     let gate_store = use_context::<SyncStore<GateState>>();
-    // let gate_chain: Option<Vec<(Arc<str>, Arc<dyn DrawableGate>)>> =
-    //     if let Some(parent) = parental_gate_id {
-    //         let arcs: Vec<(Arc<str>, Arc<dyn DrawableGate>)> = gate_store
-    //             .hierarchy()
-    //             .peek()
-    //             .get_chain_to_root(parent)
-    //             .iter()
-    //             .filter_map(|id| {
-    //                 gate_store
-    //                     .primary_and_subgate_registry()
-    //                     .peek()
-    //                     .get(id)
-    //                     .map(|g| (id.clone(), g.clone()))
-    //             })
-    //             .collect();
 
-    //         if arcs.is_empty() { None } else { Some(arcs) }
-    //     } else {
-    //         None
-    //     };
-    
     let curr_file_id = plot_store.peek().current_file_id.clone();
     let gates_and_boolean_gates = gate_store.peek().primary_and_subgate_registry.clone();
     let position_overrides = gate_store.peek().position_overrides.clone();
@@ -90,7 +70,7 @@ pub async fn get_filtered_dataframe(
             let mask = super::super::gates::gate_filtering::filter_events_by_hierarchy_to_mask(
                 &df, &gate_refs, &resolver
             )?;
-            // 2. Filter the dataframe once at the end
+            // 2. Filter the dataframe
             Ok(df.filter(&mask)?.into())
         } else {
             Ok(df_clone)

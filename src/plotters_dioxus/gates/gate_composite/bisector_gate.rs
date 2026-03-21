@@ -19,6 +19,7 @@ use crate::{FxIndexMap, plotters_dioxus::{
 pub struct BisectorGate {
     gates: FxIndexMap<Arc<str>, LineGate>,
     id: Arc<str>,
+    name: String,
     points: (f32, f32),
     axis_matched: bool,
     parameters: (Arc<str>, Arc<str>),
@@ -28,6 +29,7 @@ impl BisectorGate {
     pub fn try_new(
         plot_map: &PlotMapper,
         id: Arc<str>,
+        name: String,
         click_loc: (f32, f32),
         x_axis_param: Arc<str>,
         y_axis_param: Arc<str>,
@@ -68,6 +70,7 @@ impl BisectorGate {
         Ok(Self {
             gates: gate_map,
             id,
+            name,
             points,
             axis_matched: true,
             parameters: (x_axis_param, y_axis_param),
@@ -85,6 +88,7 @@ impl BisectorGate {
             Box::new(Self {
                 gates,
                 id: self.id.clone(),
+                name: self.name.clone(),
                 points: new_points,
                 axis_matched: !self.axis_matched,
                 parameters: new_parameters,
@@ -93,6 +97,7 @@ impl BisectorGate {
             Box::new(Self {
                 gates,
                 id: self.id.clone(),
+                name: self.name.clone(),
                 points: self.points,
                 axis_matched: self.axis_matched,
                 parameters: self.parameters.clone(),
@@ -110,6 +115,7 @@ impl BisectorGate {
         Box::new(Self {
             gates,
             id: self.id.clone(),
+            name: self.name.clone(),
             points: new_points,
             axis_matched: self.axis_matched,
             parameters: self.parameters.clone(),
@@ -163,6 +169,7 @@ impl BisectorGate {
         Ok(Self {
             gates: gate_map,
             id: self.id.clone(),
+            name: self.name.clone(),
             points,
             axis_matched: self.axis_matched,
             parameters: self.parameters.clone(),

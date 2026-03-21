@@ -105,6 +105,7 @@ impl DataPoints {
 pub struct SkewedQuadrantGate {
     gates: FxIndexMap<Arc<str>, PolygonGate>,
     id: Arc<str>,
+    name: String,
     points: DataPoints,
     axis_matched: bool,
     parameters: (Arc<str>, Arc<str>),
@@ -114,6 +115,7 @@ impl SkewedQuadrantGate {
     pub fn try_new_from_raw_coord(
         plot_map: &PlotMapper,
         id: Arc<str>,
+        name: String,
         click_loc_raw: (f32, f32),
         x_axis_param: Arc<str>,
         y_axis_param: Arc<str>,
@@ -123,6 +125,7 @@ impl SkewedQuadrantGate {
 
         SkewedQuadrantGate::try_new_from_data_points(
             id,
+            name,
             points,
             x_axis_param,
             y_axis_param,
@@ -133,6 +136,7 @@ impl SkewedQuadrantGate {
 
     fn try_new_from_data_points(
         id: Arc<str>,
+        name: String,
         data_points: DataPoints,
         x_axis_param: Arc<str>,
         y_axis_param: Arc<str>,
@@ -232,6 +236,7 @@ impl SkewedQuadrantGate {
         Ok(Self {
             gates: gate_map,
             id,
+            name,
             points,
             axis_matched: axis_matched,
             parameters: (x_axis_param, y_axis_param),
@@ -249,6 +254,7 @@ impl SkewedQuadrantGate {
             Box::new(Self {
                 gates,
                 id: self.id.clone(),
+                name: self.name.clone(),
                 points: new_points,
                 axis_matched: !self.axis_matched,
                 parameters: new_parameters,
@@ -257,6 +263,7 @@ impl SkewedQuadrantGate {
             Box::new(Self {
                 gates,
                 id: self.id.clone(),
+                name: self.name.clone(),
                 points: self.points.clone(),
                 axis_matched: self.axis_matched,
                 parameters: self.parameters.clone(),
@@ -274,6 +281,7 @@ impl SkewedQuadrantGate {
         let gate_ids = vec![subgate_bl_id, subgate_br_id, subgate_tr_id, subgate_tl_id];
         SkewedQuadrantGate::try_new_from_data_points(
             self.id.clone(),
+            self.name.clone(),
             data_points,
             x_axis_param,
             y_axis_param,
