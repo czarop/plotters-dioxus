@@ -40,7 +40,11 @@ pub fn GateLayer(
     let mut gate_store = use_context::<SyncStore<GateState>>();
     let mut draft_gate_coords = use_signal(|| Vec::<(f32, f32)>::new());
 
-    let mut selected_gate_id = gate_store.selected_gate();
+    let mut selected_gate_id: Signal<Option<Arc<str>>> = use_signal(|| None);
+    use_effect(move || {
+        let new = gate_store.selected_gate()();
+        selected_gate_id.set(new);
+    });
     let current_gate_type = use_context::<Signal<PrimaryGateType>>();
 
     let plot_store = use_context::<Store<PlotStore>>();
@@ -331,41 +335,44 @@ pub fn GateLayer(
                                     .pixel_to_data(px, py, None, None);
 
                                 let new_data = data.clone_with_point(data_coords);
-                                if let Some(selected_gate_id) = &*selected_gate_id.peek() {
-                                    match new_data {
-                                        GateDragType::Point(point_drag_data) => {
-                                            if let Some(mapper) = &*plot_map.peek() {
-                                                gate_store
-                                                    .move_gate_point(
-                                                        selected_gate_id.clone().into(),
-                                                        point_drag_data.point_index(),
-                                                        data_coords,
-                                                        mapper,
-
-                                                    )
-                                                    .expect("Gate Move Failed");
-                                            }
-
-                                        }
-                                        GateDragType::Gate(gate_drag_data) => {
+                                if selected_gate_id.peek().is_none() {
+                                    return;
+                                }
+                                let selected_gate_id = selected_gate_id().unwrap();
+                                match new_data {
+                                    GateDragType::Point(point_drag_data) => {
+                                        if let Some(mapper) = &*plot_map.peek() {
                                             gate_store
-                                                .move_gate(
-                                                    gate_drag_data
-
-                                                )
-                                                .expect("Gate Move Failed");
-                                        }
-                                        GateDragType::Rotation(rotation_data) => {
-                                            gate_store
-                                                .rotate_gate(
+                                                .move_gate_point(
                                                     selected_gate_id.clone().into(),
-                                                    rotation_data.current_loc(),
+                                                    point_drag_data.point_index(),
+                                                    data_coords,
+                                                    mapper,
+
                                                 )
                                                 .expect("Gate Move Failed");
                                         }
+
+                                    }
+                                    GateDragType::Gate(gate_drag_data) => {
+                                        gate_store
+                                            .move_gate(
+                                                gate_drag_data
+
+                                            )
+                                            .expect("Gate Move Failed");
+                                    }
+                                    GateDragType::Rotation(rotation_data) => {
+                                        gate_store
+                                            .rotate_gate(
+                                                selected_gate_id.clone().into(),
+                                                rotation_data.current_loc(),
+                                            )
+                                            .expect("Gate Move Failed");
                                     }
                                 }
                             }
+
                         },
                         onmousedown: move |evt| {
                             evt.stop_propagation();
