@@ -1,4 +1,4 @@
-use std::{sync::Arc};
+use std::sync::Arc;
 
 use anyhow::anyhow;
 use flow_fcs::{TransformType, Transformable};
@@ -18,10 +18,11 @@ use crate::plotters_dioxus::{
 pub struct EllipseGate {
     pub inner: flow_gates::Gate,
     points: Vec<(f32, f32)>,
+    is_primary: bool,
 }
 
 impl EllipseGate {
-    pub fn try_new(gate: flow_gates::Gate) -> anyhow::Result<Self> {
+    pub fn try_new(gate: flow_gates::Gate, is_primary: bool) -> anyhow::Result<Self> {
         let p = {
             if let GateGeometry::Ellipse {
                 center,
@@ -44,6 +45,7 @@ impl EllipseGate {
         Ok(Self {
             inner: gate,
             points: p,
+            is_primary,
         })
     }
 
@@ -141,7 +143,10 @@ impl DrawableGate for EllipseGate {
                 name: self.inner.name.clone(),
                 mode: self.inner.mode.clone(),
             };
-            return Ok(Some(Box::new(EllipseGate::try_new(new_gate)?)));
+            return Ok(Some(Box::new(EllipseGate::try_new(
+                new_gate,
+                self.is_primary,
+            )?)));
         }
 
         Err(anyhow!("Axis mismatch for Ellipse Gate"))
@@ -170,7 +175,7 @@ impl DrawableGate for EllipseGate {
                 point_index,
                 &self.inner.parameters.0,
                 &self.inner.parameters.1,
-                Some(mapper)
+                Some(mapper),
             )?;
         } else {
             return Err(anyhow!("Error replacing point in Ellipse"));
@@ -183,7 +188,7 @@ impl DrawableGate for EllipseGate {
             name: self.inner.name.clone(),
             mode: self.inner.mode.clone(),
         };
-        Ok(Box::new(EllipseGate::try_new(new_gate)?))
+        Ok(Box::new(EllipseGate::try_new(new_gate, self.is_primary)?))
     }
 
     fn replace_points(
@@ -208,7 +213,10 @@ impl DrawableGate for EllipseGate {
             name: self.inner.name.clone(),
             mode: self.inner.mode.clone(),
         };
-        Ok(Some(Box::new(EllipseGate::try_new(new_gate)?)))
+        Ok(Some(Box::new(EllipseGate::try_new(
+            new_gate,
+            self.is_primary,
+        )?)))
     }
 
     fn rotate_gate(&self, mouse_pos: (f32, f32)) -> anyhow::Result<Option<Box<dyn DrawableGate>>> {
@@ -229,7 +237,7 @@ impl DrawableGate for EllipseGate {
                 5,
                 &self.inner.parameters.0,
                 &self.inner.parameters.1,
-                None
+                None,
             )?;
         } else {
             return Err(anyhow!("Error rotating Ellipse"));
@@ -242,7 +250,10 @@ impl DrawableGate for EllipseGate {
             name: self.inner.name.clone(),
             mode: self.inner.mode.clone(),
         };
-        Ok(Some(Box::new(EllipseGate::try_new(new_gate)?)))
+        Ok(Some(Box::new(EllipseGate::try_new(
+            new_gate,
+            self.is_primary,
+        )?)))
     }
 
     fn recalculate_gate_for_rescaled_axis(
@@ -318,7 +329,7 @@ impl DrawableGate for EllipseGate {
             mode: self.inner.mode.clone(),
         };
 
-        Ok(Box::new(EllipseGate::try_new(new_gate)?))
+        Ok(Box::new(EllipseGate::try_new(new_gate, self.is_primary)?))
     }
 
     fn is_finalised(&self) -> bool {
@@ -330,7 +341,7 @@ impl DrawableGate for EllipseGate {
         is_selected: bool,
         drag_point: Option<PointDragData>,
         plot_map: &PlotMapper,
-        gate_stats: &Option<GateStats>
+        gate_stats: &Option<GateStats>,
     ) -> Vec<GateRenderShape> {
         let style = if is_selected {
             &SELECTED_LINE
@@ -404,12 +415,12 @@ impl DrawableGate for EllipseGate {
                 )
             });
             let mut labels = vec![];
-        
+
             if let Some(gate_stats) = gate_stats {
                 let x_offset = {
                     let axis = plot_map.x_axis_min_max();
                     let xrange = *axis.end() - *axis.start();
-                    if let Some(label_pos) = &self.inner.label_position{
+                    if let Some(label_pos) = &self.inner.label_position {
                         xrange * label_pos.offset_x
                     } else {
                         xrange * 0.02
@@ -418,22 +429,28 @@ impl DrawableGate for EllipseGate {
                 let y_offset = {
                     let axis = plot_map.y_axis_min_max();
                     let yrange = *axis.end() - *axis.start();
-                    if let Some(label_pos) = &self.inner.label_position{
+                    if let Some(label_pos) = &self.inner.label_position {
                         yrange * label_pos.offset_y
                     } else {
                         yrange * 0.00
                     }
                 };
                 let offset = (x_offset, y_offset);
-                match gate_stats.get_percent_for_id(self.inner.id.clone()){
+                match gate_stats.get_percent_for_id(self.inner.id.clone()) {
                     Some(percent) => {
-                        let shape = GateRenderShape::Text { origin: self.points[1], offset: offset, fontsize: 10f32, text: format!("{:.2}%", percent), text_anchor: None, shape_type: ShapeType::Text };
+                        let shape = GateRenderShape::Text {
+                            origin: self.points[1],
+                            offset: offset,
+                            fontsize: 10f32,
+                            text: format!("{:.2}%", percent),
+                            text_anchor: None,
+                            shape_type: ShapeType::Text,
+                        };
                         labels.push(shape)
-                },
-                    None => {},
+                    }
+                    None => {}
                 }
             }
-
 
             let labels = Some(labels);
 
@@ -449,6 +466,9 @@ impl DrawableGate for EllipseGate {
         vec![self.inner.id.clone()]
     }
 
+    fn is_primary(&self) -> bool {
+        self.is_primary
+    }
 }
 
 use crate::plotters_dioxus::gates::gate_types::DRAGGED_LINE;
@@ -587,7 +607,6 @@ pub fn draw_ghost_point_for_ellipse(
     None
 }
 
-
 pub fn calculate_projected_radii(
     cursor: (f32, f32),
     center: (f32, f32),
@@ -607,13 +626,13 @@ pub fn calculate_projected_radii(
         1 | 3 => {
             // Project onto Major Axis: (cos, sin)
             let rx_raw = dx * cos_a + dy * sin_a;
-            let rx = rx_raw.abs(); 
+            let rx = rx_raw.abs();
             (rx, current_ry, current_angle_rad)
         }
         2 | 4 => {
             // Project onto Minor Axis: (-sin, cos)
             // Note: swap the signs here to properly project perpendicular to the major axis
-            let ry_raw = dy * cos_a - dx * sin_a; 
+            let ry_raw = dy * cos_a - dx * sin_a;
             let ry = ry_raw.abs();
             (current_rx, ry, current_angle_rad)
         }
@@ -635,7 +654,7 @@ pub fn update_ellipse_geometry(
     point_index: usize,
     x_param: &str,
     y_param: &str,
-    plot_map: Option<&PlotMapper>
+    plot_map: Option<&PlotMapper>,
 ) -> anyhow::Result<GateGeometry> {
     let cx = center.get_coordinate(x_param).unwrap_or(0.0);
     let cy = center.get_coordinate(y_param).unwrap_or(0.0);
@@ -648,10 +667,15 @@ pub fn update_ellipse_geometry(
         (cx, cy, rx, ry, angle)
     };
 
-    
     // CALL THE HELPER HERE
-    let sanitized_points =
-        calculate_ellipse_nodes_y_up(final_cx, final_cy, final_rx, final_ry, final_angle, plot_map);
+    let sanitized_points = calculate_ellipse_nodes_y_up(
+        final_cx,
+        final_cy,
+        final_rx,
+        final_ry,
+        final_angle,
+        plot_map,
+    );
 
     Ok(flow_gates::create_ellipse_geometry(
         sanitized_points,
@@ -660,38 +684,39 @@ pub fn update_ellipse_geometry(
     )?)
 }
 
-
 pub fn calculate_ellipse_nodes_y_up(
     cx: f32,
     cy: f32,
     mut rx: f32, // Make these mutable
     mut ry: f32,
     angle_rad: f32,
-    plot_map_op: Option<&PlotMapper>
+    plot_map_op: Option<&PlotMapper>,
 ) -> Vec<(f32, f32)> {
-    // 1. Safety Floor: 
+    // 1. Safety Floor:
 
     if let Some(plot_map) = plot_map_op {
         let x_range = plot_map.x_axis_min_max();
         let y_range = plot_map.y_axis_min_max();
         let x_span = (*x_range.end() - *x_range.start()).abs();
         let y_span = (*y_range.end() - *y_range.start()).abs();
-        let x_min_safe = x_span * 0.000001; 
+        let x_min_safe = x_span * 0.000001;
         let y_min_safe = y_span * 0.000001;
-        if rx < x_min_safe { rx = x_min_safe; }
-        if ry < y_min_safe { ry = y_min_safe; }
-
+        if rx < x_min_safe {
+            rx = x_min_safe;
+        }
+        if ry < y_min_safe {
+            ry = y_min_safe;
+        }
     }
-    
 
     let (sin_a, cos_a) = angle_rad.sin_cos();
 
     vec![
-        (cx, cy),                           
-        (cx + rx * cos_a, cy + rx * sin_a), 
-        (cx - ry * sin_a, cy + ry * cos_a), 
-        (cx - rx * cos_a, cy - rx * sin_a), 
-        (cx + ry * sin_a, cy - ry * cos_a), 
+        (cx, cy),
+        (cx + rx * cos_a, cy + rx * sin_a),
+        (cx - ry * sin_a, cy + ry * cos_a),
+        (cx - rx * cos_a, cy - rx * sin_a),
+        (cx + ry * sin_a, cy - ry * cos_a),
     ]
 }
 

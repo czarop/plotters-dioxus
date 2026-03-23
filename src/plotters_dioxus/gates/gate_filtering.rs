@@ -2,14 +2,24 @@ use dioxus::prelude::*;
 use flow_gates::{EventIndex, Gate, GateGeometry};
 use polars::prelude::*;
 
+use crate::plotters_dioxus::gates::{GateId, gate_store::GateOverrideResolver};
+
 pub fn filter_events_to_mask(
     df: &DataFrame,
-    gate: &Gate,
-    resolver: & impl flow_gates::GateResolver
-
+    gate_id: GateId,
+    resolver: &super::gate_store::GateOverrideResolver,
 ) -> anyhow::Result<BooleanChunked> {
+    // let gate = resolver.resolve(&gate_id)?;
+    let gate_drawable = resolver
+        .active_gates
+        .get(&gate_id)
+        .ok_or_else(|| anyhow::anyhow!("error fetching gate from resolver"))?;
+    let gate = gate_drawable
+        .get_gate_ref(Some(&gate_id))
+        .ok_or_else(|| anyhow::anyhow!("error fetching gate from resolver"))?;
+
     let (x_param, y_param) = gate.parameters.clone();
-    
+
     match &gate.geometry {
         GateGeometry::Rectangle { min, max } => {
             // Polars native SIMD comparison - Extremely Fast
@@ -166,118 +176,89 @@ pub fn filter_events_to_mask(
 
             Ok(mask.with_name("mask".into()))
         }
-        GateGeometry::Boolean { operation, operands } => {
-            match operation {
-                flow_gates::BooleanOperation::And => {
-                    if operands.len() < 2 {
-                        return Err(anyhow::anyhow!("AND gates must have > 1 operand"));
-                    }
-                    let mut final_mask: Option<BooleanChunked> = None;
-                    for gate in operands {
-                        if let Some(other_gate) = resolver.resolve(gate){
-                            let current_mask = filter_events_to_mask(df, other_gate, resolver)?;
-                            match final_mask {
-                                None => final_mask = Some(current_mask),
-                                Some(ref mut acc) => {
-                                    *acc = &*acc & &current_mask;
-                                    
-                                    if !acc.any() {
-                                        break; 
-                                    }
-                                }
+        GateGeometry::Boolean {
+            operation,
+            operands,
+        } => match operation {
+            flow_gates::BooleanOperation::And => {
+                if operands.len() < 2 {
+                    return Err(anyhow::anyhow!("AND gates must have > 1 operand"));
+                }
+                let mut final_mask: Option<BooleanChunked> = None;
+                for gate in operands {
+                    let current_mask = filter_events_to_mask(df, gate.clone().into(), resolver)?;
+                    match final_mask {
+                        None => final_mask = Some(current_mask),
+                        Some(ref mut acc) => {
+                            *acc = &*acc & &current_mask;
+
+                            if !acc.any() {
+                                break;
                             }
-                            
-                        } else {
-                            return Err(anyhow::anyhow!("AND gate operand could not be resolved"));
                         }
                     }
-                    match final_mask{
-                        Some(m) => Ok(m),
-                        None => Err(anyhow::anyhow!("AND gate operand could not be resolved")),
+                }
+                match final_mask {
+                    Some(m) => Ok(m),
+                    None => Err(anyhow::anyhow!("AND gate operand could not be resolved")),
+                }
+            }
+            flow_gates::BooleanOperation::Or => {
+                if operands.len() < 2 {
+                    return Err(anyhow::anyhow!("OR gates must have > 1 operand"));
+                }
+                let mut final_mask: Option<BooleanChunked> = None;
+                for gate in operands {
+                    let current_mask = filter_events_to_mask(df, gate.clone().into(), resolver)?;
+                    match final_mask {
+                        None => final_mask = Some(current_mask),
+                        Some(ref mut acc) => *acc = &*acc | &current_mask,
                     }
-                },
-                flow_gates::BooleanOperation::Or => {
-                    if operands.len() < 2 {
-                        return Err(anyhow::anyhow!("OR gates must have > 1 operand"));
-                    }
-                    let mut final_mask: Option<BooleanChunked> = None;
-                    for gate in operands {
-                        if let Some(other_gate) = resolver.resolve(gate){
-                            let current_mask = filter_events_to_mask(df, other_gate, resolver)?;
-                            match final_mask {
-                                None => final_mask = Some(current_mask),
-                                Some(ref mut acc) => *acc = &*acc | &current_mask,
-                            }
-                            
-                        } else {
-                            return Err(anyhow::anyhow!("OR gate operand could not be resolved"));
-                        }
-                    }
-                    match final_mask{
-                        Some(m) => Ok(m),
-                        None => Err(anyhow::anyhow!("OR gate operand could not be resolved")),
-                    }
-                    
-                },
-                flow_gates::BooleanOperation::Not => {
-                    if operands.len() != 1 {
-                        return Err(anyhow::anyhow!("Not gates can only have 1 operand"));
-                    }
-                    if let Some(other_gate) = resolver.resolve(&operands[0]){
-                        let mask = !filter_events_to_mask(df, other_gate, resolver)?;
-                        return Ok(mask);
-                    } else {
-                        return Err(anyhow::anyhow!("NOT gate operand could not be resolved"));
-                    }
-                },
+                }
+                match final_mask {
+                    Some(m) => Ok(m),
+                    None => Err(anyhow::anyhow!("OR gate operand could not be resolved")),
+                }
+            }
+            flow_gates::BooleanOperation::Not => {
+                if operands.len() != 1 {
+                    return Err(anyhow::anyhow!("Not gates can only have 1 operand"));
+                }
+                let other_id = operands[0].clone().into();
+                let mask = !filter_events_to_mask(df, other_id, resolver)?;
+                return Ok(mask);
             }
         },
-        _ => {
-            // Fallback for complex polygons where an index actually helps
-            let x_series = df.column(&x_param)?.f32()?;
-            let y_series = df.column(&y_param)?.f32()?;
-
-            let indices = filter_events_by_gate(x_series, y_series, gate)
-                .map_err(|_| anyhow::anyhow!("failed to gate events"))?;
-
-            // Convert indices to mask (slightly slower, but necessary for complex shapes)
-            let mut mask_vec = vec![false; df.height()];
-            for idx in indices {
-                mask_vec[idx] = true;
-            }
-            Ok(BooleanChunked::from_slice("mask".into(), &mask_vec))
-        }
     }
 }
 
 pub fn filter_events_by_hierarchy_to_mask(
     scaled_data: &DataFrame,
-    gate_chain: &[&Gate],
-    resolver: & impl flow_gates::GateResolver
-
+    gate_chain: &[GateId],
+    resolver: &GateOverrideResolver,
 ) -> Result<BooleanChunked, anyhow::Error> {
     let event_count = scaled_data.height();
     let mut final_mask = BooleanChunked::full("mask".into(), true, event_count);
     println!("called with gate chain length {}", gate_chain.len());
-    for gate in gate_chain {
-        let gate_mask = filter_events_to_mask(scaled_data, gate, resolver)?;
+    for gate_id in gate_chain {
+        let gate_mask = filter_events_to_mask(scaled_data, gate_id.clone(), resolver)?;
         final_mask = final_mask & gate_mask;
     }
 
     Ok(final_mask)
 }
 
-pub fn filter_events_by_gate(
-    x_ca: &Float32Chunked,
-    y_ca: &Float32Chunked,
-    gate: &Gate,
-) -> Result<Vec<usize>> {
-    // Build index from slices (zero-copy)
-    let index = build_event_index_from_polars(x_ca, y_ca)?;
-    let indices = index.filter_by_gate(gate)?;
+// pub fn filter_events_by_gate(
+//     x_ca: &Float32Chunked,
+//     y_ca: &Float32Chunked,
+//     gate: &Gate,
+// ) -> Result<Vec<usize>> {
+//     // Build index from slices (zero-copy)
+//     let index = build_event_index_from_polars(x_ca, y_ca)?;
+//     let indices = index.filter_by_gate(gate)?;
 
-    Ok(indices)
-}
+//     Ok(indices)
+// }
 
 pub fn filter_events_by_gate_with_index(
     gate: &Gate,

@@ -18,10 +18,11 @@ use crate::plotters_dioxus::{
 pub struct RectangleGate {
     inner: flow_gates::Gate,
     points: Vec<(f32, f32)>,
+    is_primary: bool,
 }
 
 impl RectangleGate {
-    pub fn try_new(gate: flow_gates::Gate) -> anyhow::Result<Self> {
+    pub fn try_new(gate: flow_gates::Gate, is_primary: bool) -> anyhow::Result<Self> {
         let p;
         if let GateGeometry::Rectangle { min, max } = &gate.geometry {
             let (x1, y1) = (
@@ -47,6 +48,7 @@ impl RectangleGate {
         Ok(Self {
             inner: gate,
             points: p,
+            is_primary,
         })
     }
 
@@ -71,7 +73,7 @@ impl RectangleGate {
                 name: self.inner.name.clone(),
                 mode: self.inner.mode.clone(),
             };
-            return Ok(Some(RectangleGate::try_new(new_gate)?));
+            return Ok(Some(RectangleGate::try_new(new_gate, self.is_primary)?));
         }
         Err(anyhow!("Axis mismatch for Rectangle Gate"))
     }
@@ -99,7 +101,7 @@ impl RectangleGate {
             name: self.inner.name.clone(),
             mode: self.inner.mode.clone(),
         };
-        Ok(RectangleGate::try_new(new_gate)?)
+        Ok(RectangleGate::try_new(new_gate, self.is_primary)?)
     }
 
     pub fn clone_rectangle_for_new_point(
@@ -124,7 +126,7 @@ impl RectangleGate {
             name: self.inner.name.clone(),
             mode: self.inner.mode.clone(),
         };
-        Ok(RectangleGate::try_new(new_gate)?)
+        Ok(RectangleGate::try_new(new_gate, self.is_primary)?)
     }
 }
 
@@ -205,7 +207,10 @@ impl DrawableGate for RectangleGate {
             name: self.inner.name.clone(),
             mode: self.inner.mode.clone(),
         };
-        Ok(Some(Box::new(RectangleGate::try_new(new_gate)?)))
+        Ok(Some(Box::new(RectangleGate::try_new(
+            new_gate,
+            self.is_primary,
+        )?)))
     }
 
     fn rotate_gate(&self, _mouse_pos: (f32, f32)) -> anyhow::Result<Option<Box<dyn DrawableGate>>> {
@@ -234,9 +239,8 @@ impl DrawableGate for RectangleGate {
         is_selected: bool,
         drag_point: Option<PointDragData>,
         plot_map: &PlotMapper,
-        gate_stats: &Option<GateStats>
+        gate_stats: &Option<GateStats>,
     ) -> Vec<GateRenderShape> {
-        
         let style = if is_selected {
             &SELECTED_LINE
         } else {
@@ -258,14 +262,13 @@ impl DrawableGate for RectangleGate {
             .as_ref()
             .and_then(|d| draw_ghost_point_for_rectangle(d, &pts));
 
-
         let mut labels = vec![];
-        
+
         if let Some(gate_stats) = gate_stats {
             let x_offset = {
                 let axis = plot_map.x_axis_min_max();
                 let xrange = *axis.end() - *axis.start();
-                if let Some(label_pos) = &self.inner.label_position{
+                if let Some(label_pos) = &self.inner.label_position {
                     xrange * label_pos.offset_x
                 } else {
                     0f32
@@ -274,7 +277,7 @@ impl DrawableGate for RectangleGate {
             let y_offset = {
                 let axis = plot_map.y_axis_min_max();
                 let yrange = *axis.end() - *axis.start();
-                if let Some(label_pos) = &self.inner.label_position{
+                if let Some(label_pos) = &self.inner.label_position {
                     yrange * label_pos.offset_y
                 } else {
                     // yrange * 0.02
@@ -282,27 +285,38 @@ impl DrawableGate for RectangleGate {
                 }
             };
             let offset = (x_offset, y_offset);
-            match gate_stats.get_percent_for_id(self.inner.id.clone()){
+            match gate_stats.get_percent_for_id(self.inner.id.clone()) {
                 Some(percent) => {
                     let center = {
                         let bl = self.points[0];
                         let tr = self.points[2];
-                        (
-                            (bl.0 + tr.0) / 2.0,
-                            (bl.1 + tr.1) / 2.0
-                        )
+                        ((bl.0 + tr.0) / 2.0, (bl.1 + tr.1) / 2.0)
                     };
-                    let shape = GateRenderShape::Text { origin: center, offset: offset, fontsize: 10f32, text: format!("{:.2}%", percent), text_anchor: None, shape_type: ShapeType::Text };
+                    let shape = GateRenderShape::Text {
+                        origin: center,
+                        offset: offset,
+                        fontsize: 10f32,
+                        text: format!("{:.2}%", percent),
+                        text_anchor: None,
+                        shape_type: ShapeType::Text,
+                    };
                     labels.push(shape)
-            },
-                None => {},
+                }
+                None => {}
             }
         }
 
-
-        let labels = if labels.is_empty() {None} else {Some(labels)};
+        let labels = if labels.is_empty() {
+            None
+        } else {
+            Some(labels)
+        };
 
         crate::collate_vecs!(main, selected, ghost, labels)
+    }
+
+    fn is_primary(&self) -> bool {
+        self.is_primary
     }
 }
 
@@ -551,7 +565,7 @@ pub fn update_rectangle_geometry(
 //     plot_map: ReadSignal<PlotMapper>,
 //     gate_stats: ReadSignal<Option<GateStats>>
 // ) -> Element {
-    
+
 //     let style = if is_selected() {
 //             &SELECTED_LINE
 //         } else {
@@ -582,7 +596,6 @@ pub fn update_rectangle_geometry(
 //         }
 //     });
 
-
 //     let selected = if is_selected() {
 //         Some(draw_circles_for_selected_gate(&pts, 0))
 //     } else {
@@ -592,9 +605,8 @@ pub fn update_rectangle_geometry(
 //         .as_ref()
 //         .and_then(|d| draw_ghost_point_for_rectangle(d, &pts));
 
-
 //     let mut labels = vec![];
-    
+
 //     if let Some(gate_stats) = gate_stats() {
 //         let x_offset = {
 //             let axis = plot_map.read().x_axis_min_max();
@@ -624,12 +636,7 @@ pub fn update_rectangle_geometry(
 //         }
 //     }
 
-
 //     let labels = Some(labels);
 
-        
-
-    
 //     rsx!()
 // }
-

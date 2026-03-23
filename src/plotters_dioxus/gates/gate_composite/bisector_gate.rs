@@ -3,17 +3,21 @@ use flow_fcs::TransformType;
 use flow_gates::{Gate, GateGeometry};
 use std::{ops::Index, sync::Arc};
 
-use crate::{FxIndexMap, plotters_dioxus::{
-    gates::{
-        gate_drag::PointDragData,
-        gate_single::{line_gate::LineGate, rescale_helper_point},
-        gate_traits::DrawableGate,
-        gate_types::{self, DEFAULT_LINE, GREY_LINE_DASHED, GateRenderShape, GateStats, SELECTED_LINE, ShapeType},
+use crate::{
+    FxIndexMap,
+    plotters_dioxus::{
+        gates::{
+            gate_drag::PointDragData,
+            gate_single::{line_gate::LineGate, rescale_helper_point},
+            gate_traits::DrawableGate,
+            gate_types::{
+                self, DEFAULT_LINE, GREY_LINE_DASHED, GateRenderShape, GateStats, SELECTED_LINE,
+                ShapeType,
+            },
+        },
+        plots::parameters::PlotMapper,
     },
-    plots::parameters::PlotMapper,
-}};
-
-
+};
 
 #[derive(PartialEq, Clone)]
 pub struct BisectorGate {
@@ -59,8 +63,8 @@ impl BisectorGate {
             parameters,
             label_position: None,
         };
-        let lg_l = LineGate::try_new(gate_left, click_data.1)?;
-        let lg_r = LineGate::try_new(gate_right, click_data.1)?;
+        let lg_l = LineGate::try_new(gate_left, click_data.1, false)?;
+        let lg_r = LineGate::try_new(gate_right, click_data.1, false)?;
 
         gate_map.insert(id_left_arc, lg_l);
         gate_map.insert(id_right_arc, lg_r);
@@ -155,8 +159,8 @@ impl BisectorGate {
             parameters: curr_gate_2.inner.parameters.clone(),
             label_position: curr_gate_2.inner.label_position.clone(),
         };
-        let mut lg_l = LineGate::try_new(new_gate_1, cy)?;
-        let mut lg_r = LineGate::try_new(new_gate_2, cy)?;
+        let mut lg_l = LineGate::try_new(new_gate_1, cy, false)?;
+        let mut lg_r = LineGate::try_new(new_gate_2, cy, false)?;
 
         lg_l.axis_matched = self.axis_matched;
         lg_r.axis_matched = self.axis_matched;
@@ -191,7 +195,7 @@ impl super::super::gate_traits::DrawableGate for BisectorGate {
         is_selected: bool,
         drag_point: Option<PointDragData>,
         plot_map: &PlotMapper,
-        gate_stats: &Option<GateStats>
+        gate_stats: &Option<GateStats>,
     ) -> Vec<GateRenderShape> {
         let (min, max) = {
             let (xmin, xmax) = {
@@ -308,46 +312,73 @@ impl super::super::gate_traits::DrawableGate for BisectorGate {
             let y_axis_min_max = plot_map.y_axis_min_max();
             let x_axis_offset = ((x_axis_min_max.end() - x_axis_min_max.start()) / 100f32) * 1f32;
             let y_axis_offset = ((y_axis_min_max.end() - y_axis_min_max.start()) / 100f32) * 1f32;
-            for (i, (id, _)) in self.gates.iter().enumerate(){
-                
-                match gate_stats.get_percent_for_id(id.clone()){
+            for (i, (id, _)) in self.gates.iter().enumerate() {
+                match gate_stats.get_percent_for_id(id.clone()) {
                     Some(percent) => {
                         let text = format!("{:.2}%", percent);
                         let (origin, offset, text_anchor) = if i == 0 {
                             // LEFT LABEL
-                            if self.axis_matched{
-                                ((*x_axis_min_max.start() + x_axis_offset, self.points.1 + y_axis_offset), (0.0, 0.0), Some(String::from("start")))
+                            if self.axis_matched {
+                                (
+                                    (
+                                        *x_axis_min_max.start() + x_axis_offset,
+                                        self.points.1 + y_axis_offset,
+                                    ),
+                                    (0.0, 0.0),
+                                    Some(String::from("start")),
+                                )
                             } else {
                                 // BOTTOM LABEL
-                                ((self.points.0 + x_axis_offset, *y_axis_min_max.start() + y_axis_offset), (0.0, 0.0), None)
-                            }   
+                                (
+                                    (
+                                        self.points.0 + x_axis_offset,
+                                        *y_axis_min_max.start() + y_axis_offset,
+                                    ),
+                                    (0.0, 0.0),
+                                    None,
+                                )
+                            }
                         } else {
                             // RIGHT LABEL
-                            if self.axis_matched{
-                                ((*x_axis_min_max.end() - y_axis_offset, self.points.1 + y_axis_offset), (0.0, 0.0), Some(String::from("end")))
+                            if self.axis_matched {
+                                (
+                                    (
+                                        *x_axis_min_max.end() - y_axis_offset,
+                                        self.points.1 + y_axis_offset,
+                                    ),
+                                    (0.0, 0.0),
+                                    Some(String::from("end")),
+                                )
                             } else {
                                 // TOP LABEL
-                                ((self.points.0 + x_axis_offset, *y_axis_min_max.end() - 2f32 * y_axis_offset), (0.0, 0.0), None)
+                                (
+                                    (
+                                        self.points.0 + x_axis_offset,
+                                        *y_axis_min_max.end() - 2f32 * y_axis_offset,
+                                    ),
+                                    (0.0, 0.0),
+                                    None,
+                                )
                             }
                         };
-                        let shape = GateRenderShape::Text { 
-                            origin, 
-                            offset, 
-                            fontsize: 10f32, 
+                        let shape = GateRenderShape::Text {
+                            origin,
+                            offset,
+                            fontsize: 10f32,
                             text,
                             text_anchor,
-                            shape_type: if self.axis_matched {ShapeType::UndraggableText(gate_types::Direction::X)} else {ShapeType::UndraggableText(gate_types::Direction::Y)}
+                            shape_type: if self.axis_matched {
+                                ShapeType::UndraggableText(gate_types::Direction::X)
+                            } else {
+                                ShapeType::UndraggableText(gate_types::Direction::Y)
+                            },
                         };
                         labels.push(shape)
-                        
-                },
-                    None => {},
+                    }
+                    None => {}
                 }
             }
-            
-            
         }
-
 
         let labels = Some(labels);
 
@@ -505,9 +536,13 @@ impl super::super::gate_traits::DrawableGate for BisectorGate {
     fn get_inner_gate_ids(&self) -> Vec<Arc<str>> {
         self.gates.keys().map(|k| k.clone()).collect()
     }
-    
+
     fn get_name(&self) -> &str {
         &self.name
+    }
+
+    fn is_primary(&self) -> bool {
+        true
     }
 }
 

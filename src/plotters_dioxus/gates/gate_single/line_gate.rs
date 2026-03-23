@@ -20,10 +20,11 @@ pub struct LineGate {
     pub points: Vec<(f32, f32)>,
     pub height: f32,
     pub axis_matched: bool,
+    is_primary: bool,
 }
 
 impl LineGate {
-    pub fn try_new(gate: flow_gates::Gate, height: f32) -> anyhow::Result<Self> {
+    pub fn try_new(gate: flow_gates::Gate, height: f32, is_primary: bool) -> anyhow::Result<Self> {
         let p = {
             if let GateGeometry::Rectangle { min, max } = &gate.geometry {
                 let (x1, y1) = (
@@ -49,6 +50,7 @@ impl LineGate {
             points: p,
             height: height,
             axis_matched: true,
+            is_primary,
         })
     }
 
@@ -77,7 +79,7 @@ impl LineGate {
             name: self.inner.name.clone(),
             mode: self.inner.mode.clone(),
         };
-        let mut line = LineGate::try_new(new_gate, self.height)?;
+        let mut line = LineGate::try_new(new_gate, self.height, self.is_primary)?;
         line.axis_matched = self.axis_matched;
         Ok(line)
     }
@@ -105,7 +107,7 @@ impl LineGate {
                 name: self.inner.name.clone(),
                 mode: self.inner.mode.clone(),
             };
-            let mut new_line = LineGate::try_new(new_gate, self.height)?;
+            let mut new_line = LineGate::try_new(new_gate, self.height, self.is_primary)?;
             new_line.axis_matched = new_axis_matched;
             return Ok(Some(new_line));
         }
@@ -134,7 +136,7 @@ impl LineGate {
             name: self.inner.name.clone(),
             mode: self.inner.mode.clone(),
         };
-        let mut new_line = LineGate::try_new(new_gate, self.height)?;
+        let mut new_line = LineGate::try_new(new_gate, self.height, self.is_primary)?;
         new_line.axis_matched = self.axis_matched;
         return Ok(new_line);
     }
@@ -248,7 +250,7 @@ impl DrawableGate for LineGate {
             name: self.inner.name.clone(),
             mode: self.inner.mode.clone(),
         };
-        let mut new_line = LineGate::try_new(new_gate, height)?;
+        let mut new_line = LineGate::try_new(new_gate, height, self.is_primary)?;
         new_line.axis_matched = self.axis_matched;
         return Ok(Some(Box::new(new_line)));
     }
@@ -277,7 +279,7 @@ impl DrawableGate for LineGate {
         is_selected: bool,
         drag_point: Option<PointDragData>,
         plot_map: &PlotMapper,
-        gate_stats: &Option<GateStats>
+        gate_stats: &Option<GateStats>,
     ) -> Vec<GateRenderShape> {
         let (min, max) = {
             let (xmin, xmax) = {
@@ -334,50 +336,62 @@ impl DrawableGate for LineGate {
             None
         };
         let mut labels = vec![];
-        
+
         if let Some(gate_stats) = gate_stats {
             let x_offset = {
                 let axis = plot_map.x_axis_min_max();
                 let xrange = *axis.end() - *axis.start();
-                if let Some(label_pos) = &self.inner.label_position{
+                if let Some(label_pos) = &self.inner.label_position {
                     xrange * label_pos.offset_x
                 } else {
-                    if self.axis_matched{
+                    if self.axis_matched {
                         0f32
                     } else {
                         xrange * 0.02
                     }
-                    
                 }
             };
             let y_offset = {
                 let axis = plot_map.y_axis_min_max();
                 let yrange = *axis.end() - *axis.start();
-                if let Some(label_pos) = &self.inner.label_position{
+                if let Some(label_pos) = &self.inner.label_position {
                     yrange * label_pos.offset_y
                 } else {
-                    if self.axis_matched{
+                    if self.axis_matched {
                         yrange * 0.02
                     } else {
                         0f32
                     }
-                    
                 }
             };
             let offset = (x_offset, y_offset);
-            match gate_stats.get_percent_for_id(self.inner.id.clone()){
+            match gate_stats.get_percent_for_id(self.inner.id.clone()) {
                 Some(percent) => {
-                    let origin = if self.axis_matched {(self.points[0].0, self.height)} else {(self.height, self.points[0].1)};
-                    let shape = GateRenderShape::Text { origin, offset, fontsize: 10f32, text: format!("{:.2}%", percent), text_anchor: None, shape_type: ShapeType::Text};
+                    let origin = if self.axis_matched {
+                        (self.points[0].0, self.height)
+                    } else {
+                        (self.height, self.points[0].1)
+                    };
+                    let shape = GateRenderShape::Text {
+                        origin,
+                        offset,
+                        fontsize: 10f32,
+                        text: format!("{:.2}%", percent),
+                        text_anchor: None,
+                        shape_type: ShapeType::Text,
+                    };
                     labels.push(shape)
-            },
-                None => {},
+                }
+                None => {}
             }
         }
 
-
         let labels = Some(labels);
         crate::collate_vecs!(main, selected, labels)
+    }
+
+    fn is_primary(&self) -> bool {
+        self.is_primary
     }
 }
 

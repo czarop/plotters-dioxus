@@ -47,10 +47,10 @@ use crate::plotters_dioxus::gates::gate_store::GateId;
 // }
 
 #[derive(Clone, PartialEq)]
-pub enum GateText{
+pub enum GateText {
     Name(String),
     Percent(String),
-    Count(String)
+    Count(String),
 }
 
 #[derive(Clone, PartialEq, Copy)]
@@ -64,7 +64,7 @@ pub enum PrimaryGateType {
     SkewedQuadrant,
     Not,
     And,
-    Or
+    Or,
 }
 
 impl PrimaryGateType {
@@ -84,7 +84,7 @@ impl PrimaryGateType {
 pub enum Direction {
     X,
     Y,
-    Both
+    Both,
 }
 
 #[derive(PartialEq, Clone)]
@@ -100,7 +100,7 @@ pub enum ShapeType {
     UndraggableLine,
     UndraggablePoint(usize),
     Text,
-    UndraggableText(Direction)
+    UndraggableText(Direction),
 }
 
 #[derive(PartialEq, Clone)]
@@ -157,8 +157,8 @@ pub enum GateRenderShape {
         fontsize: f32,
         text: String,
         text_anchor: Option<String>,
-        shape_type: ShapeType
-    }
+        shape_type: ShapeType,
+    },
 }
 
 impl GateRenderShape {
@@ -249,7 +249,7 @@ impl GateRenderShape {
                 style: *style,
                 shape_type: shape_type.clone(),
             },
-            GateRenderShape::Text { .. } => self.clone()
+            GateRenderShape::Text { .. } => self.clone(),
         }
     }
 
@@ -360,7 +360,7 @@ impl GateRenderShape {
                 style: *style,
                 shape_type: shape_type.clone(),
             },
-            GateRenderShape::Text { .. } => self.clone()
+            GateRenderShape::Text { .. } => self.clone(),
         }
     }
 
@@ -373,8 +373,7 @@ impl GateRenderShape {
             | GateRenderShape::Handle { shape_type, .. }
             | GateRenderShape::Rectangle { shape_type, .. }
             | GateRenderShape::Line { shape_type, .. } => shape_type,
-            GateRenderShape::Text { .. } => return false
-            
+            GateRenderShape::Text { .. } => return false,
         };
 
         matches!(
@@ -395,7 +394,7 @@ impl GateRenderShape {
             | GateRenderShape::Handle { shape_type, .. }
             | GateRenderShape::Rectangle { shape_type, .. }
             | GateRenderShape::Line { shape_type, .. } => shape_type,
-            GateRenderShape::Text { .. } => return false
+            GateRenderShape::Text { .. } => return false,
         };
 
         matches!(
@@ -413,7 +412,7 @@ impl GateRenderShape {
             | GateRenderShape::Handle { shape_type, .. }
             | GateRenderShape::Rectangle { shape_type, .. }
             | GateRenderShape::Line { shape_type, .. } => shape_type,
-            GateRenderShape::Text { .. } => return true
+            GateRenderShape::Text { .. } => return true,
         };
 
         matches!(
@@ -473,11 +472,10 @@ pub static GREY_LINE_DASHED: DrawingStyle = DrawingStyle {
     dashed: true,
 };
 
-
 #[derive(Clone, Debug, PartialEq)]
 pub enum GateStatValue {
     Single(f32),
-    Composite(FxHashMap<Arc<str>, f32>), 
+    Composite(FxHashMap<Arc<str>, f32>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -488,27 +486,23 @@ pub struct GateStats {
 
 impl GateStats {
     pub fn is_composite(&self) -> bool {
-        match self.percent_parent{
+        match self.percent_parent {
             GateStatValue::Single(_) => false,
             GateStatValue::Composite(..) => true,
         }
     }
 
     pub fn get_percent_for_id(&self, id: Arc<str>) -> Option<f32> {
-        match &self.percent_parent{
+        match &self.percent_parent {
             GateStatValue::Single(val) => Some(*val),
-            GateStatValue::Composite(val_map) => {
-                val_map.get(&id).copied()
-            },
+            GateStatValue::Composite(val_map) => val_map.get(&id).copied(),
         }
     }
 
     pub fn get_count_for_id(&self, id: Arc<str>) -> Option<f32> {
-        match &self.count{
+        match &self.count {
             GateStatValue::Single(val) => Some(*val),
-            GateStatValue::Composite(val_map) => {
-                val_map.get(&id).copied()
-            },
+            GateStatValue::Composite(val_map) => val_map.get(&id).copied(),
         }
     }
 }

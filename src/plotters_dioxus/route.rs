@@ -38,7 +38,7 @@ pub fn NavBar() -> Element {
                     div {
                         div { class: "nav_bar-item", "|" }
                     }
-                
+
                 // div {
                 //     if geolocation::check_geolocation_permission() == PermissionResult::GRANTED {
                 //         Link { to: route::Route::LocationMap,

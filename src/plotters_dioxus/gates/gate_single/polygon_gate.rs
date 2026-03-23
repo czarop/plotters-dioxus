@@ -18,10 +18,11 @@ use crate::plotters_dioxus::{
 pub struct PolygonGate {
     inner: flow_gates::Gate,
     points: Vec<(f32, f32)>,
+    is_primary: bool,
 }
 
 impl PolygonGate {
-    pub fn try_new(gate: flow_gates::Gate) -> anyhow::Result<Self> {
+    pub fn try_new(gate: flow_gates::Gate, is_primary: bool) -> anyhow::Result<Self> {
         let p;
         if let GateGeometry::Polygon { nodes, .. } = &gate.geometry {
             p = nodes
@@ -39,6 +40,7 @@ impl PolygonGate {
         Ok(Self {
             inner: gate,
             points: p,
+            is_primary,
         })
     }
 
@@ -63,7 +65,7 @@ impl PolygonGate {
                 name: self.inner.name.clone(),
                 mode: self.inner.mode.clone(),
             };
-            return Ok(Some(PolygonGate::try_new(new_gate)?));
+            return Ok(Some(PolygonGate::try_new(new_gate, self.is_primary)?));
         }
         Err(anyhow!("Axis mismatch for Polygon Gate"))
     }
@@ -91,7 +93,7 @@ impl PolygonGate {
             name: self.inner.name.clone(),
             mode: self.inner.mode.clone(),
         };
-        Ok(PolygonGate::try_new(new_gate)?)
+        Ok(PolygonGate::try_new(new_gate, self.is_primary)?)
     }
 
     pub fn clone_polygon_for_new_point(
@@ -114,7 +116,7 @@ impl PolygonGate {
             name: self.inner.name.clone(),
             mode: self.inner.mode.clone(),
         };
-        Ok(PolygonGate::try_new(new_gate)?)
+        Ok(PolygonGate::try_new(new_gate, self.is_primary)?)
     }
 
     fn get_points(&self) -> Vec<(f32, f32)> {
@@ -134,9 +136,7 @@ impl PolygonGate {
 
     pub fn get_label_offset(&self) -> (f32, f32) {
         match &self.inner.label_position {
-            Some(o) => {
-                (o.offset_x, o.offset_y)
-            },
+            Some(o) => (o.offset_x, o.offset_y),
             None => (0f32, 0f32),
         }
     }
@@ -218,7 +218,10 @@ impl DrawableGate for PolygonGate {
             name: self.inner.name.clone(),
             mode: self.inner.mode.clone(),
         };
-        Ok(Some(Box::new(PolygonGate::try_new(new_gate)?)))
+        Ok(Some(Box::new(PolygonGate::try_new(
+            new_gate,
+            self.is_primary,
+        )?)))
     }
 
     fn rotate_gate(&self, _mouse_pos: (f32, f32)) -> anyhow::Result<Option<Box<dyn DrawableGate>>> {
@@ -246,7 +249,7 @@ impl DrawableGate for PolygonGate {
         is_selected: bool,
         drag_point: Option<PointDragData>,
         plot_map: &PlotMapper,
-        gate_stats: &Option<GateStats>
+        gate_stats: &Option<GateStats>,
     ) -> Vec<GateRenderShape> {
         let style = if is_selected {
             &SELECTED_LINE
@@ -265,12 +268,12 @@ impl DrawableGate for PolygonGate {
             .and_then(|d| draw_ghost_point_for_polygon(d, &pts));
 
         let mut labels = vec![];
-        
+
         if let Some(gate_stats) = gate_stats {
             let x_offset = {
                 let axis = plot_map.x_axis_min_max();
                 let xrange = *axis.end() - *axis.start();
-                if let Some(label_pos) = &self.inner.label_position{
+                if let Some(label_pos) = &self.inner.label_position {
                     xrange * label_pos.offset_x
                 } else {
                     0f32
@@ -279,27 +282,41 @@ impl DrawableGate for PolygonGate {
             let y_offset = {
                 let axis = plot_map.y_axis_min_max();
                 let yrange = *axis.end() - *axis.start();
-                if let Some(label_pos) = &self.inner.label_position{
+                if let Some(label_pos) = &self.inner.label_position {
                     yrange * label_pos.offset_y
                 } else {
                     0f32
                 }
             };
             let offset = (x_offset, y_offset);
-            match gate_stats.get_percent_for_id(self.inner.id.clone()){
+            match gate_stats.get_percent_for_id(self.inner.id.clone()) {
                 Some(percent) => {
                     let params = self.get_params();
-                    let origin = self.inner.geometry.calculate_center(&params.0, &params.1).expect("should not fail");
-                    let shape = GateRenderShape::Text { origin, offset, fontsize: 10f32, text: format!("{:.2}%", percent), text_anchor: None, shape_type: ShapeType::Text};
+                    let origin = self
+                        .inner
+                        .geometry
+                        .calculate_center(&params.0, &params.1)
+                        .expect("should not fail");
+                    let shape = GateRenderShape::Text {
+                        origin,
+                        offset,
+                        fontsize: 10f32,
+                        text: format!("{:.2}%", percent),
+                        text_anchor: None,
+                        shape_type: ShapeType::Text,
+                    };
                     labels.push(shape)
-            },
-                None => {},
+                }
+                None => {}
             }
         }
 
-
         let labels = Some(labels);
         crate::collate_vecs!(main, selected, ghost, labels)
+    }
+
+    fn is_primary(&self) -> bool {
+        self.is_primary
     }
 }
 

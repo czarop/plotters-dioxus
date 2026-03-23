@@ -2,16 +2,20 @@ use anyhow::anyhow;
 use core::f32;
 use dioxus::prelude::*;
 use flow_fcs::TransformType;
-use flow_gates::{EventIndex, transforms::{
-    get_plotting_area, pixel_to_raw, pixel_to_raw_y, raw_to_pixel, raw_to_pixel_y,
-}};
+use flow_gates::{
+    EventIndex,
+    transforms::{get_plotting_area, pixel_to_raw, pixel_to_raw_y, raw_to_pixel, raw_to_pixel_y},
+};
 use rustc_hash::FxHashMap;
 use std::{
     ops::RangeInclusive,
     sync::{Arc, RwLock},
 };
 
-use crate::plotters_dioxus::{AxisInfo, gates::{GateId, gate_store::FileId}};
+use crate::plotters_dioxus::{
+    AxisInfo,
+    gates::{GateId, gate_store::FileId},
+};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct PlotMapper {
@@ -189,13 +193,12 @@ impl std::fmt::Display for Param {
 pub struct EventIndexMapped {
     pub event_index: Arc<EventIndex>,
     pub index_map: Arc<Vec<usize>>,
-
 }
 
 impl PartialEq for EventIndexMapped {
     fn eq(&self, other: &Self) -> bool {
-        Arc::ptr_eq(&self.event_index, &other.event_index) 
-        &&  Arc::ptr_eq(&self.index_map, &other.index_map) 
+        Arc::ptr_eq(&self.event_index, &other.event_index)
+            && Arc::ptr_eq(&self.index_map, &other.index_map)
     }
 }
 
@@ -203,7 +206,7 @@ impl PartialEq for EventIndexMapped {
 pub struct PlotStore {
     pub current_file_id: FileId,
     pub settings: FxHashMap<Arc<str>, AxisInfo>,
-    pub event_index_map: Option<EventIndexMapped>
+    pub event_index_map: Option<EventIndexMapped>,
 }
 
 #[store(pub name = PlotStoreImplExt)]
@@ -256,18 +259,20 @@ impl<Lens> Store<PlotStore, Lens> {
         let mut old = None;
         let mut new = None;
 
-        self.settings().write().entry(id.clone()).and_modify(|axis| {
-                    if let TransformType::Arcsinh { .. } = axis.transform {
-                        let old_axis = std::mem::take(axis);
-                        let new_axis = (&old_axis)
-                            .into_archsinh(cofactor)
-                            .unwrap_or(old_axis.clone());
-                        new = Some(new_axis.clone());
-                        old = Some(old_axis);
-                        *axis = new_axis;
-                    }
-                });
-
+        self.settings()
+            .write()
+            .entry(id.clone())
+            .and_modify(|axis| {
+                if let TransformType::Arcsinh { .. } = axis.transform {
+                    let old_axis = std::mem::take(axis);
+                    let new_axis = (&old_axis)
+                        .into_archsinh(cofactor)
+                        .unwrap_or(old_axis.clone());
+                    new = Some(new_axis.clone());
+                    old = Some(old_axis);
+                    *axis = new_axis;
+                }
+            });
 
         if new.is_some() && old.is_some() {
             return Ok((old.unwrap(), new.unwrap()));

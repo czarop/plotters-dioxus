@@ -14,7 +14,7 @@ pub trait DrawableGate: Send + Sync {
     fn get_gate_ref(&self, id: Option<&str>) -> Option<&flow_gates::Gate>;
     fn get_name(&self) -> &str;
     fn get_inner_gate_ids(&self) -> Vec<Arc<str>>;
-
+    fn is_primary(&self) -> bool;
     fn is_finalised(&self) -> bool;
 
     fn draw_self(
@@ -22,7 +22,7 @@ pub trait DrawableGate: Send + Sync {
         is_selected: bool,
         drag_point: Option<PointDragData>,
         plot_map: &PlotMapper,
-        gate_stats: &Option<GateStats>
+        gate_stats: &Option<GateStats>,
     ) -> Vec<GateRenderShape>;
 
     fn is_near_segment(

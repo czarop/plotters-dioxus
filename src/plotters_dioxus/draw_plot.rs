@@ -116,7 +116,7 @@ pub fn PseudoColourPlot(
                 x_channel: x_axis_info().param.fluoro.clone(),
                 y_channel: y_axis_info().param.fluoro.clone(),
                 parental_gate_id,
-            
+
             }
         }
     }

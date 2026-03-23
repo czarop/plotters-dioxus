@@ -23,7 +23,7 @@ impl BooleanGate {
             operands: linked_gate_ids,
         };
         let gate = flow_gates::Gate::new(id.clone(), name, geom, x_param, y_param);
-        
+
         Ok(Self { inner: gate })
     }
 
@@ -40,7 +40,6 @@ impl BooleanGate {
         };
         operands
     }
-
 }
 
 impl DrawableGate for BooleanGate {
@@ -63,7 +62,7 @@ impl DrawableGate for BooleanGate {
         _is_selected: bool,
         _drag_point: Option<crate::plotters_dioxus::gates::gate_drag::PointDragData>,
         _plot_map: &crate::plotters_dioxus::plots::parameters::PlotMapper,
-        _gate_stats: &Option<crate::plotters_dioxus::gates::gate_types::GateStats>
+        _gate_stats: &Option<crate::plotters_dioxus::gates::gate_types::GateStats>,
     ) -> Vec<crate::plotters_dioxus::gates::gate_types::GateRenderShape> {
         vec![]
     }
@@ -82,9 +81,9 @@ impl DrawableGate for BooleanGate {
 
     fn is_point_on_perimeter(
         &self,
-        point: (f32, f32),
-        tolerance: (f32, f32),
-        mapper: &crate::plotters_dioxus::plots::parameters::PlotMapper,
+        _point: (f32, f32),
+        _tolerance: (f32, f32),
+        _mapper: &crate::plotters_dioxus::plots::parameters::PlotMapper,
     ) -> Option<f32> {
         None
     }
@@ -103,45 +102,47 @@ impl DrawableGate for BooleanGate {
         let new_params = (y.clone(), x.clone());
         new_self.inner.parameters = new_params;
         Ok(Some(Box::new(new_self)))
-        
     }
 
     fn recalculate_gate_for_rescaled_axis(
         &self,
-        param: std::sync::Arc<str>,
-        old_transform: &flow_fcs::TransformType,
-        new_transform: &flow_fcs::TransformType,
-        data_range: (f32, f32),
-        axis_range: (f32, f32),
+        _param: std::sync::Arc<str>,
+        _old_transform: &flow_fcs::TransformType,
+        _new_transform: &flow_fcs::TransformType,
+        _data_range: (f32, f32),
+        _axis_range: (f32, f32),
     ) -> anyhow::Result<Box<dyn DrawableGate>> {
-        return Ok(self.clone_box())
+        return Ok(self.clone_box());
     }
 
     fn rotate_gate(
         &self,
-        mouse_position: (f32, f32),
+        _mouse_position: (f32, f32),
     ) -> anyhow::Result<Option<Box<dyn DrawableGate>>> {
-        return Ok(None)
+        return Ok(None);
     }
 
     fn replace_point(
         &self,
-        new_point: (f32, f32),
-        point_index: usize,
-        plot_map: &crate::plotters_dioxus::plots::parameters::PlotMapper,
+        _new_point: (f32, f32),
+        _point_index: usize,
+        _plot_map: &crate::plotters_dioxus::plots::parameters::PlotMapper,
     ) -> anyhow::Result<Box<dyn DrawableGate>> {
-        return Ok(self.clone_box())
+        return Ok(self.clone_box());
     }
 
     fn replace_points(
         &self,
-        gate_drag_data: crate::plotters_dioxus::gates::gate_drag::GateDragData,
+        _gate_drag_data: crate::plotters_dioxus::gates::gate_drag::GateDragData,
     ) -> anyhow::Result<Option<Box<dyn DrawableGate>>> {
-        return Ok(None)
+        return Ok(None);
     }
-    
+
     fn clone_box(&self) -> Box<dyn DrawableGate> {
         Box::new(self.clone())
     }
 
+    fn is_primary(&self) -> bool {
+        true
+    }
 }

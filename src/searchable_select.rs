@@ -127,7 +127,10 @@ pub fn SearchableSelectList<T: Clone + PartialEq + std::fmt::Display + 'static>(
 use crate::FxIndexMap;
 
 #[component]
-pub fn SearchableSelectMap<T: Clone + PartialEq + std::fmt::Display + 'static, S: Clone + PartialEq + Eq + std::fmt::Display + std::hash::Hash + 'static>(
+pub fn SearchableSelectMap<
+    T: Clone + PartialEq + std::fmt::Display + 'static,
+    S: Clone + PartialEq + Eq + std::fmt::Display + std::hash::Hash + 'static,
+>(
     items: ReadSignal<FxIndexMap<S, T>>,
     on_select: EventHandler<(usize, T)>,
     placeholder: Option<String>,
@@ -144,16 +147,17 @@ pub fn SearchableSelectMap<T: Clone + PartialEq + std::fmt::Display + 'static, S
     //     items
     //     .read()
     //     .iter()
-    //     .filter(|&(&ref _k, &ref item)| { 
-    //         item.to_string().to_lowercase().contains(&q) 
+    //     .filter(|&(&ref _k, &ref item)| {
+    //         item.to_string().to_lowercase().contains(&q)
     //     })
     //     // Manually clone the key and value from the tuple
-    //     .map(|(k, v)| (k.clone(), v.clone())) 
+    //     .map(|(k, v)| (k.clone(), v.clone()))
     //     .collect::<FxIndexMap<S, T>>()
     // });
     let filtered = use_memo(move || {
         let q = search.read().to_lowercase();
-        items.read()
+        items
+            .read()
             .iter()
             .enumerate() // Capture the REAL index in the master map
             .filter(|(_, (_, v))| v.to_string().to_lowercase().contains(&q))

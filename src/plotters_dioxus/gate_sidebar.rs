@@ -1,15 +1,18 @@
+use crate::components::context_menu::*;
 use crate::plotters_dioxus::gates::GateState;
 use crate::plotters_dioxus::gates::gate_store::{GateStateImplExt, GateStateStoreExt, ROOTGATE};
 use crate::plotters_dioxus::plots::parameters::{Param, PlotStore, PlotStoreStoreExt};
 use dioxus::prelude::*;
 use dioxus::stores::SyncStore;
 use std::sync::Arc;
-use crate::components::context_menu::*;
 static SIDEBAR_STYLE: Asset = asset!("assets/gate_sidebar.css");
 
-
 #[component]
-pub fn GateSidebar(selected_id: Signal<Option<Arc<str>>>, x_axis_param: Signal<Param>, y_axis_param: Signal<Param>) -> Element {
+pub fn GateSidebar(
+    selected_id: Signal<Option<Arc<str>>>,
+    x_axis_param: Signal<Param>,
+    y_axis_param: Signal<Param>,
+) -> Element {
     // let gate_store: Store<GateState> = use_context::<Store<GateState>>();
     let gate_store = use_context::<SyncStore<GateState>>();
     let hierarchy = gate_store.hierarchy();
@@ -34,7 +37,7 @@ pub fn GateSidebar(selected_id: Signal<Option<Arc<str>>>, x_axis_param: Signal<P
                         }
                     }
                 }
-            
+
             }
         }
     }
@@ -58,8 +61,13 @@ fn ChevronIcon() -> Element {
 }
 
 #[component]
-fn GateNode(gate_id: Arc<str>, selected: Signal<Option<Arc<str>>>, level: usize, x_axis_param: Signal<Param>, y_axis_param: Signal<Param>) -> Element {
-
+fn GateNode(
+    gate_id: Arc<str>,
+    selected: Signal<Option<Arc<str>>>,
+    level: usize,
+    x_axis_param: Signal<Param>,
+    y_axis_param: Signal<Param>,
+) -> Element {
     let mut gate_store = use_context::<SyncStore<GateState>>();
     let param_store: Store<PlotStore> = use_context::<Store<PlotStore>>();
     let mut is_expanded = use_signal(|| true);
@@ -74,18 +82,17 @@ fn GateNode(gate_id: Arc<str>, selected: Signal<Option<Arc<str>>>, level: usize,
         .collect::<Vec<_>>();
     let has_children = !children.is_empty();
     let is_root = hierarchy.read().is_root(&gate_id);
-    
+
     let parent = {
         if is_root {
             gate_id.clone()
         } else {
             hierarchy.read().get_parent(&gate_id).unwrap().clone()
         }
-        
     };
 
     let gate_name = {
-        if let Some(gate) = gate_store.get_gate_by_id(gate_id.clone()){
+        if let Some(gate) = gate_store.get_gate_by_id(gate_id.clone()) {
             gate.get_name().to_owned()
         } else {
             gate_id.to_string()
@@ -190,7 +197,7 @@ fn GateNode(gate_id: Arc<str>, selected: Signal<Option<Arc<str>>>, level: usize,
                             },
                             "🎯"
                         }
-                    
+
                     }
 
                     // 4. The Children (Recursive call)
@@ -307,8 +314,7 @@ fn GateNode(gate_id: Arc<str>, selected: Signal<Option<Arc<str>>>, level: usize,
                     "Add OR Gate"
                 }
             }
-        
+
         }
     }
 }
-

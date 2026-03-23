@@ -5,11 +5,11 @@ use crate::plotters_dioxus::{
     gates::gate_types::{GateRenderShape, ShapeType},
 };
 
+pub mod boolean_gates;
 pub mod ellipse_gate;
 pub mod line_gate;
 pub mod polygon_gate;
 pub mod rectangle_gate;
-pub mod boolean_gates;
 
 pub fn draw_circles_for_selected_gate(
     points: &[(f32, f32)],

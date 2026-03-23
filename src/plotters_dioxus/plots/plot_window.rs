@@ -1,9 +1,8 @@
-use dioxus::prelude::*;
-use dioxus::stores::use_store_sync;
-use polars::frame::DataFrame;
 use crate::FxIndexMap;
 use crate::plotters_dioxus::gates::gate_buttons::NewGateButtons;
-use crate::plotters_dioxus::plots::data_helpers::{get_event_mask_from_scaled_df, get_filtered_dataframe, get_flow_data, zip_cols_from_filtered_df};
+use crate::plotters_dioxus::plots::data_helpers::{
+    get_event_mask_from_scaled_df, get_filtered_dataframe, get_flow_data, zip_cols_from_filtered_df,
+};
 use crate::plotters_dioxus::plots::parameters::EventIndexMapped;
 use crate::searchable_select::SearchableSelectMap;
 use crate::{
@@ -16,12 +15,13 @@ use crate::{
             gate_store::{GateStateImplExt, ROOTGATE},
             gate_types::PrimaryGateType,
         },
-        plots::parameters::{
-            Param, PlotStore, PlotStoreImplExt, PlotStoreStoreExt as _,
-        },
+        plots::parameters::{Param, PlotStore, PlotStoreImplExt, PlotStoreStoreExt as _},
     },
     searchable_select::SearchableSelectList,
 };
+use dioxus::prelude::*;
+use dioxus::stores::use_store_sync;
+use polars::frame::DataFrame;
 use std::sync::Arc;
 
 static CSS_STYLE: Asset = asset!("assets/plot_window.css");
@@ -30,9 +30,9 @@ static CSS_STYLE: Asset = asset!("assets/plot_window.css");
 pub fn PlotWindow() -> Element {
     let mut filehandler: Signal<Option<FcsFiles>> = use_signal(|| None);
     let mut message = use_signal(|| None::<String>);
-    let mut gate_store: Store<GateState, CopyValue<GateState, SyncStorage>> = use_store_sync(|| GateState::default());
+    let mut gate_store: Store<GateState, CopyValue<GateState, SyncStorage>> =
+        use_store_sync(|| GateState::default());
     use_context_provider(|| gate_store);
-    
 
     let mut current_gate_type = use_signal(|| PrimaryGateType::Polygon);
     use_context_provider(|| current_gate_type);
@@ -78,16 +78,27 @@ pub fn PlotWindow() -> Element {
     let mut fcs_file_resource: Signal<Option<flow_fcs::Fcs>> = use_signal(|| None);
     let _ = use_resource(move || async move {
         if let Some(sample) = current_sample() {
-            match get_flow_data(std::path::PathBuf::from(sample.get_filepath())).await{
+            match get_flow_data(std::path::PathBuf::from(sample.get_filepath())).await {
                 Ok(mut f) => {
-                    f.metadata.insert_string_keyword(String::from("$GUID"), uuid::Uuid::new_v4().to_string());
-                    *plot_store.current_file_id().write() = f.metadata.get_string_keyword("$GUID").expect("no guid store in the fcs").into();
+                    f.metadata.insert_string_keyword(
+                        String::from("$GUID"),
+                        uuid::Uuid::new_v4().to_string(),
+                    );
+                    let file_id: crate::plotters_dioxus::gates::gate_store::FileId = f
+                        .metadata
+                        .get_string_keyword("$GUID")
+                        .expect("no guid store in the fcs")
+                        .into();
+                    *plot_store.current_file_id().write() = file_id.clone();
+                    gate_store
+                        .set_current_sample(file_id, &[])
+                        .expect("failed to set current sample on gate store");
                     fcs_file_resource.set(Some(f))
-                },
+                }
                 Err(e) => {
                     fcs_file_resource.set(None);
                     println!("error generating fcs file {}", e);
-                },
+                }
             }
         } else {
             fcs_file_resource.set(None);
@@ -97,9 +108,6 @@ pub fn PlotWindow() -> Element {
 
     let sorted_params = use_memo(move || {
         if let Some(fcs_file) = &*fcs_file_resource.read() {
-
-
-            
             // pull the parameters from the file
             let mut sorted_params: FxIndexMap<Arc<str>, Param> = fcs_file
                 .parameters
@@ -129,16 +137,10 @@ pub fn PlotWindow() -> Element {
         }
     });
 
-    
-
-    // this is currently scaling the data but filtering is done elsewhere! 
+    // this is currently scaling the data but filtering is done elsewhere!
     let scaled_data = use_resource(move || async move {
         let mut params: Vec<(Arc<str>, f32)> = Vec::new();
-        for (k, v) in plot_store
-            .settings()
-            .read()
-            .iter()
-        {
+        for (k, v) in plot_store.settings().read().iter() {
             if v.is_arcsinh() {
                 params.push((k.clone(), v.get_cofactor().unwrap()))
             }
@@ -152,7 +154,7 @@ pub fn PlotWindow() -> Element {
                         params.iter().map(|(k, v)| (k.as_ref(), *v)).collect();
                     let scaled_df = fcs_clone.apply_arcsinh_transforms(param_refs.as_slice())?;
                     let df_with_index = scaled_df.with_row_index("original_index".into(), None)?;
-                    
+
                     Ok(Arc::new(df_with_index))
                 })
                 .await;
@@ -165,8 +167,6 @@ pub fn PlotWindow() -> Element {
             Err(anyhow::anyhow!("No data to scale"))
         }
     });
-
-    
 
     let mut x_axis_marker: Signal<Param> = use_signal(|| {
         let p: Arc<str> = Arc::from("FSC-A");
@@ -186,11 +186,7 @@ pub fn PlotWindow() -> Element {
     // fetch the axis limits from the settings dict when axis changed
     let x_axis_limits = use_memo(move || {
         let param = x_axis_marker.read();
-        match plot_store
-            .settings()
-            .read()
-            .get(&param.fluoro)
-        {
+        match plot_store.settings().read().get(&param.fluoro) {
             Some(d) => d.clone(),
             None => AxisInfo::default(),
         }
@@ -198,11 +194,7 @@ pub fn PlotWindow() -> Element {
 
     let y_axis_limits = use_memo(move || {
         let param = y_axis_marker();
-        match plot_store
-            .settings()
-            .read()
-            .get(&param.fluoro)
-        {
+        match plot_store.settings().read().get(&param.fluoro) {
             Some(d) => d.clone(),
             None => AxisInfo::default(),
         }
@@ -220,17 +212,13 @@ pub fn PlotWindow() -> Element {
     let parental_gate: Signal<Option<Arc<str>>> = use_signal(|| Some(ROOTGATE.clone()));
 
     let mut plot_data_signal = use_signal(|| vec![]);
-    
+
     let filtered_dataframe = use_resource(move || {
         let x_fluoro = x_axis_marker.read().fluoro.clone();
         let y_fluoro = y_axis_marker.read().fluoro.clone();
         async move {
-            
-
             if let Some(Ok(d)) = &*scaled_data.read() {
-                let filtered_data = match get_filtered_dataframe(d.clone(), parental_gate())
-                    .await
-                {
+                let filtered_data = match get_filtered_dataframe(d.clone(), parental_gate()).await {
                     Ok(d) => d.clone(),
                     Err(e) => {
                         plot_data_signal.set(vec![]);
@@ -238,7 +226,7 @@ pub fn PlotWindow() -> Element {
                     }
                 };
 
-                match zip_cols_from_filtered_df(filtered_data.clone(), x_fluoro, y_fluoro).await{
+                match zip_cols_from_filtered_df(filtered_data.clone(), x_fluoro, y_fluoro).await {
                     Ok(d) => plot_data_signal.set(d),
                     Err(_) => plot_data_signal.set(vec![]),
                 };
@@ -251,8 +239,7 @@ pub fn PlotWindow() -> Element {
         }
     });
 
-        let event_index = use_resource(move || {
-
+    let event_index = use_resource(move || {
         let df_arc = match &*filtered_dataframe.read() {
             Some(Ok(df)) => Some(df.clone()),
             _ => None,
@@ -265,33 +252,36 @@ pub fn PlotWindow() -> Element {
                 None => return Ok(None),
             };
 
-            let join_result = tokio::task::spawn_blocking(move || -> anyhow::Result<EventIndexMapped> {
-                // Build the R-Tree
-                let ei = get_event_mask_from_scaled_df(df.clone(), x_name, y_name)
-                    .map_err(|e| anyhow::anyhow!("R-Tree build failed: {e}"))?;
-                // Extract the mapping
-                let map: Vec<usize> = df.column("original_index")?
-                    .u32()?
-                    .into_iter()
-                    .flatten()
-                    .map(|v| v as usize)
-                    .collect();
-                Ok(EventIndexMapped { 
-                    event_index: ei,
-                    index_map: Arc::new(map) 
+            let join_result =
+                tokio::task::spawn_blocking(move || -> anyhow::Result<EventIndexMapped> {
+                    // Build the R-Tree
+                    let ei = get_event_mask_from_scaled_df(df.clone(), x_name, y_name)
+                        .map_err(|e| anyhow::anyhow!("R-Tree build failed: {e}"))?;
+                    // Extract the mapping
+                    let map: Vec<usize> = df
+                        .column("original_index")?
+                        .u32()?
+                        .into_iter()
+                        .flatten()
+                        .map(|v| v as usize)
+                        .collect();
+                    Ok(EventIndexMapped {
+                        event_index: ei,
+                        index_map: Arc::new(map),
+                    })
                 })
-            }).await;
+                .await;
 
             match join_result {
                 Ok(Ok(index)) => Ok(Some(index)),
                 Ok(Err(e)) => {
                     println!("{e}");
                     Err(e)
-                },
+                }
                 Err(join_err) => {
                     println!("{join_err}");
                     Err(anyhow::anyhow!("Task panicked: {join_err}"))
-                },
+                }
             }
         }
     });
@@ -299,11 +289,11 @@ pub fn PlotWindow() -> Element {
     // for the actual gating, we just use df filtering. however for the currently displayed events we use an EventIndex
     // to get real time % for child gates
     use_effect(move || {
-
-        let data = event_index.read()
-        .as_ref()
-        .and_then(|res| res.as_ref().ok())
-        .and_then(|opt| opt.clone());
+        let data = event_index
+            .read()
+            .as_ref()
+            .and_then(|res| res.as_ref().ok())
+            .and_then(|opt| opt.clone());
 
         *plot_store.event_index_map().write() = data;
     });
@@ -561,7 +551,7 @@ pub fn PlotWindow() -> Element {
                             }
                             None => rsx! {},
                         }
-                    
+
                     }
                 }
                 div { class: "status-message",
@@ -600,7 +590,7 @@ pub fn PlotWindow() -> Element {
                     }
 
                 }
-            
+
             }
         }
     }

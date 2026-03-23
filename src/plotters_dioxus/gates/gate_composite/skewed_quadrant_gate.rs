@@ -221,10 +221,10 @@ impl SkewedQuadrantGate {
             label_position: None,
         };
 
-        let lg_tl = PolygonGate::try_new(gate_top_left)?;
-        let lg_tr = PolygonGate::try_new(gate_top_right)?;
-        let lg_bl = PolygonGate::try_new(gate_bottom_left)?;
-        let lg_br = PolygonGate::try_new(gate_bottom_right)?;
+        let lg_tl = PolygonGate::try_new(gate_top_left, false)?;
+        let lg_tr = PolygonGate::try_new(gate_top_right, false)?;
+        let lg_bl = PolygonGate::try_new(gate_bottom_left, false)?;
+        let lg_br = PolygonGate::try_new(gate_bottom_right, false)?;
         // [bottom-left, bottom-right, top-right, top-left]
         gate_map.insert(id_bottom_left_arc, lg_bl);
         gate_map.insert(id_bottom_right_arc, lg_br);
@@ -307,7 +307,7 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
         is_selected: bool,
         drag_point: Option<PointDragData>,
         plot_map: &PlotMapper,
-        gate_stats: &Option<GateStats>
+        gate_stats: &Option<GateStats>,
     ) -> Vec<GateRenderShape> {
         let (xmin, xmax) = {
             let axis = plot_map.x_axis_min_max();
@@ -443,63 +443,102 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
             let y_axis_min_max = plot_map.y_axis_min_max();
             let x_axis_offset = ((x_axis_min_max.end() - x_axis_min_max.start()) / 100f32) * 1f32;
             let y_axis_offset = ((y_axis_min_max.end() - y_axis_min_max.start()) / 100f32) * 1f32;
-            for (i, (id, _)) in self.gates.iter().enumerate(){
+            for (i, (id, _)) in self.gates.iter().enumerate() {
                 // order: bl, br, tr, tl
-                match gate_stats.get_percent_for_id(id.clone()){
+                match gate_stats.get_percent_for_id(id.clone()) {
                     Some(percent) => {
                         let text = format!("{:.2}%", percent);
                         let (origin, offset, text_anchor) = match i {
                             0 => {
                                 // ALWAYS BOTTOM LEFT
-                                ((*x_axis_min_max.start() + x_axis_offset, *y_axis_min_max.start() + y_axis_offset), self.gates.get(id).expect("").get_label_offset(), Some(String::from("start")))
-                            },
+                                (
+                                    (
+                                        *x_axis_min_max.start() + x_axis_offset,
+                                        *y_axis_min_max.start() + y_axis_offset,
+                                    ),
+                                    self.gates.get(id).expect("").get_label_offset(),
+                                    Some(String::from("start")),
+                                )
+                            }
                             1 => {
                                 // BOTTOM RIGHT LABEL
-                                if self.axis_matched{
-                                    ((*x_axis_min_max.end() - x_axis_offset, *y_axis_min_max.start() + y_axis_offset), self.gates.get(id).expect("").get_label_offset(), Some(String::from("end")))
+                                if self.axis_matched {
+                                    (
+                                        (
+                                            *x_axis_min_max.end() - x_axis_offset,
+                                            *y_axis_min_max.start() + y_axis_offset,
+                                        ),
+                                        self.gates.get(id).expect("").get_label_offset(),
+                                        Some(String::from("end")),
+                                    )
                                 } else {
-                                // TOP LEFT LABEL
-                                    ((*x_axis_min_max.start() + x_axis_offset, *y_axis_min_max.end() - 2f32 * y_axis_offset), self.gates.get(id).expect("").get_label_offset(), Some(String::from("start")))
+                                    // TOP LEFT LABEL
+                                    (
+                                        (
+                                            *x_axis_min_max.start() + x_axis_offset,
+                                            *y_axis_min_max.end() - 2f32 * y_axis_offset,
+                                        ),
+                                        self.gates.get(id).expect("").get_label_offset(),
+                                        Some(String::from("start")),
+                                    )
                                 }
-                            },
+                            }
                             2 => {
                                 // ALWAYS TOP RIGHT
-                                ((*x_axis_min_max.end() - x_axis_offset, *y_axis_min_max.end() - 2f32 * y_axis_offset), self.gates.get(id).expect("").get_label_offset(), Some(String::from("end")))
-                            },
+                                (
+                                    (
+                                        *x_axis_min_max.end() - x_axis_offset,
+                                        *y_axis_min_max.end() - 2f32 * y_axis_offset,
+                                    ),
+                                    self.gates.get(id).expect("").get_label_offset(),
+                                    Some(String::from("end")),
+                                )
+                            }
                             3 => {
                                 // TOP LEFT LABEL
-                                if self.axis_matched{
-                                    ((*x_axis_min_max.start() + x_axis_offset, *y_axis_min_max.end() - 2f32 * y_axis_offset), self.gates.get(id).expect("").get_label_offset(), Some(String::from("start")))
+                                if self.axis_matched {
+                                    (
+                                        (
+                                            *x_axis_min_max.start() + x_axis_offset,
+                                            *y_axis_min_max.end() - 2f32 * y_axis_offset,
+                                        ),
+                                        self.gates.get(id).expect("").get_label_offset(),
+                                        Some(String::from("start")),
+                                    )
                                 } else {
-                                // BOTTOM RIGHT LABEL
-                                    ((*x_axis_min_max.end() - x_axis_offset, *y_axis_min_max.start() + y_axis_offset), self.gates.get(id).expect("").get_label_offset(), Some(String::from("end")))
+                                    // BOTTOM RIGHT LABEL
+                                    (
+                                        (
+                                            *x_axis_min_max.end() - x_axis_offset,
+                                            *y_axis_min_max.start() + y_axis_offset,
+                                        ),
+                                        self.gates.get(id).expect("").get_label_offset(),
+                                        Some(String::from("end")),
+                                    )
                                 }
-
-                            },
-                            _ => unreachable!()
-
-                            
+                            }
+                            _ => unreachable!(),
                         };
-                        let shape = GateRenderShape::Text { 
-                            origin, 
-                            offset, 
-                            fontsize: 10f32, 
+                        let shape = GateRenderShape::Text {
+                            origin,
+                            offset,
+                            fontsize: 10f32,
                             text,
                             text_anchor,
-                            shape_type: ShapeType::UndraggableText(gate_types::Direction::Both)
+                            shape_type: ShapeType::UndraggableText(gate_types::Direction::Both),
                         };
                         labels.push(shape)
-                        
-                },
-                    None => {},
+                    }
+                    None => {}
                 }
             }
-            
-            
         }
 
-
-        let labels = if labels.is_empty() {None} else {Some(labels)};
+        let labels = if labels.is_empty() {
+            None
+        } else {
+            Some(labels)
+        };
 
         crate::collate_vecs!(main, selected, labels)
     }
@@ -908,6 +947,10 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
 
         let new_self = self.clone_with_point(new_points)?;
         Ok(Some(Box::new(new_self)))
+    }
+
+    fn is_primary(&self) -> bool {
+        true
     }
 }
 
