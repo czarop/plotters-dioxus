@@ -604,43 +604,87 @@ impl<Lens> Store<GateState, Lens> {
     }
 
     fn rotate_gate(&mut self, gate_id: GateId, current_position: (f32, f32)) -> anyhow::Result<()> {
-        let new_gate = self
-            .gate_store()
-            .gate_resolver()
-            .peek()
+        // let new_gate = self
+        //     .gate_store()
+        //     .gate_resolver()
+        //     .peek()
+        //     .resolve_drawable(&gate_id)?
+        //     .rotate_gate(current_position)?;
+        // if let Some(new_gate) = new_gate {
+        //     let new_gate_arc: Arc<dyn DrawableGate> = Arc::from(new_gate);
+
+        //     if new_gate_arc.is_composite() {
+        //         let subgate_ids = new_gate_arc.get_inner_gate_ids();
+        //         for subgate_id in subgate_ids {
+        //             if let Some(gate_ptr) = self
+        //                 .gate_store()
+        //                 .primary_and_subgate_registry()
+        //                 .write()
+        //                 .get_mut(&subgate_id)
+        //             {
+        //                 *gate_ptr = new_gate_arc.clone();
+        //             }
+        //         }
+        //     }
+
+        //     if let Some(gate_ptr) = self
+        //         .gate_store()
+        //         .primary_and_subgate_registry()
+        //         .write()
+        //         .get_mut(&gate_id)
+        //     {
+        //         *gate_ptr = new_gate_arc.clone();
+        //     }
+
+        // }
+        let resolver_binding = self.gate_store().gate_resolver();
+        let resolver = resolver_binding.peek();
+        let new_gate = resolver
             .resolve_drawable(&gate_id)?
             .rotate_gate(current_position)?;
+
+        let gate_origin = resolver
+            .gate_origins
+            .get(&gate_id)
+            .ok_or_else(|| anyhow!("error finding gate source for {}", &gate_id))?
+            .clone();
+        drop(resolver);
         if let Some(new_gate) = new_gate {
-            let new_gate_arc: Arc<dyn DrawableGate> = Arc::from(new_gate);
+        let new_gate_arc: Arc<dyn DrawableGate> = Arc::from(new_gate);
+            let ids_to_update = if new_gate_arc.is_composite() {
+                let mut ids = new_gate_arc.get_inner_gate_ids();
+                ids.push(gate_id.clone());
+                ids
+            } else {
+                vec![gate_id.clone()]
+            };
 
-            if new_gate_arc.is_composite() {
-                let subgate_ids = new_gate_arc.get_inner_gate_ids();
-                for subgate_id in subgate_ids {
-                    if let Some(gate_ptr) = self
-                        .gate_store()
-                        .primary_and_subgate_registry()
-                        .write()
-                        .get_mut(&subgate_id)
-                    {
-                        *gate_ptr = new_gate_arc.clone();
+            self.gate_store().with_mut(|state| {
+                for id in ids_to_update {
+                    match &gate_origin {
+                        GateSource::Global => {
+                            state
+                                .primary_and_subgate_registry
+                                .insert(id.clone(), new_gate_arc.clone());
+                        }
+                        GateSource::Group(k) => {
+                            state
+                                .group_position_overrides
+                                .insert(k.clone(), new_gate_arc.clone());
+                        }
+                        GateSource::Sample(k) => {
+                            state
+                                .sample_position_overrides
+                                .insert(k.clone(), new_gate_arc.clone());
+                        }
                     }
+                    state
+                        .gate_resolver
+                        .active_gates
+                        .insert(id, new_gate_arc.clone());
                 }
-            }
-
-            if let Some(gate_ptr) = self
-                .gate_store()
-                .primary_and_subgate_registry()
-                .write()
-                .get_mut(&gate_id)
-            {
-                *gate_ptr = new_gate_arc.clone();
-            }
-
-            // if let Some(gate_ptr) = self.primary_gate_registry().write().get_mut(&gate_id) {
-            //     *gate_ptr = new_gate_arc.clone();
-            // }
+            });
         }
-
         Ok(())
     }
 
@@ -687,50 +731,50 @@ impl<Lens> Store<GateState, Lens> {
         let y: &str = &y_axis_title;
         let key = GatesOnPlotKey::new(x_axis_title.clone(), y_axis_title.clone(), parental_gate_id);
         let key_options = self.gate_ids_by_view().get(key);
-
+        let mut new_gates = vec![];
         if let Some(key_store) = key_options {
             let ids = key_store.read().clone();
 
+
+            
+            
+            let read_guard = self.gate_store().gate_resolver();
+            let registry = &*read_guard.read();
             for k in ids {
-                let new_gate = self
-                    .gate_store()
-                    .gate_resolver()
-                    .read()
+                let new_gate = registry
                     .resolve_drawable(&k)?
                     .match_to_plot_axis(x, y)?;
 
                 if let Some(new_gate) = new_gate {
                     let new_gate_arc: Arc<dyn DrawableGate> = Arc::from(new_gate);
+                    new_gates.push(new_gate_arc);
+                }
+            }
+        }
+        
+            
+            self.gate_store().with_mut(|s|{
+                for new_gate_arc in new_gates{
 
                     if new_gate_arc.is_composite() {
                         let subgate_ids = new_gate_arc.get_inner_gate_ids();
                         for subgate_id in subgate_ids {
-                            if let Some(gate_ptr) = self
-                                .gate_store()
-                                .primary_and_subgate_registry()
-                                .write()
-                                .get_mut(&subgate_id)
-                            {
-                                *gate_ptr = new_gate_arc.clone();
-                            }
+                            s
+                                .primary_and_subgate_registry
+                                .insert(subgate_id, new_gate_arc.clone());
+                        
                         }
                     }
 
-                    if let Some(gate_ptr) = self
-                        .gate_store()
-                        .primary_and_subgate_registry()
-                        .write()
-                        .get_mut(&k)
-                    {
-                        *gate_ptr = new_gate_arc.clone();
-                    }
+                    
+                        s
+                        .primary_and_subgate_registry
+                        .insert(new_gate_arc.get_id(), new_gate_arc.clone());
 
-                    // if let Some(gate_ptr) = self.primary_gate_registry().write().get_mut(&k) {
-                    //     *gate_ptr = new_gate_arc.clone();
-                    // }
                 }
-            }
-        }
+            });
+            
+    
 
         return Ok(());
     }
