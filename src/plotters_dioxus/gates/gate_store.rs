@@ -352,8 +352,6 @@ impl<Lens> Store<GateState, Lens> {
                 .add_gate_child(parental_gate_id.unwrap_or(ROOTGATE.clone()), g.get_id())?;
         }
 
-        // w.primary_gate_registry
-        //     .insert(gate_key.clone(), g.clone());
         w.gate_store
             .primary_and_subgate_registry
             .insert(gate_key.clone(), g.clone());
@@ -381,13 +379,17 @@ impl<Lens> Store<GateState, Lens> {
     ) -> anyhow::Result<()> {
         let id = Uuid::new_v4().to_string();
         let gate_id: Arc<str> = Arc::from(id.as_ref() as &str);
-        for link in linked_gate_ids.iter() {
-            self.boolean_gate_links()
-                .write()
-                .entry(link.clone())
-                .or_insert_with(Vec::new)
-                .push(gate_id.clone());
-        }
+        
+        self.boolean_gate_links().with_mut(|w|{
+            for link in linked_gate_ids.iter() {
+                w
+                    .entry(link.clone())
+                    .or_insert_with(Vec::new)
+                    .push(gate_id.clone());
+            }
+        });
+        
+        
         let g = Arc::new(BooleanGate::new(
             gate_id.clone(),
             name.unwrap_or(id),
@@ -396,16 +398,29 @@ impl<Lens> Store<GateState, Lens> {
             x_param,
             y_param,
         )?);
-        let mut w = self.write();
-        w.hierarchy.add_gate_child(
+
+        
+
+        self.hierarchy().write().add_gate_child(
             parental_gate_id.unwrap_or(ROOTGATE.clone()),
             gate_id.clone(),
         )?;
 
-        // w.primary_gate_registry.insert(g.get_id(), g.clone());
-        w.gate_store
+        let mut wb = self.gate_store();
+        let mut w = wb.write();
+
+        w
             .primary_and_subgate_registry
-            .insert(g.get_id(), g);
+            .insert(g.get_id(), g.clone());
+
+        w
+            .gate_resolver
+            .active_gates
+            .insert(g.get_id(), g.clone());
+        w
+            .gate_resolver
+            .gate_origins
+            .insert(g.get_id(), GateSource::Global);
 
         Ok(())
     }
