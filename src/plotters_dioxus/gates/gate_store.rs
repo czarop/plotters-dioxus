@@ -727,54 +727,38 @@ impl<Lens> Store<GateState, Lens> {
         y_axis_title: Arc<str>,
         parental_gate_id: Option<Arc<str>>,
     ) -> anyhow::Result<()> {
-        let x: &str = &x_axis_title;
-        let y: &str = &y_axis_title;
         let key = GatesOnPlotKey::new(x_axis_title.clone(), y_axis_title.clone(), parental_gate_id);
-        let key_options = self.gate_ids_by_view().get(key);
-        let mut new_gates = vec![];
-        if let Some(key_store) = key_options {
-            let ids = key_store.read().clone();
-
-
-            
-            
-            let read_guard = self.gate_store().gate_resolver();
-            let registry = &*read_guard.read();
+        let ids = self.gate_ids_by_view().get(key)
+            .map(|ks| ks.read().clone())
+            .ok_or_else(|| anyhow::anyhow!("No keys found"))?;
+        let mut updates = Vec::new();
+        {   
+            let resolver_bind = self.gate_store().gate_resolver();
+            let resolver = resolver_bind.peek();
             for k in ids {
-                let new_gate = registry
-                    .resolve_drawable(&k)?
-                    .match_to_plot_axis(x, y)?;
-
-                if let Some(new_gate) = new_gate {
+                if let Some(new_gate) = resolver.resolve_drawable(&k)?.match_to_plot_axis(&x_axis_title, &y_axis_title)? {
                     let new_gate_arc: Arc<dyn DrawableGate> = Arc::from(new_gate);
-                    new_gates.push(new_gate_arc);
+                    
+                    // Collect the IDs that need to point to this new Arc
+                    updates.push((new_gate_arc.get_id(), new_gate_arc.clone()));
+                    
+                    if new_gate_arc.is_composite() {
+                        for sub_id in new_gate_arc.get_inner_gate_ids() {
+                            updates.push((sub_id, new_gate_arc.clone()));
+                        }
+                    }
                 }
             }
         }
-        
+        self.gate_store().with_mut(|s| {
             
-            self.gate_store().with_mut(|s|{
-                for new_gate_arc in new_gates{
+            for (k, v) in updates{
+                // s.primary_and_subgate_registry.insert(k.clone(), v.clone());
+                s.gate_resolver.active_gates.insert(k.clone(), v.clone());
+                // do group and sample overrides?
+            }
 
-                    if new_gate_arc.is_composite() {
-                        let subgate_ids = new_gate_arc.get_inner_gate_ids();
-                        for subgate_id in subgate_ids {
-                            s
-                                .primary_and_subgate_registry
-                                .insert(subgate_id, new_gate_arc.clone());
-                        
-                        }
-                    }
-
-                    
-                        s
-                        .primary_and_subgate_registry
-                        .insert(new_gate_arc.get_id(), new_gate_arc.clone());
-
-                }
-            });
-            
-    
+        });
 
         return Ok(());
     }
