@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::plotters_dioxus::gates::GateState;
-use crate::plotters_dioxus::gates::gate_store::{GateStateImplExt, GateStateStoreExt, ROOTGATE};
+use crate::plotters_dioxus::gates::gate_store::{GateOverrideResolver, GateStateImplExt, GateStateStoreExt, ROOTGATE};
 
 use dioxus::prelude::*;
 use dioxus::stores::SyncStore;
@@ -23,11 +23,10 @@ pub async fn get_flow_data(path: std::path::PathBuf) -> Result<Fcs, Arc<anyhow::
 pub async fn get_filtered_dataframe(
     df: Arc<DataFrame>,
     parental_gate_id: Option<Arc<str>>,
+    resolver: GateOverrideResolver
 ) -> Result<Arc<DataFrame>, anyhow::Error> {
     let df_clone = df.clone();
     let gate_store = use_context::<SyncStore<GateState>>();
-
-    let resolver = gate_store.get_gate_resolver();
 
     task::spawn_blocking(move || -> Result<Arc<DataFrame>, anyhow::Error> {
         let gate_chain: Option<Vec<Arc<str>>> = if let Some(parent) = parental_gate_id {

@@ -37,7 +37,7 @@ pub fn GateSidebar(
                         }
                     }
                 }
-
+            
             }
         }
     }
@@ -92,7 +92,7 @@ fn GateNode(
     };
 
     let gate_name = {
-        if let Some(gate) = gate_store.get_gate_by_id(gate_id.clone()) {
+        if let Some(gate) = gate_store.gate_store().peek().primary_and_subgate_registry.get(&gate_id) {
             gate.get_name().to_owned()
         } else {
             gate_id.to_string()
@@ -128,7 +128,12 @@ fn GateNode(
 
                             e.stop_propagation();
 
-                            if let Some(gate) = gate_store.get_gate_by_id(gate_id_clone.clone()) {
+                            if let Some(gate) = gate_store
+                                .gate_store()
+                                .peek()
+                                .primary_and_subgate_registry
+                                .get(&gate_id_clone)
+                            {
                                 let (x, y) = gate.get_params();
                                 let (new_x, new_y);
                                 if let Some(x_axis_settings) = param_store.settings().read().get(&x) {
@@ -173,7 +178,12 @@ fn GateNode(
                             onclick: move |e| {
                                 // IMPORTANT: Stop the row's onclick from firing
                                 e.stop_propagation();
-                                if let Some(gate) = gate_store.get_gate_by_id(gate_id.clone()) {
+                                if let Some(gate) = gate_store
+                                    .gate_store()
+                                    .peek()
+                                    .primary_and_subgate_registry
+                                    .get(&gate_id)
+                                {
                                     let (x, y) = gate.get_params();
                                     let (new_x, new_y);
                                     if let Some(x_axis_settings) = param_store.settings().read().get(&x) {
@@ -197,7 +207,7 @@ fn GateNode(
                             },
                             "🎯"
                         }
-
+                    
                     }
 
                     // 4. The Children (Recursive call)
@@ -314,7 +324,7 @@ fn GateNode(
                     "Add OR Gate"
                 }
             }
-
+        
         }
     }
 }

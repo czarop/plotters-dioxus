@@ -1,4 +1,4 @@
-use crate::plotters_dioxus::gates::gate_store::GateStateStoreExt;
+use crate::plotters_dioxus::gates::gate_store::{GateOverrideResolver, GateStateStoreExt};
 use crate::plotters_dioxus::plots::parameters::PlotStoreStoreExt;
 use crate::plotters_dioxus::{
     gates::{
@@ -42,6 +42,7 @@ pub fn GateLayer(
     x_channel: ReadSignal<Arc<str>>,
     y_channel: ReadSignal<Arc<str>>,
     parental_gate_id: ReadSignal<Option<Arc<str>>>,
+    resolver: ReadSignal<GateOverrideResolver>
 ) -> Element {
     let plot_map = use_context::<Signal<Option<PlotMapper>>>();
 
@@ -55,7 +56,7 @@ pub fn GateLayer(
     let gates = use_memo(move || {
         println!("fetching gates");
         let(x, y, parent) = (x_channel(), y_channel(), parental_gate_id());
-        let g = gate_store.get_gates_for_plot(x, y, parent)
+        let g = gate_store.get_gates_for_plot(x, y, parent, &*resolver.read())
             .unwrap_or_default();
         GateList(g)
     });
@@ -65,7 +66,7 @@ pub fn GateLayer(
         let(x, y, parent) = (x_channel(), y_channel(), parental_gate_id());
         let _ = plot_store.current_file_id();
         let _ = gate_store
-                .match_gates_to_plot(x.clone(), y.clone(), parent.clone())
+                .match_gates_to_plot(x.clone(), y.clone(), parent.clone(), &resolver())
                 .inspect_err(|e| println!("{}", e.to_string()));
     });
 
@@ -109,7 +110,7 @@ pub fn GateLayer(
         let x_key = x_channel.read().clone();
         let y_key = y_channel.read().clone();
         let event_index_option = plot_store.event_index_map()();
-        if let Ok(gates_on_plot) = gate_store.get_gates_for_plot(x_key, y_key, parental_gate_id())
+        if let Ok(gates_on_plot) = gate_store.get_gates_for_plot(x_key, y_key, parental_gate_id(), &resolver())
         {
             if let Some(event_index_map) = event_index_option {
                 let join_result = tokio::task::spawn_blocking(move || -> anyhow::Result<FxHashMap<Arc<str>, GateStats>> {
@@ -150,6 +151,8 @@ pub fn GateLayer(
     let mut dbl_click_lockout = use_signal(|| false);
     let mut last_processed_pos = use_signal(|| (0.0f32, 0.0f32));
     let mut svg_data: Signal<Option<std::rc::Rc<MountedData>>> = use_signal(|| None);
+    let current_resolver_move = resolver.peek().clone();
+    let current_resolver_up = resolver.peek().clone();
 
     rsx! {
         match plot_map() {
@@ -289,7 +292,7 @@ pub fn GateLayer(
                                 let client = evt.data.client_coordinates();
                                 let div_data = svg_data.read().clone();
                                 let selected_gate_op = gate_store.selected_gate().peek().cloned();
-
+                                let current_resolver_move = current_resolver_move.clone();
                                 spawn(async move {
                                     let Some(mount) = div_data else { return };
 
@@ -321,13 +324,14 @@ pub fn GateLayer(
                                                             point_drag_data.point_index(),
                                                             data_coords,
                                                             &map,
+                                                            &current_resolver_move,
                                                         )
                                                         .expect("Gate Move Failed");
 
                                                 }
                                                 GateDragType::Gate(gate_drag_data) => {
                                                     gate_store
-                                                        .move_gate(gate_drag_data.clone())
+                                                        .move_gate(gate_drag_data.clone(), &current_resolver_move)
                                                         .expect("Gate Move Failed");
                                                 }
                                                 GateDragType::Rotation(rotation_data) => {
@@ -335,6 +339,7 @@ pub fn GateLayer(
                                                         .rotate_gate(
                                                             selected_gate_id.clone().into(),
                                                             rotation_data.current_loc(),
+                                                            &current_resolver_move,
                                                         )
                                                         .expect("Gate Move Failed");
                                                 }
@@ -373,7 +378,7 @@ pub fn GateLayer(
                                                     point_drag_data.point_index(),
                                                     data_coords,
                                                     mapper,
-
+                                                    &current_resolver_up,
                                                 )
                                                 .expect("Gate Move Failed");
                                         }
@@ -381,9 +386,7 @@ pub fn GateLayer(
                                     }
                                     GateDragType::Gate(gate_drag_data) => {
                                         gate_store
-                                            .move_gate(
-                                                gate_drag_data
-                                            )
+                                            .move_gate(gate_drag_data, &current_resolver_up)
                                             .expect("Gate Move Failed");
                                     }
                                     GateDragType::Rotation(rotation_data) => {
@@ -391,7 +394,7 @@ pub fn GateLayer(
                                             .rotate_gate(
                                                 selected_gate_id.clone().into(),
                                                 rotation_data.current_loc(),
-
+                                                &current_resolver_up,
                                             )
                                             .expect("Gate Move Failed");
                                     }

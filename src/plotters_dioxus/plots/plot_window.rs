@@ -90,9 +90,9 @@ pub fn PlotWindow() -> Element {
                         .expect("no guid store in the fcs")
                         .into();
                     *plot_store.current_file_id().write() = file_id.clone();
-                    gate_store
-                        .set_current_sample(file_id, &[])
-                        .expect("failed to set current sample on gate store");
+                    // gate_store
+                    //     .set_current_sample(file_id, &[])
+                    //     .expect("failed to set current sample on gate store");
                     fcs_file_resource.set(Some(f))
                 }
                 Err(e) => {
@@ -209,16 +209,25 @@ pub fn PlotWindow() -> Element {
         sorted_params.peek().get_index_of(&curr).unwrap_or(0)
     });
 
+
+    let resolver = use_memo(move || {
+        let id: Arc<str> = plot_store.current_file_id()();
+        gate_store.get_current_sample(id, &[])
+    });
+
     let parental_gate: Signal<Option<Arc<str>>> = use_signal(|| Some(ROOTGATE.clone()));
 
     let mut plot_data_signal = use_signal(|| vec![]);
 
-    let filtered_dataframe = use_resource(move || {
+    let filtered_dataframe: Resource<std::result::Result<Arc<DataFrame>, anyhow::Error>> = use_resource(move || {
         let x_fluoro = x_axis_marker.read().fluoro.clone();
         let y_fluoro = y_axis_marker.read().fluoro.clone();
+        let parental = parental_gate();
+        
         async move {
+            let Ok(resolver) = resolver() else {return Err(anyhow::anyhow!("No resolver"));};
             if let Some(Ok(d)) = &*scaled_data.read() {
-                let filtered_data = match get_filtered_dataframe(d.clone(), parental_gate()).await {
+                let filtered_data = match get_filtered_dataframe(d.clone(), parental, resolver).await {
                     Ok(d) => d.clone(),
                     Err(e) => {
                         plot_data_signal.set(vec![]);
@@ -579,12 +588,15 @@ pub fn PlotWindow() -> Element {
                     rsx! {
                         div {
                             NewGateButtons { callback: move |gate_type| current_gate_type.set(gate_type) }
-                            PseudoColourPlot {
-                                size: (600, 600),
-                                data: plot_data_signal,
-                                x_axis_info: x_axis_limits.read().clone(),
-                                y_axis_info: y_axis_limits.read().clone(),
-                                parental_gate_id: parental_gate,
+                            if let Ok(resolver) = resolver() {
+                                PseudoColourPlot {
+                                    size: (600, 600),
+                                    data: plot_data_signal,
+                                    x_axis_info: x_axis_limits.read().clone(),
+                                    y_axis_info: y_axis_limits.read().clone(),
+                                    parental_gate_id: parental_gate,
+                                    resolver,
+                                }
                             }
                         }
                     }

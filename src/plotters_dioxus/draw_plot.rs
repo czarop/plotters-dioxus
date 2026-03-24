@@ -24,6 +24,7 @@ pub fn PseudoColourPlot(
     x_axis_info: ReadSignal<AxisInfo>,
     y_axis_info: ReadSignal<AxisInfo>,
     parental_gate_id: ReadSignal<Option<Arc<str>>>,
+    resolver: super::gates::gate_store::GateOverrideResolver
 ) -> Element {
     let mut plot_image_src = use_signal(|| String::new());
     let mut plot_map = use_signal(|| None::<PlotMapper>);
@@ -116,7 +117,8 @@ pub fn PseudoColourPlot(
                 x_channel: x_axis_info().param.fluoro.clone(),
                 y_channel: y_axis_info().param.fluoro.clone(),
                 parental_gate_id,
-
+                resolver,
+            
             }
         }
     }
