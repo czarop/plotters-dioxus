@@ -156,7 +156,7 @@ pub struct GateState {
 }
 
 #[store(pub name = GateStateImplExt)]
-impl<Lens> Store<GateState, Lens> {
+impl<Lens: dioxus::prelude::Writable> Store<GateState, Lens> {
     fn set_current_sample(&mut self, file_id: FileId, group_ids: &[GroupId]) -> Result<()> {
         // construct the GateResolver for this file
         let mut active_gates = im::HashMap::with_hasher(FxBuildHasher);
@@ -689,79 +689,171 @@ impl<Lens> Store<GateState, Lens> {
     }
 
     fn get_gates_for_plot<T>(
-        &self,
+        &mut self,
         x_axis_title: T,
         y_axis_title: T,
         parental_gate_id: Option<T>,
-    ) -> Option<Vec<Arc<dyn DrawableGate>>>
+    ) -> Result<Vec<Arc<dyn DrawableGate>>>
     where
-        T: Into<GateId>,
+        T: Into<GateId> + Clone,
     {
-        let key = GatesOnPlotKey::new(
-            x_axis_title.into(),
-            y_axis_title.into(),
-            parental_gate_id.map(|id| id.into()),
-        );
-        let key_options = self.gate_ids_by_view().get(key);
-        let mut gate_list = vec![];
-        if let Some(key_store) = key_options {
-            let ids = key_store.read().clone();
-            let registry = self.gate_store().gate_resolver();
-            let registry_guard = registry.read();
-            for k in ids {
-                if let Ok(gate_store_entry) = registry_guard.resolve_drawable(&k) {
-                    if gate_store_entry.is_primary() {
-                        gate_list.push(gate_store_entry.clone());
-                    }
-                }
-            }
-        } else {
-            return None;
-        }
-        return Some(gate_list);
-    }
-
-    fn match_gates_to_plot(
-        &mut self,
-        x_axis_title: Arc<str>,
-        y_axis_title: Arc<str>,
-        parental_gate_id: Option<Arc<str>>,
-    ) -> anyhow::Result<()> {
-        let key = GatesOnPlotKey::new(x_axis_title.clone(), y_axis_title.clone(), parental_gate_id);
+        // let key = GatesOnPlotKey::new(
+        //     x_axis_title.into(),
+        //     y_axis_title.into(),
+        //     parental_gate_id.map(|id| id.into()),
+        // );
+        // let key_options = self.gate_ids_by_view().get(key);
+        // let mut gate_list = vec![];
+        // if let Some(key_store) = key_options {
+        //     let ids = key_store.read().clone();
+        //     let registry = self.gate_store().gate_resolver();
+        //     let registry_guard = registry.read();
+        //     for k in ids {
+        //         if let Ok(gate_store_entry) = registry_guard.resolve_drawable(&k) {
+        //             if gate_store_entry.is_primary() {
+        //                 gate_list.push(gate_store_entry.clone());
+        //             }
+        //         }
+        //     }
+        // } else {
+        //     return None;
+        // }
+        
+        // let gate_list = self.match_gates_to_plot(x_axis_title, y_axis_title, parental_gate_id).ok()?;
+        let (x, y) = (x_axis_title.clone(), y_axis_title.clone());
+        let key = GatesOnPlotKey::new(x_axis_title.into(), y_axis_title.into(), parental_gate_id.map(|id| id.into()));
         let ids = self.gate_ids_by_view().get(key)
             .map(|ks| ks.read().clone())
             .ok_or_else(|| anyhow::anyhow!("No keys found"))?;
         let mut updates = Vec::new();
+        let mut return_list = Vec::new();
         {   
             let resolver_bind = self.gate_store().gate_resolver();
             let resolver = resolver_bind.peek();
             for k in ids {
-                if let Some(new_gate) = resolver.resolve_drawable(&k)?.match_to_plot_axis(&x_axis_title, &y_axis_title)? {
-                    let new_gate_arc: Arc<dyn DrawableGate> = Arc::from(new_gate);
-                    
-                    // Collect the IDs that need to point to this new Arc
-                    updates.push((new_gate_arc.get_id(), new_gate_arc.clone()));
-                    
-                    if new_gate_arc.is_composite() {
-                        for sub_id in new_gate_arc.get_inner_gate_ids() {
-                            updates.push((sub_id, new_gate_arc.clone()));
-                        }
+                let Some(new_gate) = resolver.resolve_drawable(&k)?.match_to_plot_axis(&x.clone().into(), &y.clone().into())? else {continue};
+                let new_gate_arc: Arc<dyn DrawableGate> = Arc::from(new_gate);
+                let gate_origin = resolver
+                    .gate_origins
+                    .get(&k)
+                    .ok_or_else(|| anyhow!("error finding gate source for {}", &k))?
+                    .clone();
+
+                updates.push((new_gate_arc.get_id(), new_gate_arc.clone(), gate_origin.clone()));
+                
+                if new_gate_arc.is_composite() {
+                    for sub_id in new_gate_arc.get_inner_gate_ids() {
+                        updates.push((sub_id, new_gate_arc.clone(), gate_origin.clone()));
                     }
                 }
+
+                if new_gate_arc.is_primary(){
+                    return_list.push(new_gate_arc)
+                }
+                
             }
         }
         self.gate_store().with_mut(|s| {
             
-            for (k, v) in updates{
-                // s.primary_and_subgate_registry.insert(k.clone(), v.clone());
-                s.gate_resolver.active_gates.insert(k.clone(), v.clone());
-                // do group and sample overrides?
+            for (k, v, o) in updates{
+                match &o {
+                        GateSource::Global => {
+                            s
+                                .primary_and_subgate_registry
+                                .insert(k.clone(), v.clone());
+                        }
+                        GateSource::Group(k) => {
+                            s
+                                .group_position_overrides
+                                .insert(k.clone(), v.clone());
+                        }
+                        GateSource::Sample(k) => {
+                            s
+                                .sample_position_overrides
+                                .insert(k.clone(), v.clone());
+                        }
+                    }
+                s.gate_resolver.active_gates.insert(k, v);
+                
             }
 
         });
 
-        return Ok(());
+        return Ok(return_list);
+
+        // return Some(gate_list);
     }
+
+    // fn match_gates_to_plot<T>(
+    //     &mut self,
+    //     x_axis_title: T,
+    //     y_axis_title: T,
+    //     parental_gate_id: Option<T>,
+
+    // ) -> anyhow::Result<Vec<Arc<dyn DrawableGate>>>
+    // where
+    //     T: Into<GateId> + Clone
+    //      {
+    //     let key = GatesOnPlotKey::new(x_axis_title.clone().into(), y_axis_title.into(), parental_gate_id.map(|id| id.into()));
+    //     let ids = self.gate_ids_by_view().get(key)
+    //         .map(|ks| ks.read().clone())
+    //         .ok_or_else(|| anyhow::anyhow!("No keys found"))?;
+    //     let mut updates = Vec::new();
+    //     let mut return_list = Vec::new();
+    //     {   
+    //         let resolver_bind = self.gate_store().gate_resolver();
+    //         let resolver = resolver_bind.peek();
+    //         for k in ids {
+    //             let Some(new_gate) = resolver.resolve_drawable(&k)?.match_to_plot_axis(&x_axis_title.into(), &y_axis_title.into())? else {continue};
+    //             let new_gate_arc: Arc<dyn DrawableGate> = Arc::from(new_gate);
+    //             let gate_origin = resolver
+    //                 .gate_origins
+    //                 .get(&k)
+    //                 .ok_or_else(|| anyhow!("error finding gate source for {}", &k))?
+    //                 .clone();
+
+    //             updates.push((new_gate_arc.get_id(), new_gate_arc.clone(), gate_origin.clone()));
+                
+    //             if new_gate_arc.is_composite() {
+    //                 for sub_id in new_gate_arc.get_inner_gate_ids() {
+    //                     updates.push((sub_id, new_gate_arc.clone(), gate_origin.clone()));
+    //                 }
+    //             }
+
+    //             if new_gate_arc.is_primary(){
+    //                 return_list.push(new_gate_arc)
+    //             }
+                
+    //         }
+    //     }
+    //     self.gate_store().with_mut(|s| {
+            
+    //         for (k, v, o) in updates{
+    //             match &o {
+    //                     GateSource::Global => {
+    //                         s
+    //                             .primary_and_subgate_registry
+    //                             .insert(k.clone(), v.clone());
+    //                     }
+    //                     GateSource::Group(k) => {
+    //                         s
+    //                             .group_position_overrides
+    //                             .insert(k.clone(), v.clone());
+    //                     }
+    //                     GateSource::Sample(k) => {
+    //                         s
+    //                             .sample_position_overrides
+    //                             .insert(k.clone(), v.clone());
+    //                     }
+    //                 }
+    //             s.gate_resolver.active_gates.insert(k, v);
+                
+    //         }
+
+    //     });
+
+    //     return Ok(return_list);
+    // }
 
     fn rescale_gates(
         &mut self,

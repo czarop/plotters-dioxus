@@ -78,13 +78,13 @@ pub fn GateLayer(
     let mut drag_data = use_signal(|| Option::<GateDragType>::None);
     use_context_provider::<Signal<Option<GateDragType>>>(|| drag_data);
 
-    use_effect(move || {
-        let x_param = x_channel();
-        let y_param = y_channel();
-        let _ = gate_store
-            .match_gates_to_plot(x_param, y_param, parental_gate_id.peek().clone())
-            .inspect_err(|e| println!("{}", e.to_string()));
-    });
+    // use_effect(move || {
+    //     let x_param = x_channel();
+    //     let y_param = y_channel();
+    //     let _ = gate_store
+    //         .match_gates_to_plot(x_param, y_param, parental_gate_id.peek().clone())
+    //         .inspect_err(|e| println!("{}", e.to_string()));
+    // });
 
     // the list of finalised gates
     // use_effect(move || {
@@ -100,7 +100,7 @@ pub fn GateLayer(
         let x_key = x_channel.read().clone();
         let y_key = y_channel.read().clone();
         let event_index_option = plot_store.event_index_map()();
-        if let Some(gates_on_plot) = gate_store.get_gates_for_plot(x_key, y_key, parental_gate_id())
+        if let Ok(gates_on_plot) = gate_store.get_gates_for_plot(x_key, y_key, parental_gate_id())
         {
             if let Some(event_index_map) = event_index_option {
                 let join_result = tokio::task::spawn_blocking(move || -> anyhow::Result<FxHashMap<Arc<str>, GateStats>> {
