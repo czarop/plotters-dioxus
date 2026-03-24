@@ -52,12 +52,22 @@ pub fn GateLayer(
 
     let plot_store = use_context::<Store<PlotStore>>();
 
-    // let mut gates = use_signal(|| Vec::<Arc<dyn DrawableGate>>::new());
     let gates = use_memo(move || {
-    let g = gate_store.get_gates_for_plot(x_channel(), y_channel(), parental_gate_id())
-        .unwrap_or_default();
-    GateList(g)
-});
+        println!("fetching gates");
+        let(x, y, parent) = (x_channel(), y_channel(), parental_gate_id());
+        let g = gate_store.get_gates_for_plot(x, y, parent)
+            .unwrap_or_default();
+        GateList(g)
+    });
+
+    use_effect(move || {
+        println!("matching gates to plot");
+        let(x, y, parent) = (x_channel(), y_channel(), parental_gate_id());
+        let _ = plot_store.current_file_id();
+        let _ = gate_store
+                .match_gates_to_plot(x.clone(), y.clone(), parent.clone())
+                .inspect_err(|e| println!("{}", e.to_string()));
+    });
 
     // convert clicked coords into a draft gate
     let draft_gate = use_memo(move || {
@@ -81,9 +91,8 @@ pub fn GateLayer(
     // use_effect(move || {
     //     let x_param = x_channel();
     //     let y_param = y_channel();
-    //     let _ = gate_store
-    //         .match_gates_to_plot(x_param, y_param, parental_gate_id.peek().clone())
-    //         .inspect_err(|e| println!("{}", e.to_string()));
+
+        
     // });
 
     // the list of finalised gates
@@ -176,19 +185,15 @@ pub fn GateLayer(
                                 let draft_gate = &*draft_gate.peek();
 
                                 if draft_gate.is_none() && drag_data.is_none() {
-                                    println!("1");
                                     clicked_gate = was_gate_clicked((norm_x, norm_y), &mapper, gates);
                                 }
                                 if clicked_gate.is_none() {
-                                    println!("2");
 
                                     if selected_gate_op.is_none() {
-                                        println!("3");
                                         if &PrimaryGateType::Polygon == current_gate_type {
                                             draft_gate_coords.write().push((data_x, data_y));
                                         }
                                     } else if drag_data.is_none() {
-                                        println!("4");
                                         gate_store.selected_gate().set(None);
                                         dbl_click_lockout.set(true);
                                         spawn(async move {
@@ -197,7 +202,6 @@ pub fn GateLayer(
                                         });
                                     }
                                 } else {
-                                    println!("5");
                                     let closest_gate = clicked_gate.unwrap();
                                     let gate_id = closest_gate.get_id().clone();
                                     gate_store.selected_gate().set(Some(gate_id.clone()));

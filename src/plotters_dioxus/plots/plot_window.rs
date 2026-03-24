@@ -375,7 +375,7 @@ pub fn PlotWindow() -> Element {
                                                     )
                                                 {
                                                     Ok(_) => {}
-                                                    Err(e) => println!("{e}"),
+                                                    Err(e) => println!("{:#?}", e),
                                                 };
                                             }
                                             Err(e) => println!("{e}"),
@@ -403,7 +403,7 @@ pub fn PlotWindow() -> Element {
                                                     )
                                                 {
                                                     Ok(_) => {}
-                                                    Err(e) => println!("{e}"),
+                                                    Err(e) => println!("{:#?}", e),
                                                 };
                                             }
                                             Err(e) => println!("{e}"),
@@ -475,7 +475,7 @@ pub fn PlotWindow() -> Element {
                                                     )
                                                 {
                                                     Ok(_) => {}
-                                                    Err(e) => println!("{e}"),
+                                                    Err(e) => println!("{:#?}", e),
                                                 };
                                             }
                                             Err(e) => println!("{e}"),
@@ -503,7 +503,7 @@ pub fn PlotWindow() -> Element {
                                                     )
                                                 {
                                                     Ok(_) => {}
-                                                    Err(e) => println!("{e}"),
+                                                    Err(e) => println!("{:#?}", e),
                                                 };
                                             }
                                             Err(e) => println!("{e}"),
@@ -551,7 +551,7 @@ pub fn PlotWindow() -> Element {
                             }
                             None => rsx! {},
                         }
-
+                    
                     }
                 }
                 div { class: "status-message",
@@ -590,7 +590,7 @@ pub fn PlotWindow() -> Element {
                     }
 
                 }
-
+            
             }
         }
     }
