@@ -1,5 +1,12 @@
 Gates:
 
+gateresolver should not be a part of the store and should not be a store.
+the gatestore has a method, - its current set_current_file method except it RETURNS a gatestore.
+This method watches the 3 gate_maps
+The gate_layer holds its own resolver in a use_memo and queries it for plots
+On plot updates the resolver is a middleman that knows the origin map of the gate
+This does mean the whole resolver is remade on each gate move etc but its relatively quick
+
 
 Allow choosing other gates at the same level for AND and OR
 stats for boolean gates??
@@ -14,9 +21,8 @@ Meta:
 
 Metadata
 Metadata Groups
-Metadata-specific Gating
 Set Metadata from FCS or Omiq
-Sample-specific gating - use another resolver in the gate filtering 
+
 
 Paired samples (FMX FS)
 

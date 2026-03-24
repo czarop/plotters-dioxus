@@ -90,43 +90,64 @@ pub enum GateSource {
     Sample((GateId, FileId)),
 }
 
+pub type GroupGateMap = im::HashMap<(GateId, GroupId), Arc<dyn DrawableGate>, rustc_hash::FxBuildHasher>;
+pub type SampleGateMap = im::HashMap<(GateId, FileId), Arc<dyn DrawableGate>, rustc_hash::FxBuildHasher>;
+
 #[derive(Default, Store)]
 struct GateSubStore {
     pub gate_resolver: GateOverrideResolver,
     pub primary_and_subgate_registry: GateMap,
-    pub sample_position_overrides:
-        im::HashMap<(GateId, FileId), Arc<dyn DrawableGate>, rustc_hash::FxBuildHasher>,
-    pub group_position_overrides:
-        im::HashMap<(GateId, GroupId), Arc<dyn DrawableGate>, rustc_hash::FxBuildHasher>,
+    pub sample_position_overrides: SampleGateMap,
+    pub group_position_overrides: GroupGateMap,
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Store)]
 pub struct GateOverrideResolver {
     pub active_gates: im::HashMap<GateId, Arc<dyn DrawableGate>, FxBuildHasher>,
     pub gate_origins: im::HashMap<GateId, GateSource, FxBuildHasher>,
 }
 
-// for overides generate a clone of the drawable in new position with the same Uuid
-impl GateOverrideResolver {
-    pub fn resolve(&self, id: &GateId) -> anyhow::Result<Gate> {
-        let drawable = self
-            .active_gates
-            .get(id)
-            .ok_or_else(|| anyhow::anyhow!("Gate {} not found in active set", id))?;
 
-        // Extract the owned data for the background thread
-        drawable
+
+// for overides generate a clone of the drawable in new position with the same Uuid
+// impl GateOverrideResolver {
+#[store(pub name = GateOverrideResolverImplExt)]
+impl<Lens> Store<GateOverrideResolver, Lens> {
+    fn resolve(&self, id: &GateId) -> anyhow::Result<Gate> {
+        self
+            .active_gates()
+            .peek()
+            .get(id)
+            .ok_or_else(|| anyhow::anyhow!("Gate {} not found in active set", id))?
             .get_gate_ref(Some(id))
             .map(|g| g.clone())
             .ok_or_else(|| anyhow::anyhow!("Gate {} has no internal data", id))
     }
 
-    pub fn resolve_drawable(&self, id: &str) -> anyhow::Result<Arc<dyn DrawableGate + 'static>> {
+    fn resolve_drawable(&self, id: &str) -> anyhow::Result<Arc<dyn DrawableGate + 'static>> {
         let drawable = self
-            .active_gates
+            .active_gates()
+            .peek()
             .get(id)
-            .ok_or_else(|| anyhow::anyhow!("Gate {} not found in active set", id))?;
-        Ok(drawable.clone())
+            .ok_or_else(|| anyhow::anyhow!("Gate {} not found in active set", id))?
+            .clone();
+        Ok(drawable)
+    }
+
+    fn resolve_drawable_reactive(&self, id: &str) -> anyhow::Result<Arc<dyn DrawableGate + 'static>> {
+        let drawable = self
+            .active_gates()
+            .read()
+            .get(id)
+            .ok_or_else(|| anyhow::anyhow!("Gate {} not found in active set", id))?
+            .clone();
+        Ok(drawable)
+    }
+
+    fn refresh_self(&mut self, global_gates: &GateMap, group_gates: &GroupGateMap, sample_gates: &SampleGateMap) -> anyhow::Result<()> {
+
+        Ok(())
+
     }
 }
 
@@ -157,6 +178,9 @@ pub struct GateState {
 
 #[store(pub name = GateStateImplExt)]
 impl<Lens> Store<GateState, Lens> {
+
+    
+
     fn set_current_sample(&mut self, file_id: FileId, group_ids: &[GroupId]) -> Result<()> {
         // construct the GateResolver for this file
         let mut active_gates = im::HashMap::with_hasher(FxBuildHasher);
@@ -199,7 +223,6 @@ impl<Lens> Store<GateState, Lens> {
     fn get_gate_by_id(&self, id: GateId) -> Option<Arc<dyn DrawableGate>> {
         self.gate_store()
             .gate_resolver()
-            .peek()
             .resolve_drawable(&id)
             .ok()
     }
@@ -500,18 +523,17 @@ impl<Lens> Store<GateState, Lens> {
         new_point: (f32, f32),
         plot_map: &PlotMapper,
     ) -> anyhow::Result<()> {
-        let resolver_binding = self.gate_store().gate_resolver();
-        let resolver = resolver_binding.peek();
+        let resolver = self.gate_store().gate_resolver();
         let new_gate = resolver
             .resolve_drawable(&gate_id)?
             .replace_point(new_point, point_idx, plot_map)?;
         let new_gate_arc: Arc<dyn DrawableGate> = Arc::from(new_gate);
         let gate_origin = resolver
-            .gate_origins
+            .gate_origins()
+            .peek()
             .get(&gate_id)
             .ok_or_else(|| anyhow!("error finding gate source for {}", &gate_id))?
             .clone();
-        drop(resolver);
 
         let ids_to_update = if new_gate_arc.is_composite() {
             let mut ids = new_gate_arc.get_inner_gate_ids();
@@ -551,18 +573,18 @@ impl<Lens> Store<GateState, Lens> {
 
     fn move_gate(&mut self, gate_drag_data: GateDragData) -> Result<()> {
         let gate_id = gate_drag_data.gate_id();
-        let resolver_binding = self.gate_store().gate_resolver();
-        let resolver = resolver_binding.peek();
+        let resolver = self.gate_store().gate_resolver();
+
         let new_gate = resolver
             .resolve_drawable(&gate_id)?
             .replace_points(gate_drag_data)?;
 
         let gate_origin = resolver
-            .gate_origins
+            .gate_origins()
+            .peek()
             .get(&gate_id)
             .ok_or_else(|| anyhow!("error finding gate source for {}", &gate_id))?
             .clone();
-        drop(resolver);
 
         if let Some(new_gate) = new_gate {
             let new_gate_arc: Arc<dyn DrawableGate> = Arc::from(new_gate);
@@ -604,14 +626,15 @@ impl<Lens> Store<GateState, Lens> {
     }
 
     fn rotate_gate(&mut self, gate_id: GateId, current_position: (f32, f32)) -> anyhow::Result<()> {
-        let resolver_binding = self.gate_store().gate_resolver();
-        let resolver = resolver_binding.peek();
+        let resolver = self.gate_store().gate_resolver();
+
         let new_gate = resolver
             .resolve_drawable(&gate_id)?
             .rotate_gate(current_position)?;
 
         let gate_origin = resolver
-            .gate_origins
+            .gate_origins()
+            .peek()
             .get(&gate_id)
             .ok_or_else(|| anyhow!("error finding gate source for {}", &gate_id))?
             .clone();
@@ -674,9 +697,8 @@ impl<Lens> Store<GateState, Lens> {
         if let Some(key_store) = key_options {
             let ids = key_store.read().clone();
             let registry = self.gate_store().gate_resolver();
-            let registry_guard = registry.read();
             for k in ids {
-                if let Ok(gate_store_entry) = registry_guard.resolve_drawable(&k) {
+                if let Ok(gate_store_entry) = registry.resolve_drawable_reactive(&k) {
                     if gate_store_entry.is_primary() {
                         gate_list.push(gate_store_entry.clone());
                     }
@@ -707,13 +729,14 @@ impl<Lens> Store<GateState, Lens> {
             let key_bind = self.gate_ids_by_view();
             let kbp = &*key_bind.peek();
             let Some(ids) = kbp.get(&key) else {return Err(anyhow::anyhow!("No keys found"))};
-            let resolver_bind = self.gate_store().gate_resolver();
-            let resolver = resolver_bind.peek();
+            let resolver = self.gate_store().gate_resolver();
+
             for k in ids {
                 let Some(new_gate) = resolver.resolve_drawable(k)?.match_to_plot_axis(&x, &y)? else {continue};
                 let new_gate_arc: Arc<dyn DrawableGate> = Arc::from(new_gate);
                 let gate_origin = resolver
-                    .gate_origins
+                    .gate_origins()
+                    .peek()
                     .get(k)
                     .ok_or_else(|| anyhow!("error finding gate source for {}", k))?
                     .clone();
