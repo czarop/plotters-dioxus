@@ -6,7 +6,7 @@ use flow_gates::{
     EventIndex,
     transforms::{get_plotting_area, pixel_to_raw, pixel_to_raw_y, raw_to_pixel, raw_to_pixel_y},
 };
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxBuildHasher, FxHashMap};
 use std::{
     ops::RangeInclusive,
     sync::{Arc, RwLock},
@@ -202,15 +202,26 @@ impl PartialEq for EventIndexMapped {
     }
 }
 
+
 #[derive(Default, Store, Clone)]
 pub struct PlotStore {
     pub current_file_id: FileId,
-    pub settings: FxHashMap<Arc<str>, AxisInfo>,
     pub event_index_map: Option<EventIndexMapped>,
+    // current settings ordered by the current sample
+    
 }
 
-#[store(pub name = PlotStoreImplExt)]
-impl<Lens> Store<PlotStore, Lens> {
+
+#[derive(Default, Clone, Store)]
+pub struct AxisStore {
+    // all settings
+    pub settings: FxHashMap<Arc<str>, AxisInfo>,
+    //current file's param names listed by file's internal order
+    pub sorted_settings: indexmap::IndexSet<Arc<str>, FxBuildHasher>,
+}
+
+#[store(pub name = AxisStoreImplExt)]
+impl<Lens> Store<AxisStore, Lens> {
     fn add_new_axis_settings(&mut self, p: &Param, fcs_file: &flow_fcs::Fcs) {
         self.settings()
             .write()

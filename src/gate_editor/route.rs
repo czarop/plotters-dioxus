@@ -1,11 +1,12 @@
 use crate::gate_editor::plots::plot_window::PlotWindow;
+use crate::gate_editor::main_window::MainWindow;
 use dioxus::prelude::*;
 
 #[derive(Routable, Clone, PartialEq)]
 pub enum Route {
     #[layout(NavBar)]
     #[route("/")]
-    PlotWindow,
+    MainWindow,
     // #[route("/scale")]
     // ScaleWindow,
 
@@ -30,7 +31,7 @@ pub fn NavBar() -> Element {
                 div { class: "nav_bar-items",
 
                     div {
-                        Link { to: Route::PlotWindow,
+                        Link { to: Route::MainWindow,
                             div { class: "nav_bar-item", "🏠" }
                         }
                     }
@@ -38,7 +39,7 @@ pub fn NavBar() -> Element {
                     div {
                         div { class: "nav_bar-item", "|" }
                     }
-
+                
                 // div {
                 //     if geolocation::check_geolocation_permission() == PermissionResult::GRANTED {
                 //         Link { to: route::Route::LocationMap,

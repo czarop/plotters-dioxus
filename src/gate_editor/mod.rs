@@ -5,3 +5,4 @@ pub mod route;
 pub use axis_info::AxisInfo;
 pub mod gate_sidebar;
 pub mod plots;
+pub mod main_window;

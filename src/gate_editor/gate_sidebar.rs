@@ -1,7 +1,7 @@
 use crate::components::context_menu::*;
 use crate::gate_editor::gates::GateState;
 use crate::gate_editor::gates::gate_store::{GateStateImplExt, GateStateStoreExt, ROOTGATE};
-use crate::gate_editor::plots::parameters::{Param, PlotStore, PlotStoreStoreExt};
+use crate::gate_editor::plots::parameters::{AxisStore, Param, AxisStoreStoreExt};
 use dioxus::prelude::*;
 use dioxus::stores::SyncStore;
 use std::sync::Arc;
@@ -37,7 +37,7 @@ pub fn GateSidebar(
                         }
                     }
                 }
-
+            
             }
         }
     }
@@ -69,7 +69,7 @@ fn GateNode(
     y_axis_param: Signal<Param>,
 ) -> Element {
     let mut gate_store = use_context::<SyncStore<GateState>>();
-    let param_store: Store<PlotStore> = use_context::<Store<PlotStore>>();
+    let param_store: Store<AxisStore> = use_context::<Store<AxisStore>>();
     let mut is_expanded = use_signal(|| true);
 
     // Fetch children
@@ -212,7 +212,7 @@ fn GateNode(
                             },
                             "🎯"
                         }
-
+                    
                     }
 
                     // 4. The Children (Recursive call)
@@ -329,7 +329,7 @@ fn GateNode(
                     "Add OR Gate"
                 }
             }
-
+        
         }
     }
 }

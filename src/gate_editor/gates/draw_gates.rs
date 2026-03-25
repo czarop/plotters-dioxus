@@ -1,5 +1,6 @@
 use crate::gate_editor::gates::gate_store::{FileId, GateOverrideResolver, GateStateStoreExt};
-use crate::gate_editor::plots::parameters::PlotStoreStoreExt;
+use crate::gate_editor::plots::parameters::{AxisStore, PlotStoreStoreExt};
+use crate::gate_editor::plots::parameters::AxisStoreStoreExt;
 use crate::gate_editor::{
     gates::{
         GateState,
@@ -42,15 +43,11 @@ pub fn GateLayer(
     x_channel: ReadSignal<Arc<str>>,
     y_channel: ReadSignal<Arc<str>>,
     parental_gate_id: ReadSignal<Option<Arc<str>>>,
-    file_id: FileId
 ) -> Element {
     let plot_map = use_context::<Signal<Option<Arc<PlotMapper>>>>();
 
-    let resolver_store = use_context::<Signal<FxHashMap<FileId, GateOverrideResolver>>>();
+    let resolver = use_context::<Signal<Option<Arc<GateOverrideResolver>>>>();
 
-    let resolver = use_memo(move ||  {
-        resolver_store.get(&file_id).unwrap().clone()
-    });
 
     let mut gate_store = use_context::<SyncStore<GateState>>();
     let mut draft_gate_coords = use_signal(|| Vec::<(f32, f32)>::new());
@@ -58,11 +55,12 @@ pub fn GateLayer(
     let current_gate_type = use_context::<Signal<PrimaryGateType>>();
 
     let plot_store = use_context::<Store<PlotStore>>();
+    let axis_store = use_context::<Store<AxisStore>>();
 
     let gates = use_memo(move || {
-        println!("fetching gates");
+        let Some(resolver) = resolver() else {return GateList(vec![]);};
         let(x, y, parent) = (x_channel(), y_channel(), parental_gate_id());
-        let g = gate_store.get_gates_for_plot(x, y, parent, &*resolver.read())
+        let g = gate_store.get_gates_for_plot(x, y, parent, &resolver)
             .unwrap_or_default();
         GateList(g)
     });
@@ -70,9 +68,10 @@ pub fn GateLayer(
     use_effect(move || {
         println!("matching gates to plot");
         let(x, y, parent) = (x_channel(), y_channel(), parental_gate_id());
+        let Some(resolver) = resolver.peek().clone() else {return;};
         let _ = plot_store.current_file_id();
         let _ = gate_store
-                .match_gates_to_plot(x.clone(), y.clone(), parent.clone(), &resolver())
+                .match_gates_to_plot(x.clone(), y.clone(), parent.clone(), &resolver)
                 .inspect_err(|e| println!("{}", e.to_string()));
     });
 
@@ -115,8 +114,9 @@ pub fn GateLayer(
     let _ = use_resource(move || async move {
         let x_key = x_channel.read().clone();
         let y_key = y_channel.read().clone();
+        let Some(resolver) = resolver() else {return;};
         let event_index_option = plot_store.event_index_map()();
-        if let Ok(gates_on_plot) = gate_store.get_gates_for_plot(x_key, y_key, parental_gate_id(), &resolver())
+        if let Ok(gates_on_plot) = gate_store.get_gates_for_plot(x_key, y_key, parental_gate_id(), &resolver)
         {
             if let Some(event_index_map) = event_index_option {
                 let join_result = tokio::task::spawn_blocking(move || -> anyhow::Result<FxHashMap<Arc<str>, GateStats>> {
@@ -157,8 +157,8 @@ pub fn GateLayer(
     let mut dbl_click_lockout = use_signal(|| false);
     let mut last_processed_pos = use_signal(|| (0.0f32, 0.0f32));
     let mut svg_data: Signal<Option<std::rc::Rc<MountedData>>> = use_signal(|| None);
-    let current_resolver_move = resolver.peek().clone();
-    let current_resolver_up = resolver.peek().clone();
+    let Some(current_resolver_move) = resolver.peek().clone() else {return rsx!{ "No Gate Resolver" }};
+    let Some(current_resolver_up) = resolver.peek().clone() else {return rsx!{ "No Gate Resolver" }};
 
 
     let Some(mapper) = plot_map.read().clone() else {
@@ -249,7 +249,7 @@ pub fn GateLayer(
                     } else {
                         current_gate_type.peek().cloned()
                     };
-                    let x_p = if let Some(x_param) = plot_store
+                    let x_p = if let Some(x_param) = axis_store
                         .settings()
                         .peek()
                         .get(&x_param.clone())
@@ -258,7 +258,7 @@ pub fn GateLayer(
                     } else {
                         None
                     };
-                    let y_p = if let Some(y_param) = plot_store
+                    let y_p = if let Some(y_param) = axis_store
                         .settings()
                         .peek()
                         .get(&y_param.clone())

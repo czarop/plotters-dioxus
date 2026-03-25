@@ -1,12 +1,8 @@
-use crate::FxIndexMap;
 use crate::gate_editor::gates::gate_buttons::NewGateButtons;
-use crate::gate_editor::gates::gate_store::{FileId, GateOverrideResolver};
-use crate::gate_editor::plots::data_helpers::{
-    get_event_mask_from_scaled_df, get_filtered_dataframe, get_flow_data, zip_cols_from_filtered_df,
-};
-use crate::gate_editor::plots::draw_plot::PseudoColourPlot;
-use crate::gate_editor::plots::parameters::EventIndexMapped;
-use crate::searchable_select::{SearchableSelectMap, SearchableSelectSet};
+use crate::gate_editor::plots::parameters::AxisStore;
+use crate::gate_editor::plots::parameters::AxisStoreImplExt;
+use crate::gate_editor::plots::parameters::AxisStoreStoreExt;
+use crate::searchable_select::SearchableSelectSet;
 use crate::{
     file_load::FcsFiles,
     gate_editor::{
@@ -17,20 +13,19 @@ use crate::{
             gate_store::{GateStateImplExt, ROOTGATE},
             gate_types::PrimaryGateType,
         },
-        plots::parameters::{Param, PlotStore, AxisStore, AxisStoreImplExt, AxisStoreStoreExt, PlotStoreStoreExt},
+        plots::parameters::Param,
     },
     searchable_select::SearchableSelectList,
 };
 use dioxus::prelude::*;
 use dioxus::stores::use_store_sync;
-use polars::frame::DataFrame;
 
 use std::sync::Arc;
 
 static CSS_STYLE: Asset = asset!("assets/plot_window.css");
 
 #[component]
-pub fn PlotWindow() -> Element {
+pub fn MainWindow() -> Element {
     let mut filehandler: Signal<Option<FcsFiles>> = use_signal(|| None);
     let mut message = use_signal(|| None::<String>);
     let mut gate_store: Store<GateState, CopyValue<GateState, SyncStorage>> =
@@ -40,9 +35,9 @@ pub fn PlotWindow() -> Element {
     let mut current_gate_type = use_signal(|| PrimaryGateType::Polygon);
     use_context_provider(|| current_gate_type);
 
-    let mut gate_resolver_store: Signal<Option<Arc<GateOverrideResolver>>> = use_signal(|| None);
-    use_context_provider(|| gate_resolver_store);
-    
+    let mut axis_store = use_store(|| AxisStore::default());
+    use_context_provider(|| axis_store);
+
     let _ = use_resource(move || async move {
         let result = (|| -> anyhow::Result<FcsFiles> {
             let content = std::fs::read_to_string("file_paths.txt")?;
@@ -65,157 +60,14 @@ pub fn PlotWindow() -> Element {
 
     let mut sample_index = use_signal(|| 0);
 
-    // c
-    let plot_store = use_store(|| PlotStore::default());
-    use_context_provider(|| plot_store);
-
-    // this should be passed from the parent exentually - global axis settings
-    let mut axis_store = use_store(|| AxisStore::default());
-    use_context_provider(|| axis_store);
-    // let mut axis_store = use_context::<Store<AxisStore>>();
-
-    let current_sample = use_memo(move || {
-        let handler = filehandler.read();
-        let index = *sample_index.read();
-
-        if handler.is_some() {
-            message.set(None);
-            Some(handler.as_ref().unwrap().file_list()[index].clone())
-        } else {
-            message.set(Some("Select working directory to load files".to_string()));
-            None
-        }
-    });
-
-    // RESOURCE 1: Load FCS File
-    let mut fcs_file_resource: Signal<Option<flow_fcs::Fcs>> = use_signal(|| None);
-    let _ = use_resource(move || async move {
-        if let Some(sample) = current_sample() {
-            match get_flow_data(std::path::PathBuf::from(sample.get_filepath())).await {
-                Ok(mut f) => {
-                    f.metadata.insert_string_keyword(
-                        String::from("$GUID"),
-                        uuid::Uuid::new_v4().to_string(),
-                    );
-                    let file_id: crate::gate_editor::gates::gate_store::FileId = f
-                        .metadata
-                        .get_string_keyword("$GUID")
-                        .expect("no guid store in the fcs")
-                        .into();
-                    *plot_store.current_file_id().write() = file_id.clone();
-                    // gate_store
-                    //     .set_current_sample(file_id, &[])
-                    //     .expect("failed to set current sample on gate store");
-                    fcs_file_resource.set(Some(f))
-                }
-                Err(e) => {
-                    fcs_file_resource.set(None);
-                    println!("error generating fcs file {}", e);
-                }
-            }
-        } else {
-            fcs_file_resource.set(None);
-            println!("No file path selected.");
-        }
-    });
-
-    // let sorted_params = use_memo(move || {
-    //     if let Some(fcs_file) = &*fcs_file_resource.read() {
-    //         // pull the parameters from the file
-    //         let mut sorted_params: FxIndexMap<Arc<str>, Param> = fcs_file
-    //             .parameters
-    //             .iter()
-    //             .map(|(_, param)| {
-    //                 let p = Param {
-    //                     marker: param.label_name.clone(),
-    //                     fluoro: param.channel_name.clone(),
-    //                 };
-    //                 // add the parameter to the store if required
-    //                 axis_store.add_new_axis_settings(&p, &fcs_file);
-    //                 (param.channel_name.clone(), p)
-    //             })
-    //             .collect();
-
-    //         sorted_params.sort_by_key(|_, param| {
-    //             fcs_file
-    //                 .parameters
-    //                 .get(param.fluoro.as_ref())
-    //                 .map(|p| p.parameter_number)
-    //                 .unwrap_or(usize::MAX)
-    //         });
-
-    //         sorted_params
-    //     } else {
-    //         FxIndexMap::default()
-    //     }
-    // });
-
-    use_effect(move || {
-        if let Some(fcs_file) = &*fcs_file_resource.read() {
-            let mut sorted_settings = indexmap::IndexSet::with_hasher(rustc_hash::FxBuildHasher::default());
-
-            // 1. Get the parameters and sort them by their internal FCS parameter number once
-            let mut params_to_add: Vec<_> = fcs_file.parameters.values().collect();
-            params_to_add.sort_by_key(|p| p.parameter_number);
-
-            // 2. Iterate and update the store
-            for fcs_param in params_to_add {
-                let p = Param {
-                    marker: fcs_param.label_name.clone(),
-                    fluoro: fcs_param.channel_name.clone(),
-                };
-                
-                // Add settings to the FxHashMap if not present
-                axis_store.add_new_axis_settings(&p, &fcs_file);
-                
-                // Insert into the IndexSet (Order is preserved automatically)
-                sorted_settings.insert(p.fluoro.clone());
-            }
-
-            // 3. Update the store's set
-            *axis_store.sorted_settings().write()= sorted_settings;
-        }
-    });
-
-    // this is currently scaling the data but filtering is done elsewhere!
-    let scaled_data = use_resource(move || async move {
-        let mut params: Vec<(Arc<str>, f32)> = Vec::new();
-        for (k, v) in axis_store.settings().read().iter() {
-            if v.is_arcsinh() {
-                params.push((k.clone(), v.get_cofactor().unwrap()))
-            }
-        }
-
-        if let Some(fcs_file) = &*fcs_file_resource.read() {
-            let fcs_clone = fcs_file.clone();
-            let result =
-                tokio::task::spawn_blocking(move || -> Result<Arc<DataFrame>, anyhow::Error> {
-                    let param_refs: Vec<(&str, f32)> =
-                        params.iter().map(|(k, v)| (k.as_ref(), *v)).collect();
-                    let scaled_df = fcs_clone.apply_arcsinh_transforms(param_refs.as_slice())?;
-                    let df_with_index = scaled_df.with_row_index("original_index".into(), None)?;
-
-                    Ok(Arc::new(df_with_index))
-                })
-                .await;
-
-            match result {
-                Ok(d) => d,
-                Err(_) => Err(anyhow::anyhow!("error scaling data")),
-            }
-        } else {
-            Err(anyhow::anyhow!("No data to scale"))
-        }
-    });
-
-    let mut x_axis_marker: Signal<Param> = use_signal(|| {
+    let x_axis_marker: Signal<Param> = use_signal(|| {
         let p: Arc<str> = Arc::from("FSC-A");
         Param {
             marker: p.clone(),
             fluoro: p,
         }
     });
-    let mut y_axis_marker = use_signal(|| {
+    let y_axis_marker = use_signal(|| {
         let p: Arc<str> = Arc::from("SSC-A");
         Param {
             marker: p.clone(),
@@ -240,127 +92,39 @@ pub fn PlotWindow() -> Element {
         }
     });
 
+    let mut x_axis_marker: Signal<Param> = use_signal(|| {
+        let p: Arc<str> = Arc::from("FSC-A");
+        Param {
+            marker: p.clone(),
+            fluoro: p,
+        }
+    });
+    let mut y_axis_marker = use_signal(|| {
+        let p: Arc<str> = Arc::from("SSC-A");
+        Param {
+            marker: p.clone(),
+            fluoro: p,
+        }
+    });
+
     let x_axis_selected_index = use_memo(move || {
         let curr: Arc<str> = (&*x_axis_marker.read()).fluoro.clone();
-        axis_store.sorted_settings().peek().get_index_of(&curr).unwrap_or(0)
+        axis_store
+            .sorted_settings()
+            .peek()
+            .get_index_of(&curr)
+            .unwrap_or(0)
     });
     let y_axis_selected_index = use_memo(move || {
         let curr: Arc<str> = (&*y_axis_marker.read()).fluoro.clone();
-        axis_store.sorted_settings().peek().get_index_of(&curr).unwrap_or(0)
-    });
-
-    let resolver = use_memo(move || {
-        let id: Arc<str> = plot_store.current_file_id()();
-        match gate_store.get_current_sample(id.clone(), &[]) {
-            Ok(resolver) => {
-                gate_resolver_store.set(Some(Arc::new(resolver.clone())));
-                Ok(resolver)
-            },
-            Err(e) => Err(e),
-        }
-        
-        
+        axis_store
+            .sorted_settings()
+            .peek()
+            .get_index_of(&curr)
+            .unwrap_or(0)
     });
 
     let parental_gate: Signal<Option<Arc<str>>> = use_signal(|| Some(ROOTGATE.clone()));
-
-    let mut plot_data_signal = use_signal(|| vec![]);
-
-    let filtered_dataframe: Resource<std::result::Result<Arc<DataFrame>, anyhow::Error>> =
-        use_resource(move || {
-            let x_fluoro = x_axis_marker.read().fluoro.clone();
-            let y_fluoro = y_axis_marker.read().fluoro.clone();
-            let parental = parental_gate();
-
-            async move {
-                let Ok(resolver) = &*resolver.peek() else {
-                    return Err(anyhow::anyhow!("No resolver"));
-                };
-                if let Some(Ok(d)) = &*scaled_data.read() {
-                    let filtered_data = match get_filtered_dataframe(d.clone(), parental, resolver.clone())
-                        .await
-                    {
-                        Ok(d) => d.clone(),
-                        Err(e) => {
-                            plot_data_signal.set(vec![]);
-                            return Err(anyhow::anyhow!("No data to display {}", e.to_string()));
-                        }
-                    };
-
-                    match zip_cols_from_filtered_df(filtered_data.clone(), x_fluoro, y_fluoro).await
-                    {
-                        Ok(d) => plot_data_signal.set(d),
-                        Err(_) => plot_data_signal.set(vec![]),
-                    };
-
-                    Ok(filtered_data)
-                } else {
-                    plot_data_signal.set(vec![]);
-                    Err(anyhow::anyhow!("No data yet"))
-                }
-            }
-        });
-
-    let event_index = use_resource(move || {
-        let df_arc = match &*filtered_dataframe.read() {
-            Some(Ok(df)) => Some(df.clone()),
-            _ => None,
-        };
-        let x_name = x_axis_marker.read().fluoro.clone();
-        let y_name = y_axis_marker.read().fluoro.clone();
-        async move {
-            let df = match df_arc {
-                Some(d) => d,
-                None => return Ok(None),
-            };
-
-            let join_result =
-                tokio::task::spawn_blocking(move || -> anyhow::Result<EventIndexMapped> {
-                    // Build the R-Tree
-                    let ei = get_event_mask_from_scaled_df(df.clone(), x_name, y_name)
-                        .map_err(|e| anyhow::anyhow!("R-Tree build failed: {e}"))?;
-                    // Extract the mapping
-                    let map: Vec<usize> = df
-                        .column("original_index")?
-                        .u32()?
-                        .into_iter()
-                        .flatten()
-                        .map(|v| v as usize)
-                        .collect();
-                    Ok(EventIndexMapped {
-                        event_index: ei,
-                        index_map: Arc::new(map),
-                    })
-                })
-                .await;
-
-            match join_result {
-                Ok(Ok(index)) => Ok(Some(index)),
-                Ok(Err(e)) => {
-                    println!("{e}");
-                    Err(e)
-                }
-                Err(join_err) => {
-                    println!("{join_err}");
-                    Err(anyhow::anyhow!("Task panicked: {join_err}"))
-                }
-            }
-        }
-    });
-
-    // for the actual gating, we just use df filtering. however for the currently displayed events we use an EventIndex
-    // to get real time % for child gates
-    use_effect(move || {
-        let data = event_index
-            .read()
-            .as_ref()
-            .and_then(|res| res.as_ref().ok())
-            .and_then(|opt| opt.clone());
-
-        *plot_store.event_index_map().write() = data;
-    });
-
-
 
     rsx! {
         document::Stylesheet { href: CSS_STYLE }
@@ -625,55 +389,15 @@ pub fn PlotWindow() -> Element {
                             }
                             None => rsx! {},
                         }
-                    
-                    }
-                }
-                div { class: "status-message",
-                    {
-                        match &*filtered_dataframe.read() {
-                            Some(Ok(_)) => {
-                                rsx! {}
-                            }
-                            Some(Err(e)) => {
-                                rsx! {
-                                    p { class: "error-message", "Error: {e}" }
-                                }
-                            }
-                            None => {
-                                rsx! {
-                                    p { class: "loading-message", "Loading and processing data..." }
-                                }
-                            }
-                        }
+
                     }
                 }
 
-                {
-
-                    rsx! {
-                        div {
-                            NewGateButtons { callback: move |gate_type| current_gate_type.set(gate_type) }
-                            if let Ok(_resolver) = &*resolver.peek() {
-                                {
-                                    println!("re-rendering plot component!");
-                                    rsx! {
-                                        PseudoColourPlot {
-                                            size: (600, 600),
-                                            data: plot_data_signal,
-                                            x_axis_info: x_axis_limits.read().clone(),
-                                            y_axis_info: y_axis_limits.read().clone(),
-                                            parental_gate_id: parental_gate,
-                                        }
-                                    }
-
-                                }
-
-                            }
-                        }
-                    }
+                div {
+                    NewGateButtons { callback: move |gate_type| current_gate_type.set(gate_type) }
 
                 }
-            
+
             }
         }
     }
