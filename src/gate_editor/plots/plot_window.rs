@@ -1,5 +1,6 @@
 use crate::FxIndexMap;
 use crate::gate_editor::gates::gate_buttons::NewGateButtons;
+use crate::gate_editor::gates::gate_store::{FileId, GateOverrideResolver};
 use crate::gate_editor::plots::data_helpers::{
     get_event_mask_from_scaled_df, get_filtered_dataframe, get_flow_data, zip_cols_from_filtered_df,
 };
@@ -23,6 +24,7 @@ use crate::{
 use dioxus::prelude::*;
 use dioxus::stores::use_store_sync;
 use polars::frame::DataFrame;
+use rustc_hash::FxHashMap;
 use std::sync::Arc;
 
 static CSS_STYLE: Asset = asset!("assets/plot_window.css");
@@ -38,6 +40,9 @@ pub fn PlotWindow() -> Element {
     let mut current_gate_type = use_signal(|| PrimaryGateType::Polygon);
     use_context_provider(|| current_gate_type);
 
+    let mut gate_resolver_store: Signal<FxHashMap<FileId, GateOverrideResolver>> = use_signal(|| FxHashMap::default());
+    use_context_provider(|| gate_resolver_store);
+    
     let _ = use_resource(move || async move {
         let result = (|| -> anyhow::Result<FcsFiles> {
             let content = std::fs::read_to_string("file_paths.txt")?;
@@ -212,7 +217,15 @@ pub fn PlotWindow() -> Element {
 
     let resolver = use_memo(move || {
         let id: Arc<str> = plot_store.current_file_id()();
-        gate_store.get_current_sample(id, &[])
+        match gate_store.get_current_sample(id.clone(), &[]) {
+            Ok(resolver) => {
+                gate_resolver_store.insert(id.into(), resolver.clone());
+                Ok(resolver)
+            },
+            Err(e) => Err(e),
+        }
+        
+        
     });
 
     let parental_gate: Signal<Option<Arc<str>>> = use_signal(|| Some(ROOTGATE.clone()));
@@ -226,11 +239,11 @@ pub fn PlotWindow() -> Element {
             let parental = parental_gate();
 
             async move {
-                let Ok(resolver) = resolver() else {
+                let Ok(resolver) = &*resolver.peek() else {
                     return Err(anyhow::anyhow!("No resolver"));
                 };
                 if let Some(Ok(d)) = &*scaled_data.read() {
-                    let filtered_data = match get_filtered_dataframe(d.clone(), parental, resolver)
+                    let filtered_data = match get_filtered_dataframe(d.clone(), parental, resolver.clone())
                         .await
                     {
                         Ok(d) => d.clone(),
@@ -566,7 +579,7 @@ pub fn PlotWindow() -> Element {
                             }
                             None => rsx! {},
                         }
-
+                    
                     }
                 }
                 div { class: "status-message",
@@ -594,21 +607,29 @@ pub fn PlotWindow() -> Element {
                     rsx! {
                         div {
                             NewGateButtons { callback: move |gate_type| current_gate_type.set(gate_type) }
-                            if let Ok(resolver) = resolver() {
-                                PseudoColourPlot {
-                                    size: (600, 600),
-                                    data: plot_data_signal,
-                                    x_axis_info: x_axis_limits.read().clone(),
-                                    y_axis_info: y_axis_limits.read().clone(),
-                                    parental_gate_id: parental_gate,
-                                    resolver,
+                            if let Ok(_resolver) = &*resolver.peek() {
+                                {
+                                    let file_id: Arc<str> = plot_store.current_file_id()();
+                                    println!("re-rendering plot component!");
+                                    rsx! {
+                                        PseudoColourPlot {
+                                            size: (600, 600),
+                                            data: plot_data_signal,
+                                            x_axis_info: x_axis_limits.read().clone(),
+                                            y_axis_info: y_axis_limits.read().clone(),
+                                            parental_gate_id: parental_gate,
+                                            file_id,
+                                        }
+                                    }
+
                                 }
+
                             }
                         }
                     }
 
                 }
-
+            
             }
         }
     }

@@ -13,7 +13,7 @@ use flow_plots::{
     BasePlotOptions, ColorMaps, DensityPlot, DensityPlotOptions, Plot, render::RenderConfig,
 };
 
-use crate::gate_editor::{AxisInfo, gates::draw_gates::GateLayer, plots::parameters::PlotMapper};
+use crate::gate_editor::{AxisInfo, gates::{draw_gates::GateLayer, gate_store::FileId}, plots::parameters::PlotMapper};
 
 pub type DioxusDrawingArea<'a> = DrawingArea<BitMapBackend<'a>, Shift>;
 
@@ -24,13 +24,14 @@ pub fn PseudoColourPlot(
     x_axis_info: ReadSignal<AxisInfo>,
     y_axis_info: ReadSignal<AxisInfo>,
     parental_gate_id: ReadSignal<Option<Arc<str>>>,
-    resolver: crate::gate_editor::gates::gate_store::GateOverrideResolver,
+    file_id: FileId
 ) -> Element {
     let mut plot_image_src = use_signal(|| String::new());
-    let mut plot_map = use_signal(|| None::<PlotMapper>);
-    use_context_provider::<Signal<Option<PlotMapper>>>(|| plot_map);
+    let mut plot_map = use_signal(|| None::<Arc<PlotMapper>>);
+    use_context_provider::<Signal<Option<Arc<PlotMapper>>>>(|| plot_map);
 
     use_effect(move || {
+        println!("re-drawing plot and making mapper!");
         let x_axis_info = x_axis_info();
         let y_axis_info = y_axis_info();
         let (width, height) = size();
@@ -102,7 +103,7 @@ pub fn PseudoColourPlot(
         let base64_str = BASE64_STANDARD.encode(&plot_data);
         plot_image_src.set(format!("data:image/jpeg;base64,{}", base64_str));
 
-        plot_map.set(Some(mapper));
+        plot_map.set(Some(Arc::new(mapper)));
     });
 
     rsx! {
@@ -117,8 +118,8 @@ pub fn PseudoColourPlot(
                 x_channel: x_axis_info().param.fluoro.clone(),
                 y_channel: y_axis_info().param.fluoro.clone(),
                 parental_gate_id,
-                resolver,
-
+                file_id,
+            
             }
         }
     }
