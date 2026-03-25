@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 
-use clingate::plotters_dioxus::route::Route;
+use clingate::gate_editor::route::Route;
 use dioxus::prelude::*;
 
 use dioxus::desktop::{Config, LogicalSize, WindowBuilder};
@@ -21,12 +21,16 @@ fn App() -> Element {
 
 // #[cfg(feature = "desktop")]
 fn main() {
+    unsafe { std::env::set_var("RUST_BACKTRACE", "1") };
     dioxus::LaunchBuilder::new()
         .with_cfg(
-            Config::new().with_window(
+            Config::new()
+            .with_disable_context_menu(true)
+            .with_window(
                 WindowBuilder::new()
                     .with_title("FCS Plot Viewer")
                     .with_inner_size(LogicalSize::new(1500.0, 900.0)),
+                    
             ),
         )
         .launch(App);
