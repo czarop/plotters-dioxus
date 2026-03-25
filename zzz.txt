@@ -1,11 +1,9 @@
 Gates:
 
-gateresolver should not be a part of the store and should not be a store.
-the gatestore has a method, - its current set_current_file method except it RETURNS a gatestore.
-This method watches the 3 gate_maps
-The gate_layer holds its own resolver in a use_memo and queries it for plots
-On plot updates the resolver is a middleman that knows the origin map of the gate
-This does mean the whole resolver is remade on each gate move etc but its relatively quick
+Stats needs to be sample specific 
+Lost scaling & transforms from the fluoro channels
+Lost activation button function - you have not passed poarental_gate signal through to children
+
 
 
 Allow choosing other gates at the same level for AND and OR

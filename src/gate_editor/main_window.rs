@@ -2,6 +2,7 @@ use crate::gate_editor::gates::gate_buttons::NewGateButtons;
 use crate::gate_editor::plots::parameters::AxisStore;
 use crate::gate_editor::plots::parameters::AxisStoreImplExt;
 use crate::gate_editor::plots::parameters::AxisStoreStoreExt;
+use crate::gate_editor::plots::plot_window::PlotWindow;
 use crate::searchable_select::SearchableSelectSet;
 use crate::{
     file_load::FcsFiles,
@@ -389,15 +390,26 @@ pub fn MainWindow() -> Element {
                             }
                             None => rsx! {},
                         }
-
+                    
                     }
                 }
 
                 div {
                     NewGateButtons { callback: move |gate_type| current_gate_type.set(gate_type) }
-
+                    {
+                        if let Some(files) = &*filehandler.read() {
+                            let sample_stub = files.file_list()[sample_index()].clone();
+                            let sample_stub2 = files.file_list()[sample_index() + 1].clone();
+                            rsx! {
+                                PlotWindow { sample_stub, x_axis_marker, y_axis_marker }
+                                PlotWindow { sample_stub: sample_stub2, x_axis_marker, y_axis_marker }
+                            }
+                        } else {
+                            rsx! { "No directory selected" }
+                        }
+                    }
                 }
-
+            
             }
         }
     }
