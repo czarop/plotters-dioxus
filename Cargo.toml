@@ -23,6 +23,8 @@ polars = {version = "0.53", default-features = false, features = ["lazy", "perfo
 rayon = "1"
 im = "15"
 uuid = { version = "1.0", features = ["v4"] }
+serde = {version = "1"}
+serde_json = "1"
 
 [features]
 default = ["desktop"]
