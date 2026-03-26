@@ -1,4 +1,4 @@
-use crate::gate_editor::plots::plot_window::PlotWindow;
+
 use crate::gate_editor::main_window::MainWindow;
 use dioxus::prelude::*;
 

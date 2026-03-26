@@ -25,7 +25,6 @@ use polars::frame::DataFrame;
 
 use std::sync::Arc;
 
-static CSS_STYLE: Asset = asset!("assets/plot_window.css");
 
 #[component]
 pub fn PlotWindow(
@@ -260,55 +259,52 @@ pub fn PlotWindow(
 
 
     rsx! {
-        document::Stylesheet { href: CSS_STYLE }
 
-        div { class: "gate-window",
-
-            div { class: "status-message",
-                {
-                    match &*filtered_dataframe.read() {
-                        Some(Ok(_)) => {
-                            rsx! {}
-                        }
-                        Some(Err(e)) => {
-                            rsx! {
-                                p { class: "error-message", "Error: {e}" }
-                            }
-                        }
-                        None => {
-                            rsx! {
-                                p { class: "loading-message", "Loading and processing data..." }
-                            }
-                        }
-                    }
-                }
-            }
-
+        div { class: "status-message",
             {
-
-                rsx! {
-                    div {
-
-                        if let Ok(_resolver) = &*resolver.peek() {
-                            {
-                                println!("re-rendering plot component!");
-                                rsx! {
-                                    PseudoColourPlot {
-                                        size: (600, 600),
-                                        data: plot_data_signal,
-                                        x_axis_info: x_axis_limits.read().clone(),
-                                        y_axis_info: y_axis_limits.read().clone(),
-                                        parental_gate_id: parental_gate,
-                                    }
-                                }
-
-                            }
-
+                match &*filtered_dataframe.read() {
+                    Some(Ok(_)) => {
+                        rsx! {}
+                    }
+                    Some(Err(e)) => {
+                        rsx! {
+                            p { class: "error-message", "Error: {e}" }
+                        }
+                    }
+                    None => {
+                        rsx! {
+                            p { class: "loading-message", "Loading and processing data..." }
                         }
                     }
                 }
-
             }
         }
+
+        {
+
+            rsx! {
+                div {
+
+                    if let Ok(_resolver) = &*resolver.peek() {
+                        {
+                            println!("re-rendering plot component!");
+                            rsx! {
+                                PseudoColourPlot {
+                                    size: (600, 600),
+                                    data: plot_data_signal,
+                                    x_axis_info: x_axis_limits.read().clone(),
+                                    y_axis_info: y_axis_limits.read().clone(),
+                                    parental_gate_id: parental_gate,
+                                }
+                            }
+
+                        }
+
+                    }
+                }
+            }
+
+        }
     }
+    
 }

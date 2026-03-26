@@ -5,17 +5,11 @@ use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use dioxus::prelude::*;
 
-use plotters::coord::Shift;
-use plotters::prelude::*;
-use plotters_bitmap::BitMapBackend;
-
 use flow_plots::{
-    BasePlotOptions, ColorMaps, DensityPlot, DensityPlotOptions, Plot, render::RenderConfig,
+    BasePlotOptions, ColorMaps, DensityPlot, DensityPlotOptions, Plot, render::RenderConfig
 };
 
-use crate::gate_editor::{AxisInfo, gates::{draw_gates::GateLayer, gate_store::FileId}, plots::axis_store::PlotMapper};
-
-pub type DioxusDrawingArea<'a> = DrawingArea<BitMapBackend<'a>, Shift>;
+use crate::gate_editor::{AxisInfo, gates::{draw_gates::GateLayer}, plots::axis_store::PlotMapper};
 
 #[component]
 pub fn PseudoColourPlot(
@@ -25,45 +19,44 @@ pub fn PseudoColourPlot(
     y_axis_info: ReadSignal<AxisInfo>,
     parental_gate_id: ReadSignal<Option<Arc<str>>>,
 ) -> Element {
-    let mut plot_image_src = use_signal(|| String::new());
+    // let mut plot_image_src = use_signal(|| String::new());
     let mut plot_map = use_signal(|| None::<Arc<PlotMapper>>);
     use_context_provider::<Signal<Option<Arc<PlotMapper>>>>(|| plot_map);
 
-    use_effect(move || {
-        println!("re-drawing plot and making mapper!");
+    let render_result = use_resource(move || { 
+
+        async move {
         let x_axis_info = x_axis_info();
         let y_axis_info = y_axis_info();
         let (width, height) = size();
-        let data = data.clone();
+        let data = data.clone()();
 
+        let result = tokio::task::spawn_blocking(move || -> Result<(String, Arc<PlotMapper>), anyhow::Error> {
         let plot = DensityPlot::new();
         let base_options = BasePlotOptions::new()
             .width(width)
             .height(height)
             .title("My Density Plot")
-            .build()
-            .expect("shouldn't fail");
+            // .show_colorbar(false)
+            .build()?;
 
         let x_axis_options = flow_plots::AxisOptions::new()
             .range(x_axis_info.axis_lower..=x_axis_info.axis_upper)
             .transform(x_axis_info.transform.clone())
             .label(&x_axis_info.param.to_string())
-            .build()
-            .expect("axis options failed");
+            .build()?;
         let y_axis_options = flow_plots::AxisOptions::new()
             .range(y_axis_info.axis_lower..=y_axis_info.axis_upper)
             .transform(y_axis_info.transform.clone())
             .label(y_axis_info.param.to_string())
-            .build()
-            .expect("axis options failed");
+            .build()?;
 
         let actual_ranges = flow_plots::create_axis_specs(
             &x_axis_options.range,
             &y_axis_options.range,
             &x_axis_info.transform,
             &y_axis_info.transform,
-        )
-        .expect("should not fail");
+        )?;
 
         let (inc_x, inc_y) = {
             (
@@ -86,39 +79,70 @@ pub fn PseudoColourPlot(
         );
         let options = DensityPlotOptions::new()
             .base(base_options)
+            // .plot_type(PlotType::Density)
             .colormap(ColorMaps::Jet)
             .x_axis(x_axis_options)
             .y_axis(y_axis_options)
             .point_size(0.35)
-            .build()
-            .expect("shouldn't fail");
+            .build()?;
 
         let mut render_config = RenderConfig::default();
-
+        let data_final: flow_plots::ScatterPlotData = data.into();
         let plot_data = plot
-            .render(data().into(), &options, &mut render_config)
-            .expect("failed to render plot");
+            .render(data_final, &options, &mut render_config)?;
 
         let base64_str = BASE64_STANDARD.encode(&plot_data);
-        plot_image_src.set(format!("data:image/jpeg;base64,{}", base64_str));
+        Ok((format!("data:image/jpeg;base64,{}", base64_str), Arc::new(mapper)))
+    }).await;
 
-        plot_map.set(Some(Arc::new(mapper)));
-    });
+    match result{
+        Ok(r) => r,
+        Err(e) => Err(anyhow::anyhow!("Failed to generate plot {}", e)),
+    }
+
+
+} });
+
 
     rsx! {
-        div { style: "position: relative; width: {size().0}px; height: {size().1}px;",
-            img {
-                style: "user-select: none; -webkit-user-select: none;",
-                src: "{plot_image_src()}",
-                width: "{size().0}",
-                height: "{size().1}",
+        match &*render_result.read() {
+            Some(Ok((data, map))) => {
+                plot_map.set(Some(map.clone()));
+                let size = size();
+                rsx! {
+                    div { style: "position: relative; width: {size.0}px; height: {size.1}px;",
+                        img {
+                            style: "user-select: none; -webkit-user-select: none;",
+                            src: "{data}",
+                            width: "{size.0}",
+                            height: "{size.1}",
+                        }
+                        GateLayer {
+                            x_channel: x_axis_info().param.fluoro.clone(),
+                            y_channel: y_axis_info().param.fluoro.clone(),
+                            parental_gate_id,
+
+                        }
+                    }
+                }
+
             }
-            GateLayer {
-                x_channel: x_axis_info().param.fluoro.clone(),
-                y_channel: y_axis_info().param.fluoro.clone(),
-                parental_gate_id,
-            
+            Some(Err(e)) => {
+                rsx! {
+                    {e.to_string()}
+                }
+            }
+            None => {
+                let size = size();
+                let style = format!("width: {}px; height: {}px;", size.0, size.1);
+                rsx! {
+                    div { style, class: "spinner-container",
+                        div { class: "spinner" }
+                        span { style: "margin-top: 10px; font-size: 12px; color: #666;", "Rendering Plot..." }
+                    }
+                }
             }
         }
+
     }
 }

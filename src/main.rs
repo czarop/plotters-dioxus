@@ -6,6 +6,7 @@ use dioxus::prelude::*;
 use dioxus::desktop::{Config, LogicalSize, WindowBuilder};
 
 static NAV_STYLE: Asset = asset!("assets/navbar.css");
+static SPINNER_STYLE: Asset = asset!("assets/spinner.css");
 static COMPONENTS_STYLE: Asset = asset!("assets/dx-components-theme.css");
 static COMPONENTS_STYLE_2: Asset = asset!("assets/searchable_select.css");
 
@@ -62,6 +63,7 @@ fn App() -> Element {
         document::Stylesheet { href: COMPONENTS_STYLE }
         document::Stylesheet { href: COMPONENTS_STYLE_2 }
         document::Stylesheet { href: NAV_STYLE }
+        document::Stylesheet { href: SPINNER_STYLE }
         div { class: "main_div",
             FPSCounter {}
             Router::<Route> {}
@@ -79,7 +81,7 @@ fn main() {
             .with_window(
                 WindowBuilder::new()
                     .with_title("FCS Plot Viewer")
-                    .with_inner_size(LogicalSize::new(1500.0, 900.0)),
+                    .with_inner_size(LogicalSize::new(1600.0, 950.0)),
                     
             ),
         )

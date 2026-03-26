@@ -23,7 +23,7 @@ use dioxus::stores::use_store_sync;
 
 use std::sync::Arc;
 
-static CSS_STYLE: Asset = asset!("assets/plot_window.css");
+static CSS_STYLE: Asset = asset!("assets/main_window.css");
 
 #[component]
 pub fn MainWindow() -> Element {
@@ -382,17 +382,23 @@ pub fn MainWindow() -> Element {
                             let sample_stub = files.file_list()[sample_index()].clone();
                             let sample_stub2 = files.file_list()[sample_index() + 1].clone();
                             rsx! {
-                                PlotWindow {
-                                    sample_stub,
-                                    x_axis_marker,
-                                    y_axis_marker,
-                                    parental_gate,
-                                }
-                                PlotWindow {
-                                    sample_stub: sample_stub2,
-                                    x_axis_marker,
-                                    y_axis_marker,
-                                    parental_gate,
+                                div { class: "gate-window-container",
+                                    div { class: "gate-window",
+                                        PlotWindow {
+                                            sample_stub,
+                                            x_axis_marker,
+                                            y_axis_marker,
+                                            parental_gate,
+                                        }
+                                    }
+                                    div { class: "gate-window",
+                                        PlotWindow {
+                                            sample_stub: sample_stub2,
+                                            x_axis_marker,
+                                            y_axis_marker,
+                                            parental_gate,
+                                        }
+                                    }
                                 }
                             }
                         } else {

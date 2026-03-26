@@ -55,6 +55,14 @@ button:hover {
     gap: 20px;
 }
 
+.gate-window-container{
+    display: flex; 
+    flex-direction: row; 
+    align-items: flex-start;
+    gap: 20px;
+    width: 100%;
+}
+
 .file-info {
     display: flex;
     flex-direction: column;
