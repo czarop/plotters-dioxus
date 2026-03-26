@@ -8,7 +8,7 @@ use crate::gate_editor::{
         gate_traits::DrawableGate,
         gate_types::{self, DEFAULT_LINE, GateRenderShape, GateStats, SELECTED_LINE, ShapeType},
     },
-    plots::parameters::PlotMapper,
+    plots::axis_store::PlotMapper,
 };
 use anyhow::Result;
 use flow_gates::Gate;

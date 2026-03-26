@@ -3,7 +3,7 @@ use std::{f32::INFINITY, sync::Arc};
 use dioxus::prelude::*;
 use flow_fcs::TransformType;
 
-use crate::gate_editor::plots::parameters::Param;
+use crate::gate_editor::plots::axis_store::Param;
 
 pub fn asinh_transform_f32(value: f32, cofactor: f32) -> anyhow::Result<f32> {
     if value.is_nan() || value.is_infinite() {

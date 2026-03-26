@@ -1,13 +1,13 @@
 
 use crate::file_load::FcsSampleStub;
-use crate::gate_editor::gates::gate_buttons::NewGateButtons;
+
 use crate::gate_editor::gates::gate_store::{GateOverrideResolver};
 use crate::gate_editor::plots::data_helpers::{
     get_event_mask_from_scaled_df, get_filtered_dataframe, get_flow_data, zip_cols_from_filtered_df,
 };
 use crate::gate_editor::plots::draw_plot::PseudoColourPlot;
-use crate::gate_editor::plots::parameters::EventIndexMapped;
-use crate::searchable_select::{SearchableSelectSet};
+
+use crate::gate_editor::plots::plot_store::{PlotStore, PlotStoreStoreExt, EventIndexMapped};
 use crate::{
 
     gate_editor::{
@@ -15,9 +15,9 @@ use crate::{
 
         gates::{
             GateState,
-            gate_store::{GateStateImplExt, ROOTGATE},
+            gate_store::{GateStateImplExt},
         },
-        plots::parameters::{Param, PlotStore, AxisStore, AxisStoreImplExt, AxisStoreStoreExt, PlotStoreStoreExt},
+        plots::axis_store::{Param, AxisStore, AxisStoreImplExt, AxisStoreStoreExt},
     },
 };
 use dioxus::prelude::*;
@@ -31,7 +31,8 @@ static CSS_STYLE: Asset = asset!("assets/plot_window.css");
 pub fn PlotWindow(
     sample_stub: ReadSignal<FcsSampleStub>,
     x_axis_marker: ReadSignal<Param>,
-    y_axis_marker: ReadSignal<Param>
+    y_axis_marker: ReadSignal<Param>,
+    parental_gate: ReadSignal<Option<Arc<str>>>
 ) -> Element {
 
 
@@ -89,7 +90,7 @@ pub fn PlotWindow(
                 axis_store.add_new_axis_settings(&p, &fcs_file);
                 
                 // Insert into the IndexSet (Order is preserved automatically)
-                sorted_settings.insert(p.fluoro.clone());
+                sorted_settings.insert(p.clone());
             }
 
             // 3. Update the store's set
@@ -159,8 +160,6 @@ pub fn PlotWindow(
         
         
     });
-
-    let parental_gate: Signal<Option<Arc<str>>> = use_signal(|| Some(ROOTGATE.clone()));
 
     let mut plot_data_signal = use_signal(|| vec![]);
 

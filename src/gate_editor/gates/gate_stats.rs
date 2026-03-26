@@ -7,7 +7,7 @@ use crate::gate_editor::{
         gate_traits::DrawableGate,
         gate_types::{GateStatValue, GateStats},
     },
-    plots::parameters::EventIndexMapped,
+    plots::plot_store::EventIndexMapped,
 };
 
 pub fn get_percent_and_counts_gate(

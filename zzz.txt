@@ -1,13 +1,9 @@
 Gates:
 
-Stats needs to be sample specific 
-Lost scaling & transforms from the fluoro channels
-Lost activation button function - you have not passed poarental_gate signal through to children
-
+gate axis limits 'niceifying' is not working well - it gives too much above the plot. This is a lib feature??
 
 
 Allow choosing other gates at the same level for AND and OR
-stats for boolean gates??
 
 Add filter Cache
 

@@ -14,7 +14,7 @@ use crate::gate_editor::{
         gate_traits::DrawableGate,
         gate_types::{DEFAULT_LINE, GateRenderShape, SELECTED_LINE, ShapeType},
     },
-    plots::parameters::PlotMapper,
+    plots::axis_store::PlotMapper,
 };
 
 type FxIndexMap<K, V> = IndexMap<K, V, FxBuildHasher>;

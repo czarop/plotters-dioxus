@@ -61,7 +61,7 @@ impl DrawableGate for BooleanGate {
         &self,
         _is_selected: bool,
         _drag_point: Option<crate::gate_editor::gates::gate_drag::PointDragData>,
-        _plot_map: &crate::gate_editor::plots::parameters::PlotMapper,
+        _plot_map: &crate::gate_editor::plots::axis_store::PlotMapper,
         _gate_stats: &Option<crate::gate_editor::gates::gate_types::GateStats>,
     ) -> Vec<crate::gate_editor::gates::gate_types::GateRenderShape> {
         vec![]
@@ -83,7 +83,7 @@ impl DrawableGate for BooleanGate {
         &self,
         _point: (f32, f32),
         _tolerance: (f32, f32),
-        _mapper: &crate::gate_editor::plots::parameters::PlotMapper,
+        _mapper: &crate::gate_editor::plots::axis_store::PlotMapper,
     ) -> Option<f32> {
         None
     }
@@ -126,7 +126,7 @@ impl DrawableGate for BooleanGate {
         &self,
         _new_point: (f32, f32),
         _point_index: usize,
-        _plot_map: &crate::gate_editor::plots::parameters::PlotMapper,
+        _plot_map: &crate::gate_editor::plots::axis_store::PlotMapper,
     ) -> anyhow::Result<Box<dyn DrawableGate>> {
         return Ok(self.clone_box());
     }

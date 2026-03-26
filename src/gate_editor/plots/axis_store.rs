@@ -7,10 +7,7 @@ use flow_gates::{
     transforms::{get_plotting_area, pixel_to_raw, pixel_to_raw_y, raw_to_pixel, raw_to_pixel_y},
 };
 use rustc_hash::{FxBuildHasher, FxHashMap};
-use std::{
-    ops::RangeInclusive,
-    sync::{Arc, RwLock},
-};
+use std::{ops::RangeInclusive, sync::Arc};
 
 use crate::gate_editor::{
     AxisInfo,
@@ -167,7 +164,7 @@ impl PlotMapper {
     }
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, Hash)]
 pub struct Param {
     pub marker: Arc<str>,
     pub fluoro: Arc<str>,
@@ -189,35 +186,12 @@ impl std::fmt::Display for Param {
     }
 }
 
-#[derive(Clone)]
-pub struct EventIndexMapped {
-    pub event_index: Arc<EventIndex>,
-    pub index_map: Arc<Vec<usize>>,
-}
-
-impl PartialEq for EventIndexMapped {
-    fn eq(&self, other: &Self) -> bool {
-        Arc::ptr_eq(&self.event_index, &other.event_index)
-            && Arc::ptr_eq(&self.index_map, &other.index_map)
-    }
-}
-
-
-#[derive(Default, Store, Clone)]
-pub struct PlotStore {
-    pub current_file_id: FileId,
-    pub event_index_map: Option<EventIndexMapped>,
-    // current settings ordered by the current sample
-    
-}
-
-
 #[derive(Default, Clone, Store)]
 pub struct AxisStore {
     // all settings
     pub settings: FxHashMap<Arc<str>, AxisInfo>,
     //current file's param names listed by file's internal order
-    pub sorted_settings: indexmap::IndexSet<Arc<str>, FxBuildHasher>,
+    pub sorted_settings: indexmap::IndexSet<Param, FxBuildHasher>,
 }
 
 #[store(pub name = AxisStoreImplExt)]

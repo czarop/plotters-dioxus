@@ -15,7 +15,7 @@ use crate::{
                 ShapeType,
             },
         },
-        plots::parameters::PlotMapper,
+        plots::axis_store::PlotMapper,
     },
 };
 

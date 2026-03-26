@@ -1,7 +1,7 @@
 use crate::gate_editor::gates::gate_buttons::NewGateButtons;
-use crate::gate_editor::plots::parameters::AxisStore;
-use crate::gate_editor::plots::parameters::AxisStoreImplExt;
-use crate::gate_editor::plots::parameters::AxisStoreStoreExt;
+use crate::gate_editor::plots::axis_store::AxisStore;
+use crate::gate_editor::plots::axis_store::AxisStoreImplExt;
+use crate::gate_editor::plots::axis_store::AxisStoreStoreExt;
 use crate::gate_editor::plots::plot_window::PlotWindow;
 use crate::searchable_select::SearchableSelectSet;
 use crate::{
@@ -14,7 +14,7 @@ use crate::{
             gate_store::{GateStateImplExt, ROOTGATE},
             gate_types::PrimaryGateType,
         },
-        plots::parameters::Param,
+        plots::axis_store::Param,
     },
     searchable_select::SearchableSelectList,
 };
@@ -61,14 +61,14 @@ pub fn MainWindow() -> Element {
 
     let mut sample_index = use_signal(|| 0);
 
-    let x_axis_marker: Signal<Param> = use_signal(|| {
+    let mut x_axis_marker: Signal<Param> = use_signal(|| {
         let p: Arc<str> = Arc::from("FSC-A");
         Param {
             marker: p.clone(),
             fluoro: p,
         }
     });
-    let y_axis_marker = use_signal(|| {
+    let mut y_axis_marker = use_signal(|| {
         let p: Arc<str> = Arc::from("SSC-A");
         Param {
             marker: p.clone(),
@@ -93,35 +93,20 @@ pub fn MainWindow() -> Element {
         }
     });
 
-    let mut x_axis_marker: Signal<Param> = use_signal(|| {
-        let p: Arc<str> = Arc::from("FSC-A");
-        Param {
-            marker: p.clone(),
-            fluoro: p,
-        }
-    });
-    let mut y_axis_marker = use_signal(|| {
-        let p: Arc<str> = Arc::from("SSC-A");
-        Param {
-            marker: p.clone(),
-            fluoro: p,
-        }
-    });
-
     let x_axis_selected_index = use_memo(move || {
-        let curr: Arc<str> = (&*x_axis_marker.read()).fluoro.clone();
+        let curr = &*x_axis_marker.read();
         axis_store
             .sorted_settings()
             .peek()
-            .get_index_of(&curr)
+            .get_index_of(curr)
             .unwrap_or(0)
     });
     let y_axis_selected_index = use_memo(move || {
-        let curr: Arc<str> = (&*y_axis_marker.read()).fluoro.clone();
+        let curr = &*y_axis_marker.read();
         axis_store
             .sorted_settings()
             .peek()
-            .get_index_of(&curr)
+            .get_index_of(curr)
             .unwrap_or(0)
     });
 
@@ -145,11 +130,8 @@ pub fn MainWindow() -> Element {
                         div { class: "grid-label", "X-Axis" }
                         SearchableSelectSet {
                             items: axis_store.sorted_settings(),
-                            on_select: move |(_, k): (_, Arc<str>)| {
-                                if let Some(axis) = axis_store.settings().peek().get(&k.clone()) {
-                                    x_axis_marker.set(axis.param.clone());
-                                }
-
+                            on_select: move |(_, k): (_, Param)| {
+                                x_axis_marker.set(k.clone());
                             },
                             placeholder: x_axis_marker.peek().to_string(),
                             selected_index: Some(x_axis_selected_index.into()),
@@ -250,11 +232,10 @@ pub fn MainWindow() -> Element {
                         div { class: "grid-label", "Y-Axis" }
                         SearchableSelectSet {
                             items: axis_store.sorted_settings(),
-                            on_select: move |(_, k): (_, Arc<str>)| {
-                                if let Some(axis) = axis_store.settings().peek().get(&k.clone()) {
-                                    y_axis_marker.set(axis.param.clone());
-                                }
-
+                            on_select: move |(_, k): (_, Param)| {
+                                // if let Some(axis) = axis_store.settings().peek().get(&k.clone()) {
+                                y_axis_marker.set(k.clone());
+                                // }
                             },
                             placeholder: y_axis_marker.peek().to_string(),
                             selected_index: Some(y_axis_selected_index.into()),
@@ -401,8 +382,18 @@ pub fn MainWindow() -> Element {
                             let sample_stub = files.file_list()[sample_index()].clone();
                             let sample_stub2 = files.file_list()[sample_index() + 1].clone();
                             rsx! {
-                                PlotWindow { sample_stub, x_axis_marker, y_axis_marker }
-                                PlotWindow { sample_stub: sample_stub2, x_axis_marker, y_axis_marker }
+                                PlotWindow {
+                                    sample_stub,
+                                    x_axis_marker,
+                                    y_axis_marker,
+                                    parental_gate,
+                                }
+                                PlotWindow {
+                                    sample_stub: sample_stub2,
+                                    x_axis_marker,
+                                    y_axis_marker,
+                                    parental_gate,
+                                }
                             }
                         } else {
                             rsx! { "No directory selected" }

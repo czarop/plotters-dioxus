@@ -13,7 +13,7 @@ use flow_plots::{
     BasePlotOptions, ColorMaps, DensityPlot, DensityPlotOptions, Plot, render::RenderConfig,
 };
 
-use crate::gate_editor::{AxisInfo, gates::{draw_gates::GateLayer, gate_store::FileId}, plots::parameters::PlotMapper};
+use crate::gate_editor::{AxisInfo, gates::{draw_gates::GateLayer, gate_store::FileId}, plots::axis_store::PlotMapper};
 
 pub type DioxusDrawingArea<'a> = DrawingArea<BitMapBackend<'a>, Shift>;
 

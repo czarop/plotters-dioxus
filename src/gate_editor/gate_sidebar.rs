@@ -1,7 +1,7 @@
 use crate::components::context_menu::*;
 use crate::gate_editor::gates::GateState;
 use crate::gate_editor::gates::gate_store::{GateStateImplExt, GateStateStoreExt, ROOTGATE};
-use crate::gate_editor::plots::parameters::{AxisStore, Param, AxisStoreStoreExt};
+use crate::gate_editor::plots::axis_store::{AxisStore, Param, AxisStoreStoreExt};
 use dioxus::prelude::*;
 use dioxus::stores::SyncStore;
 use std::sync::Arc;
@@ -133,32 +133,30 @@ fn GateNode(
 
                             e.stop_propagation();
 
-                            if let Some(gate) = gate_store
+                            let Some((x, y)) = gate_store
                                 .gate_store()
                                 .peek()
                                 .primary_and_subgate_registry
                                 .get(&gate_id_clone)
-                            {
-                                let (x, y) = gate.get_params();
-                                let (new_x, new_y);
-                                if let Some(x_axis_settings) = param_store.settings().read().get(&x) {
-                                    new_x = Some(x_axis_settings.param.clone());
-                                } else {
-                                    new_x = None;
-                                }
-                                if let Some(y_axis_settings) = param_store.settings().read().get(&y) {
-                                    new_y = Some(y_axis_settings.param.clone());
-                                } else {
-                                    new_y = None;
-                                }
-                                if let (Some(new_x), Some(new_y)) = (new_x, new_y) {
-                                    x_axis_param.set(new_x);
-                                    y_axis_param.set(new_y);
-                                    selected.set(Some(parent.clone()));
-                                    *gate_store.selected_gate().write() = Some(gate_id_clone.clone());
-                                }
-
+                                .and_then(|g| { Some(g.get_params()) }) else { return };
+                            let (new_x, new_y);
+                            if let Some(x_axis_settings) = param_store.settings().read().get(&x) {
+                                new_x = Some(x_axis_settings.param.clone());
+                            } else {
+                                new_x = None;
                             }
+                            if let Some(y_axis_settings) = param_store.settings().read().get(&y) {
+                                new_y = Some(y_axis_settings.param.clone());
+                            } else {
+                                new_y = None;
+                            }
+                            if let (Some(new_x), Some(new_y)) = (new_x, new_y) {
+                                x_axis_param.set(new_x);
+                                y_axis_param.set(new_y);
+                                selected.set(Some(parent.clone()));
+                                *gate_store.selected_gate().write() = Some(gate_id_clone.clone());
+                            }
+
                         },
 
                         if has_children {
@@ -183,30 +181,27 @@ fn GateNode(
                             onclick: move |e| {
                                 // IMPORTANT: Stop the row's onclick from firing
                                 e.stop_propagation();
-                                if let Some(gate) = gate_store
+                                let Some((x, y)) = gate_store
                                     .gate_store()
                                     .peek()
                                     .primary_and_subgate_registry
                                     .get(&gate_id)
-                                {
-                                    let (x, y) = gate.get_params();
-                                    let (new_x, new_y);
-                                    if let Some(x_axis_settings) = param_store.settings().read().get(&x) {
-                                        new_x = Some(x_axis_settings.param.clone());
-                                    } else {
-                                        new_x = None;
-                                    }
-                                    if let Some(y_axis_settings) = param_store.settings().read().get(&y) {
-                                        new_y = Some(y_axis_settings.param.clone());
-                                    } else {
-                                        new_y = None;
-                                    }
-                                    if let (Some(new_x), Some(new_y)) = (new_x, new_y) {
-                                        x_axis_param.set(new_x);
-                                        y_axis_param.set(new_y);
-                                        selected.set(Some(gate_id.clone()));
-                                    }
-
+                                    .and_then(|g| { Some(g.get_params()) }) else { return };
+                                let (new_x, new_y);
+                                if let Some(x_axis_settings) = param_store.settings().read().get(&x) {
+                                    new_x = Some(x_axis_settings.param.clone());
+                                } else {
+                                    new_x = None;
+                                }
+                                if let Some(y_axis_settings) = param_store.settings().read().get(&y) {
+                                    new_y = Some(y_axis_settings.param.clone());
+                                } else {
+                                    new_y = None;
+                                }
+                                if let (Some(new_x), Some(new_y)) = (new_x, new_y) {
+                                    x_axis_param.set(new_x);
+                                    y_axis_param.set(new_y);
+                                    selected.set(Some(gate_id.clone()));
                                 }
 
                             },

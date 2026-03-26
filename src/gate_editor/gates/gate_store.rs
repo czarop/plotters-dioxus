@@ -27,7 +27,7 @@ use crate::gate_editor::{
         gate_traits::DrawableGate,
         gate_types::PrimaryGateType,
     },
-    plots::parameters::PlotMapper,
+    plots::axis_store::PlotMapper,
 };
 
 pub type GateId = std::sync::Arc<str>;
@@ -173,7 +173,7 @@ pub struct GateState {
     // when deleting a gate, do you need to delete any boolean gates that depend on it?
     boolean_gate_links: FxHashMap<GateId, Vec<GateId>>,
 
-    gate_stats: FxHashMap<Arc<str>, GateStats>,
+    
 
     gate_store: GateSubStore,
 }

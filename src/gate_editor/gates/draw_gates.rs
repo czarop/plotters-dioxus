@@ -1,6 +1,7 @@
-use crate::gate_editor::gates::gate_store::{FileId, GateOverrideResolver, GateStateStoreExt};
-use crate::gate_editor::plots::parameters::{AxisStore, PlotStoreStoreExt};
-use crate::gate_editor::plots::parameters::AxisStoreStoreExt;
+use crate::gate_editor::gates::gate_store::{GateOverrideResolver, GateStateStoreExt};
+use crate::gate_editor::plots::axis_store::{AxisStore};
+use crate::gate_editor::plots::axis_store::AxisStoreStoreExt;
+use crate::gate_editor::plots::plot_store::{PlotStore, PlotStoreStoreExt};
 use crate::gate_editor::{
     gates::{
         GateState,
@@ -11,7 +12,7 @@ use crate::gate_editor::{
         gate_traits::DrawableGate,
         gate_types::{Direction, GateRenderShape, GateStats, PrimaryGateType, ShapeType},
     },
-    plots::parameters::{PlotMapper, PlotStore},
+    plots::axis_store::{PlotMapper},
 };
 use dioxus::{prelude::*, stores::SyncStore};
 use rustc_hash::FxHashMap;
@@ -133,14 +134,14 @@ pub fn GateLayer(
                 }).await;
 
                 match join_result {
-                    Ok(Ok(index)) => *gate_store.gate_stats().write() = index,
+                    Ok(Ok(index)) => *plot_store.gate_stats().write() = index,
                     Ok(Err(e)) => {
                         println!("{e}");
-                        *gate_store.gate_stats().write() = FxHashMap::default();
+                        *plot_store.gate_stats().write() = FxHashMap::default();
                     }
                     Err(e) => {
                         println!("{e}");
-                        *gate_store.gate_stats().write() = FxHashMap::default();
+                        *plot_store.gate_stats().write() = FxHashMap::default();
                     }
                 }
             }
@@ -475,7 +476,7 @@ pub fn GateLayer(
                             None
                         };
 
-                        let gate_stats = gate_store.gate_stats().read().get(&gate.get_id()).cloned();
+                        let gate_stats = plot_store.gate_stats().read().get(&gate.get_id()).cloned();
                         rsx! {
                             RenderGate {
                                 gate: gate.clone(),

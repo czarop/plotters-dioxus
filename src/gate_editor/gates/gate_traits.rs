@@ -7,7 +7,7 @@ use crate::gate_editor::{
         gate_drag::{GateDragData, PointDragData},
         gate_types::{GateRenderShape, GateStats},
     },
-    plots::parameters::PlotMapper,
+    plots::axis_store::PlotMapper,
 };
 
 pub trait DrawableGate: Send + Sync {
