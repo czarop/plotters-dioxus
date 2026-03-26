@@ -1,7 +1,10 @@
+use rustc_hash::{FxBuildHasher, FxHashMap};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use crate::gate_editor::gates::GateId;
+use crate::gate_editor::gates::gate_store::{FileId, GateSource, GroupId};
 use crate::gate_editor::gates::gate_traits::DrawableGate;
 
 #[derive(Deserialize, Debug)]
@@ -70,7 +73,7 @@ impl FilterContainer {
             // --- GROUP SPECIFIC MODE ---
             // We use a temporary map to ensure one Arc per GroupId
             let mut group_cache: HashMap<GroupId, Arc<dyn DrawableGate>> = HashMap::new();
-            let Some(file_to_group_map) = metadata_file_to_group_map.get(md_key).ok()?;
+            let file_to_group_map = metadata_file_to_group_map.get(md_key).ok_or_else(|| anyhow::anyhow!("No metadata found for {}", md_key))?;
 
             for (file_id, gate_spec) in &self.per_file_filters {
                 if let Some(group_id) = file_to_group_map.get(file_id) {
@@ -84,18 +87,18 @@ impl FilterContainer {
 
             // Move the unique group gates into the final collection
             for (group_id, gate_instance) in group_cache {
-                results.push((GateSource::Group(group_id, gate_id.clone()), gate_instance));
+                collections.push((GateSource::Group((group_id, gate_id.clone())), gate_instance));
             }
         } else {
             // --- FILE SPECIFIC MODE ---
             // No metadata grouping; every entry is a unique Sample override
             for (file_id, gate_spec) in &self.per_file_filters {
-                if let Some(file_gate) = gate_spec.to_drawable()? {
-                    results.push((
-                        GateSource::Sample(gate_id.clone(), file_id.clone()),
-                        file_gate,
-                    ));
-                }
+                let file_gate = gate_spec.to_drawable()?;
+                collections.push((
+                    GateSource::Sample((gate_id.clone(), file_id.clone())),
+                    file_gate,
+                ));
+                
             }
         }
 
