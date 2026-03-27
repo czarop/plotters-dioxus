@@ -207,8 +207,8 @@ pub fn PlotWindow(
             Some(Ok(df)) => Some(df.clone()),
             _ => None,
         };
-        let x_name = x_axis_marker.read().fluoro.clone();
-        let y_name = y_axis_marker.read().fluoro.clone();
+        let x_name = x_axis_marker.peek().fluoro.clone();
+        let y_name = y_axis_marker.peek().fluoro.clone();
         async move {
             let df = match df_arc {
                 Some(d) => d,
