@@ -7,8 +7,16 @@ use rustc_hash::{FxBuildHasher, FxHashMap};
 use crate::gate_editor::gates::gate_store::{FileId, GroupId};
 
 pub type MetaDataParameter = Arc<str>;
+
+#[derive(PartialEq, Clone, Hash, Debug, Eq)]
+pub struct MetaDataKey {
+    pub parameter: MetaDataParameter,
+    pub group: GroupId
+} 
+// pub type MetaDataFileMap =
+//     im::HashMap<MetaDataParameter, FxHashMap<FileId, GroupId>, FxBuildHasher>;
 pub type MetaDataFileMap =
-    im::HashMap<MetaDataParameter, FxHashMap<FileId, GroupId>, FxBuildHasher>;
+    im::HashMap<FileId, FxHashMap<MetaDataParameter, GroupId>, FxBuildHasher>;
 
 pub enum MetaDataOrigin {
     Omiq,
@@ -65,25 +73,51 @@ impl<Lens> Store<MetaDataStore, Lens> {
             }
         }
 
-        // Iterate through metadata columns
-        for col_name in df.get_column_names() {
-            if col_name == file_id_column || col_name == file_name_column {
-                continue;
-            }
+        // // Iterate through metadata columns
+        // for col_name in df.get_column_names() {
+        //     if col_name == file_id_column || col_name == file_name_column {
+        //         continue;
+        //     }
 
-            let mut current_column_map = FxHashMap::default();
-            let metadata_vals = df.column(col_name)?.str()?;
+        //     let mut current_column_map = FxHashMap::default();
+        //     let metadata_vals = df.column(col_name)?.str()?;
 
-            // Zip the pre-processed IDs with these values
-            for (actual_id, val_opt) in processed_ids.iter().zip(metadata_vals.into_iter()) {
-                if let Some(val) = val_opt {
-                    current_column_map.insert(actual_id.clone(), Arc::from(val));
+        //     // Zip the pre-processed IDs with these values
+        //     for (actual_id, val_opt) in processed_ids.iter().zip(metadata_vals.into_iter()) {
+        //         if let Some(val) = val_opt {
+        //             current_column_map.insert(actual_id.clone(), Arc::from(val));
+        //         }
+        //     }
+
+        //     master_map.insert(Arc::from(col_name.as_str()), current_column_map);
+        // }
+
+
+        // 2. Prepare the metadata columns we actually want to process
+        // We filter out the ID and Name columns once to save cycles in the row loop
+        let metadata_column_names: Vec<&PlSmallStr> = df.get_column_names()
+            .into_iter()
+            .filter(|&name| name != file_id_column && name != file_name_column)
+            .collect();
+
+        // 3. Iterate through every pre-processed FileId
+        for (row_idx, actual_id) in processed_ids.iter().enumerate() {
+            let mut file_metadata = FxHashMap::default();
+
+            for col_name in &metadata_column_names {
+                // Get the value for this specific row in this specific column
+                let col = df.column(col_name.as_str())?.str()?;
+                
+                if let Some(val) = col.get(row_idx) {
+                    // Clean the parameter name (drop '$' if needed)
+                    let param_name = Arc::from(col_name.as_str());
+                    file_metadata.insert(param_name, Arc::from(val));
                 }
             }
 
-            master_map.insert(Arc::from(col_name.as_str()), current_column_map);
+            // Insert the complete metadata bundle for this file
+            master_map.insert(actual_id.clone(), file_metadata);
         }
-
         self.with_mut(|s| {
             s.metadata = master_map;
             s.file_name_to_gating_id = name_to_id;

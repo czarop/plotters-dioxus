@@ -29,6 +29,7 @@ use crate::gate_editor::{
     },
     plots::axis_store::PlotMapper,
 };
+use crate::omiq::metadata::{MetaDataKey, MetaDataParameter};
 
 pub type GateId = std::sync::Arc<str>;
 pub type FileId = std::sync::Arc<str>;
@@ -86,12 +87,12 @@ impl Default for GateMap {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum GateSource {
     Global,
-    Group((GateId, GroupId)),
+    Group((GateId, MetaDataKey)),
     Sample((GateId, FileId)),
 }
 
 pub type GroupGateMap =
-    im::HashMap<(GateId, GroupId), Arc<dyn DrawableGate>, rustc_hash::FxBuildHasher>;
+    im::HashMap<(GateId, MetaDataKey), Arc<dyn DrawableGate>, rustc_hash::FxBuildHasher>;
 pub type SampleGateMap =
     im::HashMap<(GateId, FileId), Arc<dyn DrawableGate>, rustc_hash::FxBuildHasher>;
 
@@ -183,7 +184,7 @@ impl<Lens> Store<GateState, Lens> {
     fn get_current_sample(
         &mut self,
         file_id: FileId,
-        group_ids: &[GroupId],
+        group_ids: &FxHashMap<MetaDataParameter, GroupId>
     ) -> Result<GateOverrideResolver> {
         // construct the GateResolver for this file
         let mut active_gates: im::HashMap<Arc<str>, ComparableGate, FxBuildHasher> =
@@ -205,7 +206,8 @@ impl<Lens> Store<GateState, Lens> {
                     active_gates.insert(default_id.clone(), s_ovr.clone().into());
                     gate_origins.insert(default_id.clone(), GateSource::Sample(key.clone()));
                 } else if let Some((key, g_ovr)) = group_ids.iter().find_map(|gid| {
-                    group_overrides.get_key_value(&(default_id.clone(), gid.clone()))
+                    let key = MetaDataKey{ parameter: gid.0.clone(), group: gid.1.clone() };
+                    group_overrides.get_key_value(&(default_id.clone(), key))
                 }) {
                     active_gates.insert(default_id.clone(), g_ovr.clone().into());
                     gate_origins.insert(default_id.clone(), GateSource::Group(key.clone()));

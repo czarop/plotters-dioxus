@@ -6,7 +6,7 @@ use crate::gate_editor::plots::plot_window::PlotWindow;
 use crate::omiq::metadata::MetaDataImplExt;
 use crate::omiq::metadata::MetaDataOrigin;
 use crate::omiq::metadata::MetaDataStore;
-use crate::omiq::metadata::MetaDataStoreStoreExt;
+
 use crate::searchable_select::SearchableSelectSet;
 use crate::{
     file_load::FcsFiles,

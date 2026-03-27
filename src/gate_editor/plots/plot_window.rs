@@ -1,6 +1,6 @@
 
 use crate::file_load::FcsSampleStub;
-
+use crate::omiq::metadata::MetaDataStoreStoreExt;
 use crate::gate_editor::gates::gate_store::{GateOverrideResolver};
 use crate::gate_editor::plots::data_helpers::{
     get_event_mask_from_scaled_df, get_filtered_dataframe, get_flow_data, zip_cols_from_filtered_df,
@@ -8,6 +8,7 @@ use crate::gate_editor::plots::data_helpers::{
 use crate::gate_editor::plots::draw_plot::PseudoColourPlot;
 
 use crate::gate_editor::plots::plot_store::{PlotStore, PlotStoreStoreExt, EventIndexMapped};
+use crate::omiq::metadata::MetaDataStore;
 use crate::{
 
     gate_editor::{
@@ -20,7 +21,7 @@ use crate::{
         plots::axis_store::{Param, AxisStore, AxisStoreImplExt, AxisStoreStoreExt},
     },
 };
-use dioxus::prelude::*;
+use dioxus::{CapturedError, prelude::*};
 use polars::frame::DataFrame;
 
 use std::sync::Arc;
@@ -42,24 +43,27 @@ pub fn PlotWindow(
     let plot_store = use_store(|| PlotStore::default());
     use_context_provider(|| plot_store);
 
+    let metadata_store = use_context::<Store<MetaDataStore, CopyValue<MetaDataStore, SyncStorage>>>();
+
     let mut axis_store = use_context::<Store<AxisStore>>();
 
     // RESOURCE 1: Load FCS File
     let mut fcs_file: Signal<Option<flow_fcs::Fcs>> = use_signal(|| None);
-    let fcs_file_resource = use_resource(move || async move {
+    let _ = use_resource(move || async move {
         let sample = &*sample_stub.read();
+
+        let Some(file_name) = sample.get_filepath().file_name() else {return};
+        let Some(file_name) = file_name.to_str() else {return};
+        let Some(id) = metadata_store.file_name_to_gating_id()
+            .read()
+            .get(file_name)
+            .cloned() else {
+                return
+            };
+
         match get_flow_data(std::path::PathBuf::from(sample.get_filepath())).await {
-            Ok(mut f) => {
-                f.metadata.insert_string_keyword(
-                    String::from("$GUID"),
-                    uuid::Uuid::new_v4().to_string(),
-                );
-                let file_id: crate::gate_editor::gates::gate_store::FileId = f
-                    .metadata
-                    .get_string_keyword("$GUID")
-                    .expect("no guid store in the fcs")
-                    .into();
-                *plot_store.current_file_id().write() = file_id.clone();
+            Ok(f) => {
+                *plot_store.current_file_id().write() = id.clone();
                 fcs_file.set(Some(f))
             }
             Err(e) => {
@@ -149,7 +153,8 @@ pub fn PlotWindow(
 
     let resolver = use_memo(move || {
         let id: Arc<str> = plot_store.current_file_id()();
-        match gate_store.get_current_sample(id.clone(), &[]) {
+        let Some(groups) = metadata_store.metadata().read().get(&id).cloned() else {return Err(CapturedError::from_display(format!("no metadata for file {}", id)))};
+        match gate_store.get_current_sample(id.clone(), &groups) {
             Ok(resolver) => {
                 gate_resolver_store.set(Some(Arc::new(resolver.clone())));
                 Ok(resolver)
@@ -167,13 +172,13 @@ pub fn PlotWindow(
             let x_fluoro = x_axis_marker.read().fluoro.clone();
             let y_fluoro = y_axis_marker.read().fluoro.clone();
             let parental = parental_gate();
-
+            plot_store.current_file_id()();
             async move {
-                let Ok(resolver) = &*resolver.peek() else {
+                let Ok(resolver) = resolver.peek().clone() else {
                     return Err(anyhow::anyhow!("No resolver"));
                 };
                 if let Some(Ok(d)) = &*scaled_data.read() {
-                    let filtered_data = match get_filtered_dataframe(d.clone(), parental, resolver.clone())
+                    let filtered_data = match get_filtered_dataframe(d.clone(), parental, resolver)
                         .await
                     {
                         Ok(d) => d.clone(),
@@ -212,7 +217,7 @@ pub fn PlotWindow(
 
             let join_result =
                 tokio::task::spawn_blocking(move || -> anyhow::Result<EventIndexMapped> {
-                    std::thread::sleep(std::time::Duration::from_secs(3));
+                    // std::thread::sleep(std::time::Duration::from_secs(3));
                     // Build the R-Tree
                     let ei = get_event_mask_from_scaled_df(df.clone(), x_name, y_name)
                         .map_err(|e| anyhow::anyhow!("R-Tree build failed: {e}"))?;
@@ -269,21 +274,25 @@ pub fn PlotWindow(
             },
         }
 
-    if plot_data_signal.read().is_empty(){
-        return rsx! {
-            div { class: "spinner-container",
-                div { class: "spinner" }
-            }
-        }
-    }
+    
 
     rsx! {
 
-        div {
+        div { style: "position: relative; width: 100%; height: 100%;",
 
-            if let Ok(_resolver) = &*resolver.peek() {
-                {
-                    println!("re-rendering plot component!");
+            {
+                match event_index.state().cloned() {
+                    UseResourceState::Pending | UseResourceState::Stopped => rsx! {
+                        div { style: "position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; background-color: rgba(255, 255, 255, 0.6); z-index: 10;",
+                            div { class: "spinner" }
+                        }
+                    },
+                    _ => rsx! {},
+                }
+            }
+            {
+                let show_plot = resolver.read().is_ok();
+                if show_plot {
                     rsx! {
                         PseudoColourPlot {
                             size: (600, 600),
@@ -293,9 +302,34 @@ pub fn PlotWindow(
                             parental_gate_id: parental_gate,
                         }
                     }
-
+                } else {
+                    rsx! {}
                 }
             }
+                // if let Ok(_resolver) = &*resolver.read() {
+
+        // }
+        // match event_index.state().cloned() {
+        //     UseResourceState::Pending | UseResourceState::Stopped => rsx! {
+        //         div { class: "spinner-container",
+        //             div { class: "spinner" }
+        //         }
+        //     },
+        //     _ => rsx! {},
+        // }
+        // match &*event_index.read() {
+        //     Some(Ok(_)) => {
+        //         rsx! {}
+        //     }
+        //     Some(Err(e)) => rsx! {
+        //         div { class: "spinner-container", "{e}" }
+        //     },
+        //     None => rsx! {
+        //         div { class: "spinner-container",
+        //             div { class: "spinner" }
+        //         }
+        //     },
+        // }
         }
     }
 

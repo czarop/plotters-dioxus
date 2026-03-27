@@ -6,7 +6,7 @@ use std::sync::Arc;
 use crate::gate_editor::gates::GateId;
 use crate::gate_editor::gates::gate_store::{FileId, GateSource, GroupId};
 use crate::gate_editor::gates::gate_traits::DrawableGate;
-use crate::omiq::metadata::{MetaDataFileMap, MetaDataParameter};
+use crate::omiq::metadata::{MetaDataFileMap, MetaDataKey, MetaDataParameter};
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -55,9 +55,59 @@ pub struct FilterContainer {
 }
 
 impl FilterContainer {
+    // pub fn process_gates_to_drawable(
+    //     &self,
+    //     metadata_file_to_group_map: MetaDataFileMap,
+    // ) -> anyhow::Result<Vec<(GateSource, Arc<dyn DrawableGate>)>> {
+    //     let mut collections = Vec::new();
+    //     let gate_id = self.id.clone();
+
+    //     // 1. Handle Global (Default)
+    //     let global_gate = self.default_filter.to_drawable()?;
+    //     collections.push((GateSource::Global, global_gate));
+
+    //     if let Some(ref md_key) = self.md { // this is broken - ensure aligns with metadatstore
+    //         // --- GROUP SPECIFIC MODE ---
+    //         // We use a temporary map to ensure one Arc per GroupId
+    //         let mut group_cache: HashMap<MetaDataKey, Arc<dyn DrawableGate>> = HashMap::new();
+    //         let file_to_group_map = metadata_file_to_group_map
+    //             .get(md_key)
+    //             .ok_or_else(|| anyhow::anyhow!("No metadata found for {}", md_key))?;
+
+    //         for (file_id, gate_spec) in &self.per_file_filters {
+    //             if let Some(group_id) = file_to_group_map.get(file_id) {
+    //                 // Only create the Arc/Gate if we haven't seen this GroupId yet
+    //                 if !group_cache.contains_key(group_id) {
+    //                     let gate = gate_spec.to_drawable()?;
+    //                     group_cache.insert(group_id.clone(), gate);
+    //                 }
+    //             }
+    //         }
+
+    //         // Move the unique group gates into the final collection
+    //         for (group_id, gate_instance) in group_cache {
+    //             collections.push((
+    //                 GateSource::Group((group_id, gate_id.clone())),
+    //                 gate_instance,
+    //             ));
+    //         }
+    //     } else {
+    //         // --- FILE SPECIFIC MODE ---
+    //         // No metadata grouping; every entry is a unique Sample override
+    //         for (file_id, gate_spec) in &self.per_file_filters {
+    //             let file_gate = gate_spec.to_drawable()?;
+    //             collections.push((
+    //                 GateSource::Sample((gate_id.clone(), file_id.clone())),
+    //                 file_gate,
+    //             ));
+    //         }
+    //     }
+
+    //     Ok(collections)
+    // }
     pub fn process_gates_to_drawable(
         &self,
-        metadata_file_to_group_map: MetaDataFileMap,
+        metadata_file_to_group_map: &MetaDataFileMap, // Changed to ref to avoid move
     ) -> anyhow::Result<Vec<(GateSource, Arc<dyn DrawableGate>)>> {
         let mut collections = Vec::new();
         let gate_id = self.id.clone();
@@ -66,34 +116,40 @@ impl FilterContainer {
         let global_gate = self.default_filter.to_drawable()?;
         collections.push((GateSource::Global, global_gate));
 
-        if let Some(ref md_key) = self.md {
+        if let Some(ref md_parameter) = self.md {
             // --- GROUP SPECIFIC MODE ---
-            // We use a temporary map to ensure one Arc per GroupId
-            let mut group_cache: HashMap<GroupId, Arc<dyn DrawableGate>> = HashMap::new();
-            let file_to_group_map = metadata_file_to_group_map
-                .get(md_key)
-                .ok_or_else(|| anyhow::anyhow!("No metadata found for {}", md_key))?;
+            // We track unique MetaDataKeys (Param + Group) to avoid duplicate gates
+            let mut group_cache: HashMap<MetaDataKey, Arc<dyn DrawableGate>> = HashMap::new();
 
             for (file_id, gate_spec) in &self.per_file_filters {
-                if let Some(group_id) = file_to_group_map.get(file_id) {
-                    // Only create the Arc/Gate if we haven't seen this GroupId yet
-                    if !group_cache.contains_key(group_id) {
-                        let gate = gate_spec.to_drawable()?;
-                        group_cache.insert(group_id.clone(), gate);
+                // 1. Look up this file in our new File-First map
+                if let Some(file_metadata) = metadata_file_to_group_map.get(file_id) {
+                    // 2. Check if this file has the parameter Omiq is asking for
+                    if let Some(group_id) = file_metadata.get(md_parameter) {
+                        
+                        let key = MetaDataKey {
+                            parameter: md_parameter.clone(),
+                            group: group_id.clone(),
+                        };
+
+                        // 3. Only create the DrawableGate if we haven't handled this specific Group yet
+                        if !group_cache.contains_key(&key) {
+                            let gate = gate_spec.to_drawable()?;
+                            group_cache.insert(key, gate);
+                        }
                     }
                 }
             }
 
-            // Move the unique group gates into the final collection
-            for (group_id, gate_instance) in group_cache {
+            // 4. Move the unique group gates into the final collection
+            for (metadata_key, gate_instance) in group_cache {
                 collections.push((
-                    GateSource::Group((group_id, gate_id.clone())),
+                    GateSource::Group((gate_instance.get_id(), metadata_key)), // Matches your new struct
                     gate_instance,
                 ));
             }
         } else {
             // --- FILE SPECIFIC MODE ---
-            // No metadata grouping; every entry is a unique Sample override
             for (file_id, gate_spec) in &self.per_file_filters {
                 let file_gate = gate_spec.to_drawable()?;
                 collections.push((
