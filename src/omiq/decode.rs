@@ -6,6 +6,7 @@ use std::sync::Arc;
 use crate::gate_editor::gates::GateId;
 use crate::gate_editor::gates::gate_store::{FileId, GateSource, GroupId};
 use crate::gate_editor::gates::gate_traits::DrawableGate;
+use crate::omiq::metadata::{MetaDataFileMap, MetaDataParameter};
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -45,7 +46,7 @@ pub struct FilterContainer {
     // this will be SOME if there is a metadata param governing this
     // ie group-specific - each file still gets an entry in file-specific
     // even if its group-specific
-    pub md: Option<Arc<str>>,
+    pub md: Option<MetaDataParameter>,
 
     // The "File-Specific" variants
     // JSON: "perFileFilters": { "628415...": { ... } }
@@ -54,13 +55,9 @@ pub struct FilterContainer {
 }
 
 impl FilterContainer {
-    pub fn process_gates(
+    pub fn process_gates_to_drawable(
         &self,
-        metadata_file_to_group_map: im::HashMap<
-            Arc<str>,
-            FxHashMap<FileId, GroupId>,
-            FxBuildHasher,
-        >,
+        metadata_file_to_group_map: MetaDataFileMap,
     ) -> anyhow::Result<Vec<(GateSource, Arc<dyn DrawableGate>)>> {
         let mut collections = Vec::new();
         let gate_id = self.id.clone();
@@ -73,7 +70,9 @@ impl FilterContainer {
             // --- GROUP SPECIFIC MODE ---
             // We use a temporary map to ensure one Arc per GroupId
             let mut group_cache: HashMap<GroupId, Arc<dyn DrawableGate>> = HashMap::new();
-            let file_to_group_map = metadata_file_to_group_map.get(md_key).ok_or_else(|| anyhow::anyhow!("No metadata found for {}", md_key))?;
+            let file_to_group_map = metadata_file_to_group_map
+                .get(md_key)
+                .ok_or_else(|| anyhow::anyhow!("No metadata found for {}", md_key))?;
 
             for (file_id, gate_spec) in &self.per_file_filters {
                 if let Some(group_id) = file_to_group_map.get(file_id) {
@@ -87,7 +86,10 @@ impl FilterContainer {
 
             // Move the unique group gates into the final collection
             for (group_id, gate_instance) in group_cache {
-                collections.push((GateSource::Group((group_id, gate_id.clone())), gate_instance));
+                collections.push((
+                    GateSource::Group((group_id, gate_id.clone())),
+                    gate_instance,
+                ));
             }
         } else {
             // --- FILE SPECIFIC MODE ---
@@ -98,7 +100,6 @@ impl FilterContainer {
                     GateSource::Sample((gate_id.clone(), file_id.clone())),
                     file_gate,
                 ));
-                
             }
         }
 

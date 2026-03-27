@@ -45,8 +45,8 @@ pub fn PlotWindow(
     let mut axis_store = use_context::<Store<AxisStore>>();
 
     // RESOURCE 1: Load FCS File
-    let mut fcs_file_resource: Signal<Option<flow_fcs::Fcs>> = use_signal(|| None);
-    let _ = use_resource(move || async move {
+    let mut fcs_file: Signal<Option<flow_fcs::Fcs>> = use_signal(|| None);
+    let fcs_file_resource = use_resource(move || async move {
         let sample = &*sample_stub.read();
         match get_flow_data(std::path::PathBuf::from(sample.get_filepath())).await {
             Ok(mut f) => {
@@ -60,10 +60,10 @@ pub fn PlotWindow(
                     .expect("no guid store in the fcs")
                     .into();
                 *plot_store.current_file_id().write() = file_id.clone();
-                fcs_file_resource.set(Some(f))
+                fcs_file.set(Some(f))
             }
             Err(e) => {
-                fcs_file_resource.set(None);
+                fcs_file.set(None);
                 println!("error generating fcs file {}", e);
             }
         }
@@ -71,7 +71,7 @@ pub fn PlotWindow(
     });
 
     use_effect(move || {
-        if let Some(fcs_file) = &*fcs_file_resource.read() {
+        if let Some(fcs_file) = &*fcs_file.read() {
             let mut sorted_settings = indexmap::IndexSet::with_hasher(rustc_hash::FxBuildHasher::default());
 
             // 1. Get the parameters and sort them by their internal FCS parameter number once
@@ -106,7 +106,7 @@ pub fn PlotWindow(
             }
         }
 
-        if let Some(fcs_file) = &*fcs_file_resource.read() {
+        if let Some(fcs_file) = &*fcs_file.read() {
             let fcs_clone = fcs_file.clone();
             let result =
                 tokio::task::spawn_blocking(move || -> Result<Arc<DataFrame>, anyhow::Error> {
@@ -212,6 +212,7 @@ pub fn PlotWindow(
 
             let join_result =
                 tokio::task::spawn_blocking(move || -> anyhow::Result<EventIndexMapped> {
+                    std::thread::sleep(std::time::Duration::from_secs(3));
                     // Build the R-Tree
                     let ei = get_event_mask_from_scaled_df(df.clone(), x_name, y_name)
                         .map_err(|e| anyhow::anyhow!("R-Tree build failed: {e}"))?;
@@ -256,55 +257,49 @@ pub fn PlotWindow(
         *plot_store.event_index_map().write() = data;
     });
 
+    match &*event_index.read() {
+            Some(Ok(_)) => {}
+            Some(Err(e)) => return rsx! {
+                div { class: "spinner-container", "{e}" }
+            },
+            None => return rsx! {
+                div { class: "spinner-container",
+                    div { class: "spinner" }
+                }
+            },
+        }
 
+    if plot_data_signal.read().is_empty(){
+        return rsx! {
+            div { class: "spinner-container",
+                div { class: "spinner" }
+            }
+        }
+    }
 
     rsx! {
 
-        div { class: "status-message",
-            {
-                match &*filtered_dataframe.read() {
-                    Some(Ok(_)) => {
-                        rsx! {}
-                    }
-                    Some(Err(e)) => {
-                        rsx! {
-                            p { class: "error-message", "Error: {e}" }
+        div {
+
+            if let Ok(_resolver) = &*resolver.peek() {
+                {
+                    println!("re-rendering plot component!");
+                    rsx! {
+                        PseudoColourPlot {
+                            size: (600, 600),
+                            data: plot_data_signal,
+                            x_axis_info: x_axis_limits.read().clone(),
+                            y_axis_info: y_axis_limits.read().clone(),
+                            parental_gate_id: parental_gate,
                         }
                     }
-                    None => {
-                        rsx! {
-                            p { class: "loading-message", "Loading and processing data..." }
-                        }
-                    }
+
                 }
             }
-        }
-
-        {
-
-            rsx! {
-                div {
-
-                    if let Ok(_resolver) = &*resolver.peek() {
-                        {
-                            println!("re-rendering plot component!");
-                            rsx! {
-                                PseudoColourPlot {
-                                    size: (600, 600),
-                                    data: plot_data_signal,
-                                    x_axis_info: x_axis_limits.read().clone(),
-                                    y_axis_info: y_axis_limits.read().clone(),
-                                    parental_gate_id: parental_gate,
-                                }
-                            }
-
-                        }
-
-                    }
-                }
-            }
-
         }
     }
+
+        }
     
-}
+    
+

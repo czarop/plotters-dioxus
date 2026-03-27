@@ -3,6 +3,10 @@ use crate::gate_editor::plots::axis_store::AxisStore;
 use crate::gate_editor::plots::axis_store::AxisStoreImplExt;
 use crate::gate_editor::plots::axis_store::AxisStoreStoreExt;
 use crate::gate_editor::plots::plot_window::PlotWindow;
+use crate::omiq::metadata::MetaDataImplExt;
+use crate::omiq::metadata::MetaDataOrigin;
+use crate::omiq::metadata::MetaDataStore;
+use crate::omiq::metadata::MetaDataStoreStoreExt;
 use crate::searchable_select::SearchableSelectSet;
 use crate::{
     file_load::FcsFiles,
@@ -21,6 +25,7 @@ use crate::{
 use dioxus::prelude::*;
 use dioxus::stores::use_store_sync;
 
+use std::path::PathBuf;
 use std::sync::Arc;
 
 static CSS_STYLE: Asset = asset!("assets/main_window.css");
@@ -29,6 +34,32 @@ static CSS_STYLE: Asset = asset!("assets/main_window.css");
 pub fn MainWindow() -> Element {
     let mut filehandler: Signal<Option<FcsFiles>> = use_signal(|| None);
     let mut message = use_signal(|| None::<String>);
+
+    let mut metadata_store = use_store_sync(|| MetaDataStore::default());
+    use_context_provider(|| metadata_store);
+
+    let meta_result = use_resource(move || { async move{
+        let result = tokio::task::spawn_blocking(move || -> Result<(), anyhow::Error> {
+            
+            let content = std::fs::read_to_string("file_paths.txt")?;
+            let second_line = content
+                .lines()
+                .filter(|l| !l.trim().is_empty())
+                .nth(1)
+                .ok_or_else(|| anyhow::anyhow!("File does not have a second non-empty line"))?;
+            let path = PathBuf::from(second_line);
+            metadata_store.set_metadata_from_file(path, "OmiqID", "Filename", MetaDataOrigin::Omiq)
+
+        }).await;
+        
+        
+
+        match result{
+            Ok(r) => r,
+            Err(e) => Err(anyhow::anyhow!("Failed to load metadata from file {}", e)),
+        }
+    }});
+
     let mut gate_store: Store<GateState, CopyValue<GateState, SyncStorage>> =
         use_store_sync(|| GateState::default());
     use_context_provider(|| gate_store);
@@ -39,8 +70,9 @@ pub fn MainWindow() -> Element {
     let mut axis_store = use_store(|| AxisStore::default());
     use_context_provider(|| axis_store);
 
-    let _ = use_resource(move || async move {
-        let result = (|| -> anyhow::Result<FcsFiles> {
+    let file_result = use_resource(move || async move {
+
+        let result = tokio::task::spawn_blocking(move || -> anyhow::Result<FcsFiles> {
             let content = std::fs::read_to_string("file_paths.txt")?;
             let path = content
                 .lines()
@@ -48,14 +80,23 @@ pub fn MainWindow() -> Element {
                 .ok_or_else(|| anyhow::anyhow!("No path found"))?;
 
             FcsFiles::create(path.trim())
-        })();
+        
+        }).await;
 
         match result {
-            Ok(files) => {
+            Ok(Ok(files)) => {
                 message.set(None);
                 filehandler.set(Some(files));
+                Ok(())
             }
-            Err(e) => message.set(Some(e.to_string())),
+            Ok(Err(e)) => {
+                message.set(Some(e.to_string()));
+                Err(e)
+            }
+            Err(e) => {
+                message.set(Some(e.to_string()));
+                Err(anyhow::anyhow!("Failed to load files from path {}", e))
+            },
         }
     });
 
@@ -115,6 +156,30 @@ pub fn MainWindow() -> Element {
     rsx! {
         document::Stylesheet { href: CSS_STYLE }
         div { class: "sidebar-local",
+
+            match &*meta_result.read() {
+                Some(Ok(())) => {}
+                Some(Err(e)) => return rsx! {
+                    div { class: "spinner-container", "{e}" }
+                },
+                None => return rsx! {
+                    div { class: "spinner-container",
+                        div { class: "spinner" }
+                    }
+                },
+            }
+
+            match &*file_result.read() {
+                Some(Ok(())) => {}
+                Some(Err(e)) => return rsx! {
+                    div { class: "spinner-container", "{e}" }
+                },
+                None => return rsx! {
+                    div { class: "spinner-container",
+                        div { class: "spinner" }
+                    }
+                },
+            }
 
             GateSidebar {
                 selected_id: parental_gate,

@@ -19,7 +19,7 @@ base64 = "0.22.1"
 dioxus-primitives = { git = "https://github.com/DioxusLabs/components", version = "0.0.1", default-features = false }
 rustc-hash = "2.1"
 indexmap = "2.1"
-polars = {version = "0.53", default-features = false, features = ["lazy", "performant"]}
+polars = {version = "0.53", default-features = false, features = ["lazy", "performant", "csv", "temporal"]}
 rayon = "1"
 im = "15"
 uuid = { version = "1.0", features = ["v4"] }
