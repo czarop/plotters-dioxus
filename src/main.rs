@@ -75,7 +75,7 @@ fn App() -> Element {
 
 // #[cfg(feature = "desktop")]
 fn main() {
-    unsafe { std::env::set_var("RUST_BACKTRACE", "1") };
+    unsafe { std::env::set_var("RUST_BACKTRACE", "full") };
     
 
 

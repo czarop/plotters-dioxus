@@ -1,5 +1,8 @@
 Gates:
 
+check group-specific: seems it is sometimes using the default position instead of the actual position, check keys etc
+
+
 gate axis limits 'niceifying' is not working well - it gives too much above the plot. This is a lib feature??
 
 
@@ -12,18 +15,15 @@ Show names on gates
 
 
 Meta:
-
-Metadata
-Metadata Groups
-Set Metadata from FCS or Omiq
-
+Set gates from omiq gating
+set gate-origins by Meta
 
 Paired samples (FMX FS)
 
 
-Omiq Integration:
 
-Set gates from omiq gating
+
+
 Save gates to omiq gating
 
 Set Scaling from omiq Scaling

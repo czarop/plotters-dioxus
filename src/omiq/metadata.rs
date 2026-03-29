@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 use dioxus::prelude::*;
 use polars::prelude::*;
@@ -26,9 +26,9 @@ pub enum MetaDataOrigin {
 pub struct MetaDataStore {
     metadata: MetaDataFileMap,
     // map of file names -> gating id's so we can associate the actual files with metadata
-    file_name_to_gating_id: im::HashMap<Arc<str>, FileId, FxBuildHasher>,
+    file_name_to_gating_id: HashMap<Arc<str>, FileId, FxBuildHasher>,
     // used for omiq where file id's start with 'f' .. but not in the gating jsons (thanks omiq!)
-    gating_id_to_actual_id_override_map: im::HashMap<FileId, String, FxBuildHasher>,
+    gating_id_to_actual_id_override_map: HashMap<FileId, String, FxBuildHasher>,
 }
 
 #[store(pub name = MetaDataImplExt)]
@@ -43,16 +43,16 @@ impl<Lens> Store<MetaDataStore, Lens> {
         let df = fetch_metadata_from_csv(path)?;
 
         let mut master_map: MetaDataFileMap = im::HashMap::with_hasher(FxBuildHasher);
-        let mut file_id_overrides: im::HashMap<FileId, String, FxBuildHasher> =
-            im::HashMap::with_hasher(FxBuildHasher);
+        let mut file_id_overrides: HashMap<FileId, String, FxBuildHasher> =
+            HashMap::with_hasher(FxBuildHasher);
 
         // Pre-process IDs to handle the 'f' prefix in omiq and build a map
         let raw_ids = df.column(file_id_column)?.str()?;
         let file_names = df.column(file_name_column)?.str()?;
         let len = raw_ids.len();
         let mut processed_ids = Vec::with_capacity(len);
-        let mut name_to_id: im::HashMap<Arc<str>, FileId, FxBuildHasher> =
-            im::HashMap::with_hasher(FxBuildHasher);
+        let mut name_to_id: HashMap<Arc<str>, FileId, FxBuildHasher> =
+            HashMap::with_hasher(FxBuildHasher);
 
         for (raw_id_opt, name_opt) in raw_ids.into_iter().zip(file_names.into_iter()) {
             if let (Some(raw_id), Some(name)) = (raw_id_opt, name_opt) {
@@ -126,6 +126,7 @@ impl<Lens> Store<MetaDataStore, Lens> {
 
         Ok(())
     }
+
 }
 
 fn fetch_metadata_from_csv(path: PathBuf) -> anyhow::Result<DataFrame> {

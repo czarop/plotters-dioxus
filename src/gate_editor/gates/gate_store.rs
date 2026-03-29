@@ -5,6 +5,7 @@ use flow_gates::{BooleanOperation, Gate, GateHierarchy};
 use rustc_hash::{FxBuildHasher, FxHashMap};
 use std::collections::HashSet;
 use std::ops::{Deref, DerefMut};
+use std::path::PathBuf;
 use std::sync::{Arc, LazyLock};
 use uuid::Uuid;
 
@@ -92,9 +93,9 @@ pub enum GateSource {
 }
 
 pub type GroupGateMap =
-    im::HashMap<(GateId, MetaDataKey), Arc<dyn DrawableGate>, rustc_hash::FxBuildHasher>;
+    FxHashMap<(GateId, MetaDataKey), Arc<dyn DrawableGate>>;
 pub type SampleGateMap =
-    im::HashMap<(GateId, FileId), Arc<dyn DrawableGate>, rustc_hash::FxBuildHasher>;
+    FxHashMap<(GateId, FileId), Arc<dyn DrawableGate>>;
 
 #[derive(Default, Store)]
 pub struct GateSubStore {
@@ -163,19 +164,14 @@ impl GateOverrideResolver {
 
 #[derive(Default, Store)]
 pub struct GateState {
-    file_id: FileId,
+    // file_id: FileId,
     selected_gate: Option<Arc<str>>,
     // For the Renderer: "What gates do I draw on this Plot?"
     gate_ids_by_view: FxHashMap<GatesOnPlotKey, Vec<GateId>>,
-
     // For the Filtering: "How are these gates nested?" - this is the master hierarchy
     hierarchy: GateHierarchy,
-
     // when deleting a gate, do you need to delete any boolean gates that depend on it?
     boolean_gate_links: FxHashMap<GateId, Vec<GateId>>,
-
-    
-
     gate_store: GateSubStore,
 }
 
@@ -198,9 +194,29 @@ impl<Lens> Store<GateState, Lens> {
             let sample_overrides = sample_ovr_binding.read();
             let group_ovr_binding = self.gate_store().group_position_overrides();
             let group_overrides = group_ovr_binding.read();
-
+            
             for (default_id, base_arc) in &registry.0 {
+
+                // if let Some(s_ovr) = self.gate_store().sample_position_overrides().get((default_id.clone(), file_id.clone()))
+                // {
+                //     active_gates.insert(default_id.clone(), s_ovr().into());
+                //     gate_origins.insert(default_id.clone(), GateSource::Sample((default_id.clone(), file_id.clone())));
+                // } else if let Some((key, g_ovr)) = group_ids.iter().find_map(|gid| {
+                //     let key = MetaDataKey{ parameter: gid.0.clone(), group: gid.1.clone() };
+                //     match self.gate_store().group_position_overrides().get((default_id.clone(), key.clone())){
+                //         Some(ovr) => Some(((default_id.clone(), key), ovr())),
+                //         None => None
+                //     }
+                // }) {
+                //     active_gates.insert(default_id.clone(), g_ovr.clone().into());
+                //     gate_origins.insert(default_id.clone(), GateSource::Group(key));
+                // } else {
+                //     active_gates.insert(default_id.clone(), base_arc.clone().into());
+                //     gate_origins.insert(default_id.clone(), GateSource::Global);
+                // }
+                
                 if let Some((key, s_ovr)) =
+                
                     sample_overrides.get_key_value(&(default_id.clone(), file_id.clone()))
                 {
                     active_gates.insert(default_id.clone(), s_ovr.clone().into());
@@ -612,7 +628,7 @@ impl<Lens> Store<GateState, Lens> {
             .get(&gate_id)
             .ok_or_else(|| anyhow!("error finding gate source for {}", &gate_id))?
             .clone();
-        drop(resolver);
+
         if let Some(new_gate) = new_gate {
             let new_gate_arc: Arc<dyn DrawableGate> = Arc::from(new_gate);
             let ids_to_update = if new_gate_arc.is_composite() {
@@ -899,5 +915,66 @@ impl<Lens> Store<GateState, Lens> {
         }
 
         None
+    }
+
+    fn upload_gates_from_file(&mut self, path: PathBuf, metadata: &crate::omiq::metadata::MetaDataFileMap) -> anyhow::Result<()> {
+        // 1. Open the file
+        let file = std::fs::File::open(&path)?;
+        let reader = std::io::BufReader::new(file);
+
+        // 2. Deserialize into your ExperimentJson struct
+        let experiment: crate::omiq::decode::ExperimentJson = serde_json::from_reader(reader)?;
+
+        // the parent id's are node id's rather that gate id's so need to initially map these
+        let mut node_to_gate_id: FxHashMap<Arc<str>, GateId> = FxHashMap::default();
+
+        for (node_id, node) in experiment.tree.nodes.iter() {
+            node_to_gate_id.insert(node_id.clone(), node.filter_container_id.clone());
+        }
+
+
+        for (_node_id, node) in experiment.tree.nodes {
+            if *"" != *node.parent_id {
+                let parent_gate_id = node_to_gate_id.get(&node.parent_id).ok_or_else(|| anyhow::anyhow!("Could not find parent gate id for node {}", node.parent_id))?;
+                println!("adding gate child {} with parent {}", node.filter_container_id, node.parent_id);
+                self.hierarchy().write().add_gate_child(parent_gate_id.clone(), node.filter_container_id)?;
+            } else {
+                println!("adding root gate child {} with parent {}", node.filter_container_id, *ROOTGATE);
+                self.hierarchy().write().add_gate_child(ROOTGATE.clone(), node.filter_container_id)?;
+            }
+        }
+
+        // 3. Iterate through the filter containers and process them
+        for (_, container) in experiment.tree.filter_containers {
+            // Process the container using your logic
+            let drawables = container.process_gates_to_drawable(metadata)?;
+
+            for (source, gate) in drawables {
+                // 4. Insert into your Store based on Source
+                match source {
+                    GateSource::Global => {
+                        let gate_id = gate.get_id();
+                        let parent = self.hierarchy().peek().get_parent(&gate_id).cloned().ok_or_else(|| anyhow::anyhow!("Could not locate parent in hierarchy"))?;
+                        let params = gate.get_params();
+                        let key = GatesOnPlotKey::new(params.0, params.1, Some(parent));
+                        self.gate_ids_by_view().write().entry(key)
+                            .or_insert(vec![])
+                            .push(gate.get_id());
+                        self.gate_store().primary_and_subgate_registry().write().insert(gate.get_id(), gate);
+
+                    }
+                    GateSource::Group(key) => {
+                        self.gate_store().group_position_overrides().write().insert(key, gate);
+                    }
+                    GateSource::Sample(key) => {
+                        self.gate_store().sample_position_overrides().write().insert(key, gate);
+                    }
+                }
+            }
+        }
+
+        
+
+        Ok(())
     }
 }

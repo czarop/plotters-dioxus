@@ -1,10 +1,13 @@
-use rustc_hash::{FxBuildHasher, FxHashMap};
+use flow_gates::create_rectangle_geometry;
+use flow_gates::types::LabelPosition;
+use rustc_hash::{FxHashMap};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::gate_editor::gates::GateId;
-use crate::gate_editor::gates::gate_store::{FileId, GateSource, GroupId};
+use crate::gate_editor::gates::gate_single::rectangle_gate::RectangleGate;
+use crate::gate_editor::gates::gate_store::{FileId, GateSource};
 use crate::gate_editor::gates::gate_traits::DrawableGate;
 use crate::omiq::metadata::{MetaDataFileMap, MetaDataKey, MetaDataParameter};
 
@@ -113,7 +116,8 @@ impl FilterContainer {
         let gate_id = self.id.clone();
 
         // 1. Handle Global (Default)
-        let global_gate = self.default_filter.to_drawable()?;
+        let global_gate = self.default_filter.to_drawable(gate_id.clone(), self.name.clone(), flow_gates::GateMode::Global)?;
+        println!("CREATED GLOBAL GATE! ID: {}, Name: {}", global_gate.get_id(), global_gate.get_name());
         collections.push((GateSource::Global, global_gate));
 
         if let Some(ref md_parameter) = self.md {
@@ -134,7 +138,8 @@ impl FilterContainer {
 
                         // 3. Only create the DrawableGate if we haven't handled this specific Group yet
                         if !group_cache.contains_key(&key) {
-                            let gate = gate_spec.to_drawable()?;
+                            let gate = gate_spec.to_drawable(gate_id.clone(), self.name.clone(), flow_gates::GateMode::Global)?;
+                            println!("CREATED GROUP-SPECIFIC GATE! ID: {}, Name: {}, Group: {}", gate.get_id(), gate.get_name(), key.group);
                             group_cache.insert(key, gate);
                         }
                     }
@@ -151,7 +156,9 @@ impl FilterContainer {
         } else {
             // --- FILE SPECIFIC MODE ---
             for (file_id, gate_spec) in &self.per_file_filters {
-                let file_gate = gate_spec.to_drawable()?;
+                let file_gate = gate_spec.to_drawable(gate_id.clone(), self.name.clone(), flow_gates::GateMode::Global)?;
+                println!("CREATED FILE-SPECIFIC GATE! ID: {}, Name: {}, File: {}", file_gate.get_id(), file_gate.get_name(), file_id);
+
                 collections.push((
                     GateSource::Sample((gate_id.clone(), file_id.clone())),
                     file_gate,
@@ -183,15 +190,53 @@ pub enum GateSerialized {
 }
 
 impl GateSerialized {
-    pub fn to_drawable(&self) -> anyhow::Result<Arc<dyn DrawableGate>> {
-        todo!()
+    pub fn to_drawable(&self, id: Arc<str>, name: Arc<str>, gate_mode: flow_gates::GateMode) -> anyhow::Result<Arc<dyn DrawableGate>> {
+        match self {
+            GateSerialized::Rectangle { x_param, y_param, min, max, label_position } => {
+                let raw_coords = vec![
+                    (min.x, min.y),
+                    (max.x, min.y),
+                    (max.x, max.y),
+                    (min.x, max.y),
+                ];
+                let parameters = (x_param.clone(), y_param.clone());
+                let geom = create_rectangle_geometry(raw_coords, x_param, y_param)?;
+                let label_position = LabelPosition {
+                    offset_x: label_position.x,
+                    offset_y: label_position.y,
+                };
+                let gate = flow_gates::Gate {
+                    id: id.clone(),
+                    name: name.to_string(),
+                    geometry: geom,
+                    mode: gate_mode,
+                    parameters,
+                    label_position: Some(label_position),
+                };
+                
+                Ok(Arc::new(RectangleGate::try_new(gate, true)?))
+                
+
+                // Err(anyhow::anyhow!("Rectangle gate geometry created: {:?}, label at ({}, {})", geom, label_position.x, label_position.y))
+            },
+            GateSerialized::Unknown => todo!(),
+        }
     }
 }
 
 #[derive(Deserialize, Debug)]
 pub struct Point {
     #[serde(rename = "f1Val")]
-    pub x: f64,
+    pub x: f32,
     #[serde(rename = "f2Val")]
-    pub y: f64,
+    pub y: f32,
+}
+
+impl From<(f32, f32)> for Point {
+    fn from(coords: (f32, f32)) -> Self {
+        Point {
+            x: coords.0,
+            y: coords.1,
+        }
+    }
 }

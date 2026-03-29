@@ -136,16 +136,16 @@ pub fn PlotWindow(
     // fetch the axis limits from the settings dict when axis changed
     let x_axis_limits = use_memo(move || {
         let param = x_axis_marker.read();
-        match axis_store.settings().read().get(&param.fluoro) {
-            Some(d) => d.clone(),
+        match axis_store.settings().get(param.fluoro.clone()) {
+            Some(d) => d(),
             None => AxisInfo::default(),
         }
     });
 
     let y_axis_limits = use_memo(move || {
         let param = y_axis_marker();
-        match axis_store.settings().read().get(&param.fluoro) {
-            Some(d) => d.clone(),
+        match axis_store.settings().get(param.fluoro.clone()) {
+            Some(d) => d(),
             None => AxisInfo::default(),
         }
     });
@@ -153,7 +153,7 @@ pub fn PlotWindow(
 
     let resolver = use_memo(move || {
         let id: Arc<str> = plot_store.current_file_id()();
-        let Some(groups) = metadata_store.metadata().read().get(&id).cloned() else {return Err(CapturedError::from_display(format!("no metadata for file {}", id)))};
+        let Some(groups) = metadata_store.metadata()().get(&id).cloned() else {return Err(CapturedError::from_display(format!("no metadata for file {}", id)))};
         match gate_store.get_current_sample(id.clone(), &groups) {
             Ok(resolver) => {
                 gate_resolver_store.set(Some(Arc::new(resolver.clone())));
@@ -306,30 +306,7 @@ pub fn PlotWindow(
                     rsx! {}
                 }
             }
-                // if let Ok(_resolver) = &*resolver.read() {
-
-        // }
-        // match event_index.state().cloned() {
-        //     UseResourceState::Pending | UseResourceState::Stopped => rsx! {
-        //         div { class: "spinner-container",
-        //             div { class: "spinner" }
-        //         }
-        //     },
-        //     _ => rsx! {},
-        // }
-        // match &*event_index.read() {
-        //     Some(Ok(_)) => {
-        //         rsx! {}
-        //     }
-        //     Some(Err(e)) => rsx! {
-        //         div { class: "spinner-container", "{e}" }
-        //     },
-        //     None => rsx! {
-        //         div { class: "spinner-container",
-        //             div { class: "spinner" }
-        //         }
-        //     },
-        // }
+        
         }
     }
 

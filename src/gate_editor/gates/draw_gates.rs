@@ -125,9 +125,8 @@ pub fn GateLayer(
                     let parental_events = event_index_map.event_index.len() as f32;
                     for gate in gates_on_plot{
                         let id = gate.get_id();
-                            let stats = crate::gate_editor::gates::gate_stats::get_percent_and_counts_gate(gate, &event_index_map, parental_events)?;
-                            stat_map.insert(id, stats);
-
+                        let stats = crate::gate_editor::gates::gate_stats::get_percent_and_counts_gate(gate, &event_index_map, parental_events)?;
+                        stat_map.insert(id, stats);
                     }
 
                     Ok(stat_map)
@@ -476,7 +475,13 @@ pub fn GateLayer(
                             None
                         };
 
-                        let gate_stats = plot_store.gate_stats().read().get(&gate.get_id()).cloned();
+                        let gate_stats = if let Some(stats) = plot_store.gate_stats().get(gate.get_id())
+                        {
+                            Some(stats())
+                        } else {
+                            None
+                        };
+
                         rsx! {
                             RenderGate {
                                 gate: gate.clone(),
@@ -519,42 +524,14 @@ pub struct RenderGateProps {
 }
 
 impl PartialEq for RenderGateProps {
-    // fn eq(&self, other: &Self) -> bool {
-    //     let equal = self.is_selected == other.is_selected
-    //         && self.gate_index == other.gate_index
-    //         && Arc::ptr_eq(&self.gate, &other.gate)
-    //         // && self.gate.get_id() == other.gate.get_id()
-    //         && match (&self.gate_stats, &other.gate_stats) {
-    //             (Some(a), Some(b)) => {
-    //                 a == b
-    //             },
-    //             (None, None) => true,
-    //             _ => false,
-    //         }
-            
-    //         && self.drag_data == other.drag_data
-    //         && self.mapper == other.mapper;
-    //         println!("{equal} for {}", self.gate.get_id());
-    //         equal
-    // }
+    
     fn eq(&self, other: &Self) -> bool {
-        let sel = self.is_selected == other.is_selected;
-        let idx = self.gate_index == other.gate_index;
-        let ptr = Arc::ptr_eq(&self.gate, &other.gate);
-        let stat = self.gate_stats == other.gate_stats;
-        let drag = self.drag_data == other.drag_data;
-        let map = Arc::ptr_eq(&self.mapper, &other.mapper);
-
-        let equal = sel && idx && ptr && stat && drag && map;
-
-        if !equal {
-            println!(
-                "ID: {} | sel:{} idx:{} ptr:{} stat:{} drag:{} map:{}",
-                self.gate.get_id(), sel, idx, ptr, stat, drag, map
-            );
-        }
-
-        equal
+        self.is_selected == other.is_selected
+        && self.gate_index == other.gate_index
+        && Arc::ptr_eq(&self.gate, &other.gate)
+        && self.gate_stats == other.gate_stats
+        && self.drag_data == other.drag_data
+        && Arc::ptr_eq(&self.mapper, &other.mapper)
     }
 }
 
@@ -641,7 +618,7 @@ fn RenderShape(
     shape_index: usize,
     drag_data: Option<GateDragType>,
 ) -> Element {
-    println!("shape with id {} and index {}", gate_id, shape_index);
+
     let plot_map = use_context::<Signal<Option<Arc<PlotMapper>>>>();
     let mut drag_data_signal = use_context::<Signal<Option<GateDragType>>>();
     if let Some(mapper) = &*plot_map.read() {
