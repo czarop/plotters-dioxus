@@ -189,14 +189,14 @@ impl std::fmt::Display for Param {
 #[derive(Default, Clone, Store)]
 pub struct AxisStore {
     // all settings
-    pub settings: FxHashMap<Arc<str>, AxisInfo>,
+    pub settings: im::HashMap<Arc<str>, AxisInfo, FxBuildHasher>,
     //current file's param names listed by file's internal order
     pub sorted_settings: indexmap::IndexSet<Param, FxBuildHasher>,
 }
 
 #[store(pub name = AxisStoreImplExt)]
 impl<Lens> Store<AxisStore, Lens> {
-    fn add_new_axis_settings(&mut self, p: &Param, fcs_file: &flow_fcs::Fcs) {
+    fn add_new_default_axis_settings(&mut self, p: &Param, fcs_file: &flow_fcs::Fcs) {
         self.settings()
             .write()
             .entry(p.fluoro.clone())

@@ -90,7 +90,7 @@ pub fn PlotWindow(
                 };
                 
                 // Add settings to the FxHashMap if not present
-                axis_store.add_new_axis_settings(&p, &fcs_file);
+                axis_store.add_new_default_axis_settings(&p, &fcs_file);
                 
                 // Insert into the IndexSet (Order is preserved automatically)
                 sorted_settings.insert(p.clone());
@@ -136,16 +136,16 @@ pub fn PlotWindow(
     // fetch the axis limits from the settings dict when axis changed
     let x_axis_limits = use_memo(move || {
         let param = x_axis_marker.read();
-        match axis_store.settings().get(param.fluoro.clone()) {
-            Some(d) => d(),
+        match axis_store.settings().read().get(&param.fluoro) {
+            Some(d) => d.clone(),
             None => AxisInfo::default(),
         }
     });
 
     let y_axis_limits = use_memo(move || {
-        let param = y_axis_marker();
-        match axis_store.settings().get(param.fluoro.clone()) {
-            Some(d) => d(),
+        let param = y_axis_marker.read();
+        match axis_store.settings().read().get(&param.fluoro) {
+            Some(d) => d.clone(),
             None => AxisInfo::default(),
         }
     });

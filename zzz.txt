@@ -4,32 +4,24 @@ check group-specific: seems it is sometimes using the default position instead o
 
 
 gate axis limits 'niceifying' is not working well - it gives too much above the plot. This is a lib feature??
-
-
 Allow choosing other gates at the same level for AND and OR
-
 Add filter Cache
 
 rename gates
 Show names on gates
 
+Linked gates:
+You have no concept of linked gates - but this is just using the same gate at 2 different points in the hierarchy - this may work already by default from omiq.
+
 
 Meta:
 Set gates from omiq gating
-set gate-origins by Meta
+Set Scaling from omiq Scaling
+Set Comp from omiq Comp
 
 Paired samples (FMX FS)
-
-
-
-
-
-Save gates to omiq gating
-
-Set Scaling from omiq Scaling
 Send Scaling to omiq Scaling
-
-Set Comp from omiq Comp
+Save gates to omiq gating
 
 
 Nice to have:

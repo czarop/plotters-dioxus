@@ -3,7 +3,6 @@ use crate::gate_editor::plots::axis_store::AxisStore;
 use crate::gate_editor::plots::axis_store::AxisStoreImplExt;
 use crate::gate_editor::plots::axis_store::AxisStoreStoreExt;
 use crate::gate_editor::plots::plot_window::PlotWindow;
-use crate::omiq::metadata;
 use crate::omiq::metadata::MetaDataImplExt;
 use crate::omiq::metadata::MetaDataOrigin;
 use crate::omiq::metadata::MetaDataStore;
@@ -122,16 +121,16 @@ pub fn MainWindow() -> Element {
     // fetch the axis limits from the settings dict when axis changed
     let x_axis_limits = use_memo(move || {
         let param = x_axis_marker.read();
-        match axis_store.settings().get(param.fluoro.clone()) {
-            Some(d) => d().clone(),
+        match axis_store.settings().read().get(&param.fluoro) {
+            Some(d) => d.clone(),
             None => AxisInfo::default(),
         }
     });
 
     let y_axis_limits = use_memo(move || {
-        let param = y_axis_marker();
-        match axis_store.settings().get(param.fluoro.clone()) {
-            Some(d) => d().clone(),
+        let param = y_axis_marker.read();
+        match axis_store.settings().read().get(&param.fluoro) {
+            Some(d) => d.clone(),
             None => AxisInfo::default(),
         }
     });
@@ -153,17 +152,39 @@ pub fn MainWindow() -> Element {
             .unwrap_or(0)
     });
 
-
+    let mut upload_succeded = use_signal(|| false);
     use_effect(move || {
         // spawn(async move {
-            let path: PathBuf = PathBuf::from("/Users/czarop/Downloads/unscaled_t/test - Gating (2).omiqgt");
+            // let path: PathBuf = PathBuf::from("/Users/czarop/Downloads/unscaled_t/test - Gating (2).omiqgt");
+
+            if *upload_succeded.peek() {
+                return;
+            }
+
             let metadata = metadata_store.metadata().read().clone();
             if metadata.is_empty() {
                 println!("Metadata is empty, skipping gate loading");
                 return;
             }
-            match gate_store.upload_gates_from_file(path, &metadata){
-                Ok(_) => println!("Gates loaded successfully"),
+
+            let axis_settings = axis_store.settings().read().clone();
+            if axis_settings.is_empty() {
+                println!("Axis settings are empty, skipping gate loading");
+                return;
+            }
+
+            let content = std::fs::read_to_string("file_paths.txt").expect("Failed to read file paths");
+            let third_line = content
+                .lines()
+                .filter(|l| !l.trim().is_empty())
+                .nth(2)
+                .ok_or_else(|| anyhow::anyhow!("File does not have a third non-empty line")).expect("");
+            let path = PathBuf::from(third_line);
+            
+            
+
+            match gate_store.upload_gates_from_file(path, &metadata, axis_settings){
+                Ok(_) => {upload_succeded.set(true); println!("Gates loaded successfully")},
                 Err(e) => println!("Failed to load gates: {:#?}", e),
             };
         // });

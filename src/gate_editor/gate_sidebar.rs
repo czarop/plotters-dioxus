@@ -140,13 +140,13 @@ fn GateNode(
                                 .get(&gate_id_clone)
                                 .and_then(|g| { Some(g.get_params()) }) else { return };
                             let (new_x, new_y);
-                            if let Some(x_axis_settings) = axis_store.settings().get(x.clone()) {
-                                new_x = Some(x_axis_settings().param.clone());
+                            if let Some(x_axis_settings) = axis_store.settings().peek().get(&x) {
+                                new_x = Some(x_axis_settings.param.clone());
                             } else {
                                 new_x = None;
                             }
-                            if let Some(y_axis_settings) = axis_store.settings().get(y.clone()) {
-                                new_y = Some(y_axis_settings().param.clone());
+                            if let Some(y_axis_settings) = axis_store.settings().peek().get(&y) {
+                                new_y = Some(y_axis_settings.param.clone());
                             } else {
                                 new_y = None;
                             }
@@ -188,13 +188,13 @@ fn GateNode(
                                     .get(&gate_id)
                                     .and_then(|g| { Some(g.get_params()) }) else { return };
                                 let (new_x, new_y);
-                                if let Some(x_axis_settings) = axis_store.settings().get(x.clone()) {
-                                    new_x = Some(x_axis_settings().param.clone());
+                                if let Some(x_axis_settings) = axis_store.settings().peek().get(&x) {
+                                    new_x = Some(x_axis_settings.param.clone());
                                 } else {
                                     new_x = None;
                                 }
-                                if let Some(y_axis_settings) = axis_store.settings().get(y.clone()) {
-                                    new_y = Some(y_axis_settings().param.clone());
+                                if let Some(y_axis_settings) = axis_store.settings().peek().get(&y) {
+                                    new_y = Some(y_axis_settings.param.clone());
                                 } else {
                                     new_y = None;
                                 }

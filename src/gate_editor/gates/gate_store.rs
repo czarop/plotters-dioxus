@@ -30,6 +30,7 @@ use crate::gate_editor::{
     },
     plots::axis_store::PlotMapper,
 };
+use crate::omiq::decode::GateSerialized;
 use crate::omiq::metadata::{MetaDataKey, MetaDataParameter};
 
 pub type GateId = std::sync::Arc<str>;
@@ -917,7 +918,7 @@ impl<Lens> Store<GateState, Lens> {
         None
     }
 
-    fn upload_gates_from_file(&mut self, path: PathBuf, metadata: &crate::omiq::metadata::MetaDataFileMap) -> anyhow::Result<()> {
+    fn upload_gates_from_file(&mut self, path: PathBuf, metadata: &crate::omiq::metadata::MetaDataFileMap, axis_settings: im::HashMap<Arc<str>, AxisInfo, FxBuildHasher>) -> anyhow::Result<()> {
         // 1. Open the file
         let file = std::fs::File::open(&path)?;
         let reader = std::io::BufReader::new(file);
@@ -925,27 +926,57 @@ impl<Lens> Store<GateState, Lens> {
         // 2. Deserialize into your ExperimentJson struct
         let experiment: crate::omiq::decode::ExperimentJson = serde_json::from_reader(reader)?;
 
-        // the parent id's are node id's rather that gate id's so need to initially map these
+        let mut composite_gates = FxHashMap::default();
+        let mut primary_gates = vec![];
+        // step 1 is to separate the composite gates from the primary gates
+        for container in experiment.tree.filter_containers.values() {
+            if container.group_id.is_none() {
+                primary_gates.push(container.clone());
+                continue;
+            }
+            let group_id_unprocessed = container.group_id.as_ref().unwrap();
+            
+            let group_id = group_id_unprocessed.split('_').nth(0).ok_or_else(|| anyhow::anyhow!("Error processing composite gate id"))?;
+            let group_position = group_id_unprocessed.chars().last().and_then(|c| c.to_digit(10)).ok_or_else(|| anyhow::anyhow!("Error processing composite gate id"))?;
+
+            let composite_type = if group_id_unprocessed.contains("SPLIT") {
+                CompositeType::Bisector(group_id.to_string())
+            } else if group_id_unprocessed.contains("SKEWEDQUAD") {
+                CompositeType::SkewedQuadrant(group_id.to_string())
+            } else if group_id_unprocessed.contains("QUAD") {
+                CompositeType::Quadrant(group_id.to_string())
+            } else {
+                return Err(anyhow::anyhow!("Unknown composite gate type in id {}", group_id_unprocessed));
+            };
+            composite_gates.entry(composite_type).or_insert(vec![]).push((group_position, container.clone()));
+        }
+
+
+        // the parent id's are node id's rather than gate id's so need to initially map these
         let mut node_to_gate_id: FxHashMap<Arc<str>, GateId> = FxHashMap::default();
 
         for (node_id, node) in experiment.tree.nodes.iter() {
             node_to_gate_id.insert(node_id.clone(), node.filter_container_id.clone());
         }
 
+        
+        let mut w = self.write();
 
+        
+
+        // build the hierarchy first.
         for (_node_id, node) in experiment.tree.nodes {
-            if *"" != *node.parent_id {
-                let parent_gate_id = node_to_gate_id.get(&node.parent_id).ok_or_else(|| anyhow::anyhow!("Could not find parent gate id for node {}", node.parent_id))?;
-                println!("adding gate child {} with parent {}", node.filter_container_id, node.parent_id);
-                self.hierarchy().write().add_gate_child(parent_gate_id.clone(), node.filter_container_id)?;
+            // deal with composites - you need to add the sub-gates not the gates
+            let parent_id = if *"" != *node.parent_id {
+                node_to_gate_id.get(&node.parent_id).ok_or_else(|| anyhow::anyhow!("Could not find parent gate id for node {}", node.parent_id))?.clone()
             } else {
-                println!("adding root gate child {} with parent {}", node.filter_container_id, *ROOTGATE);
-                self.hierarchy().write().add_gate_child(ROOTGATE.clone(), node.filter_container_id)?;
-            }
+                ROOTGATE.clone()
+            };
+            w.hierarchy.add_gate_child(parent_id, node.filter_container_id)?;
         }
 
-        // 3. Iterate through the filter containers and process them
-        for (_, container) in experiment.tree.filter_containers {
+        // 3. Iterate through the primary gates containers and process them
+        for container in primary_gates {
             // Process the container using your logic
             let drawables = container.process_gates_to_drawable(metadata)?;
 
@@ -954,23 +985,87 @@ impl<Lens> Store<GateState, Lens> {
                 match source {
                     GateSource::Global => {
                         let gate_id = gate.get_id();
-                        let parent = self.hierarchy().peek().get_parent(&gate_id).cloned().ok_or_else(|| anyhow::anyhow!("Could not locate parent in hierarchy"))?;
+                        let parent = w.hierarchy.get_parent(&gate_id).cloned().ok_or_else(|| anyhow::anyhow!("Could not locate parent in hierarchy"))?;
                         let params = gate.get_params();
                         let key = GatesOnPlotKey::new(params.0, params.1, Some(parent));
-                        self.gate_ids_by_view().write().entry(key)
+                        w.gate_ids_by_view.entry(key)
                             .or_insert(vec![])
                             .push(gate.get_id());
-                        self.gate_store().primary_and_subgate_registry().write().insert(gate.get_id(), gate);
+                        w.gate_store.primary_and_subgate_registry.insert(gate.get_id(), gate);
 
                     }
                     GateSource::Group(key) => {
-                        self.gate_store().group_position_overrides().write().insert(key, gate);
+                        w.gate_store.group_position_overrides.insert(key, gate);
                     }
                     GateSource::Sample(key) => {
-                        self.gate_store().sample_position_overrides().write().insert(key, gate);
+                        w.gate_store.sample_position_overrides.insert(key, gate);
                     }
                 }
             }
+        }
+
+        for (composite_type, subgates) in composite_gates {
+            let arc_gate: Arc<dyn DrawableGate> = match composite_type {
+                CompositeType::Bisector(composite_group_id) => todo!(),
+                CompositeType::Quadrant(composite_group_id) => {
+
+                    let params = if let GateSerialized::Rectangle { x_param, y_param, .. } = &subgates[0].1.default_filter {
+                        (x_param, y_param)
+                        } else {
+                            return Err(anyhow::anyhow!("Unexpected gate type for quadrant subgate"));
+                        };
+                    let x_axis = axis_settings.get(params.0).ok_or_else(|| anyhow::anyhow!("Could not find axis settings for parameter {}", params.0))?;
+                    let y_axis = axis_settings.get(params.1).ok_or_else(|| anyhow::anyhow!("Could not find axis settings for parameter {}", params.1))?;
+                    let x_data_range = x_axis.data_lower..=x_axis.data_upper;
+                    let y_data_range = y_axis.data_lower..=y_axis.data_upper;
+                    // get the bits of PointData from each subgate
+                    let mut subgate_ids = Vec::with_capacity(4);
+                    
+                    for (pos, fc) in subgates.iter() {
+                        let actual_pos = if *pos == 0 {
+                            3 // tl
+                        } else if *pos == 1 {
+                            2 // tr
+                        } else if *pos == 2 {
+                            1 // br
+                        } else {
+                            0 // bl
+                        };
+                        subgate_ids[actual_pos] = fc.id.clone();
+                    }
+
+                    let center: (f32, f32) = if let GateSerialized::Rectangle {min, .. } = &subgates[1].1.default_filter {
+                        (*min).into()
+                    } else {
+                        return Err(anyhow::anyhow!("Unexpected gate type for quadrant subgate"));
+                    };
+
+                    let data_points = super::gate_composite::skewed_quadrant_gate::DataPoints{ 
+                        center: center, 
+                        left: (*x_data_range.start(), center.1), 
+                        bottom: (center.0, *y_data_range.start()), 
+                        right: (*x_data_range.end(), center.1), 
+                        top: (center.0, *y_data_range.end()), 
+                        x_data_range, 
+                        y_data_range};
+
+                    let gate = QuadrantGate::try_new_from_data_points(
+                        Arc::from(composite_group_id.as_str()), 
+                        composite_group_id.to_string(), 
+                        data_points, 
+                        params.0.clone(), 
+                        params.1.clone(), 
+                        true, 
+                        Some(subgate_ids)
+                    )?;
+
+                    Arc::new(gate)
+
+
+                },
+                CompositeType::SkewedQuadrant(composite_group_id) => todo!(),
+            };
+
         }
 
         
@@ -978,3 +1073,11 @@ impl<Lens> Store<GateState, Lens> {
         Ok(())
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+enum CompositeType {
+    Bisector(String),
+    Quadrant(String),
+    SkewedQuadrant(String),
+}
+

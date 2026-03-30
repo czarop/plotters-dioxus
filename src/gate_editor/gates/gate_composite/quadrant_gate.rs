@@ -42,7 +42,7 @@ impl QuadrantGate {
         Self::try_new_from_data_points(id, name, points, x_axis_param, y_axis_param, true, None)
     }
 
-    fn try_new_from_data_points(
+    pub fn try_new_from_data_points(
         id: Arc<str>,
         name: String,
         mut data_points: DataPoints,
