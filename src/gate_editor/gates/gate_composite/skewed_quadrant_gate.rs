@@ -19,7 +19,7 @@ use crate::gate_editor::{
 
 type FxIndexMap<K, V> = IndexMap<K, V, FxBuildHasher>;
 
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Clone, Debug)]
 pub struct DataPoints {
     pub center: (f32, f32),
     pub left: (f32, f32),
@@ -97,6 +97,39 @@ impl DataPoints {
                 x_data_range: self.y_data_range.clone(),
                 y_data_range: self.x_data_range.clone(),
             }
+        }
+    }
+
+    pub fn new_from_data_center(
+        cx: f32, 
+        cy: f32, 
+        x_axis_range: RangeInclusive<f32>,
+        y_axis_range: RangeInclusive<f32>,
+        x_data_range: RangeInclusive<f32>,
+        y_data_range: RangeInclusive<f32>,
+    ) -> Self {
+        let (xmin, xmax) = (*x_axis_range.start(), *x_axis_range.end());
+        let (ymin, ymax) = (*y_axis_range.start(), *y_axis_range.end());
+
+        // 1. Clamp the center to the VISUAL axis boundaries 
+        // This prevents the center handle from being lost if Omiq data is off-plot
+        let safe_cx = cx.clamp(xmin, xmax);
+        let safe_cy = cy.clamp(ymin, ymax);
+
+        // 2. Derive handles based on Axis limits to ensure lines hit the plot edges
+        let left = (xmin, safe_cy);
+        let right = (xmax, safe_cy);
+        let bottom = (safe_cx, ymin);
+        let top = (safe_cx, ymax);
+
+        Self {
+            center: (safe_cx, safe_cy),
+            left,
+            bottom,
+            right,
+            top,
+            x_data_range,
+            y_data_range,
         }
     }
 }

@@ -28,6 +28,7 @@ pub struct GatingTree {
     pub filter_containers: HashMap<Arc<str>, FilterContainer>,
 }
 
+
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct GatingNode {
@@ -89,7 +90,6 @@ impl FilterContainer {
         };
 
         // 1. Handle Global (Default)
-        println!("attempting to make gate");
         let global_gate = self.default_filter.to_drawable(gate_id.clone(), self.name.clone(), flow_gates::GateMode::Global, rect_to_polygon)?;
         println!("CREATED GLOBAL GATE! ID: {}, Name: {}", global_gate.get_id(), global_gate.get_name());
         collections.push((GateSource::Global, global_gate));
