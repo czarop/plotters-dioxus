@@ -8,6 +8,7 @@ use std::ops::{Deref, DerefMut, RangeInclusive};
 use std::path::PathBuf;
 use std::sync::{Arc, LazyLock};
 use uuid::Uuid;
+use itertools::Itertools;
 
 use crate::gate_editor::gates::gate_composite::skewed_quadrant_gate::DataPoints;
 use crate::gate_editor::gates::gate_single::boolean_gates::BooleanGate;
@@ -1041,99 +1042,165 @@ enum CompositeType {
 }
 
 fn get_composite_gates_from_filter_container(composite_type: CompositeType, subgates: &[(u32, FilterContainer)], axis_settings: &im::HashMap<Arc<str>, AxisInfo, FxBuildHasher>, metadata_file_to_group_map: &MetaDataFileMap) -> anyhow::Result<FxHashMap<(GateId, GateSource),  Arc<dyn DrawableGate>>> {
+    if matches!(composite_type, CompositeType::Bisector(_)) && subgates.len() != 2 {
+        return Err(anyhow::anyhow!("Bisector must have exactly 2 subgates, found {}", subgates.len()));
+    }
+    if matches!(composite_type, CompositeType::Quadrant(_) | CompositeType::SkewedQuadrant(_)) {
+        if subgates.len() != 4 {
+            return Err(anyhow::anyhow!(
+                "Quadrant composite gate must have exactly 4 subgates, found {}", 
+                subgates.len()
+            ));
+        }
+    }
     let mut map = FxHashMap::default();
-    
-
-    match composite_type {
-                CompositeType::Bisector(composite_group_id) => todo!(),
-                CompositeType::Quadrant(composite_group_id) => {
-
-                    let params = if let GateSerialized::Rectangle { x_param, y_param, .. } = &subgates[0].1.default_filter {
+    let params = if let GateSerialized::Rectangle { x_param, y_param, .. } | GateSerialized::Line { x_param, y_param, .. } = &subgates[0].1.default_filter {
                         (x_param, y_param)
                         } else {
-                            return Err(anyhow::anyhow!("Unexpected gate type for quadrant subgate"));
+                            return Err(anyhow::anyhow!("Unexpected gate type for composite subgate"));
                         };
-                    let (x_data_range, y_data_range) = extract_data_range_from_axis_settings(&params, &axis_settings)?;
-                    let (x_axis_range, y_axis_range) = extract_axis_range_from_axis_settings(&params, &axis_settings)?;
-                    let subgate_ids = get_quadrant_subgate_ids(&subgates)?;
+    let (x_data_range, y_data_range) = extract_data_range_from_axis_settings(&params, &axis_settings)?;
+    let (x_axis_range, y_axis_range) = extract_axis_range_from_axis_settings(&params, &axis_settings)?;
 
-                    // make the default gate
-                    let gate_id: Arc<str> = Arc::from(composite_group_id.as_str());
-                    let default_subgate = subgates[1].1.default_filter.clone(); // we only need one of the subgates - we only need a center point for this
-                    let default_gate_arc = get_gate_for_filter_container(&default_subgate, gate_id.clone(), composite_group_id.clone(), params, &x_data_range, &y_data_range, &x_axis_range, &y_axis_range,&subgate_ids)?;
-                    
+    let (subgate_ids, gate_id): (_, Arc<str>) = match &composite_type {
+        CompositeType::Bisector(id) | 
+        CompositeType::Quadrant(id) | 
+        CompositeType::SkewedQuadrant(id) => {
+            (get_sorted_subgate_ids(&subgates)?, Arc::from(id.as_str()))
+        }
+    };
+
+    // make the default gate
+    match &composite_type {
+                CompositeType::Bisector(composite_group_id) => {
+                    let default_subgate = subgates[0].1.default_filter.clone(); // we only need one of the subgates - we only need a center point for this
+                    let default_gate_arc = get_bisector_gate_for_filter_container(&default_subgate, gate_id.clone(), composite_group_id.clone(), params,&subgate_ids)?;
                     map.insert((default_gate_arc.get_id(), GateSource::Global),default_gate_arc);
-                    
-                    
-                    
-                    if subgates[1].1.md.is_some() { // we have metadata-specific overrides
-                        let md_param = subgates[1].1.md.as_ref().unwrap().clone();
-                        // Cache to ensure we only build the geometry once per metadata group
-                        let mut group_cache: FxHashMap<Arc<str>, Arc<dyn DrawableGate>> = FxHashMap::default();
-
-                        for (file_id, gate_spec) in &subgates[1].1.per_file_filters {
-                            let file_metadata = metadata_file_to_group_map.get(file_id)
-                                .ok_or_else(|| anyhow!("Missing metadata for file {}", file_id))?;
-                            
-                            let group_id = file_metadata.get(&md_param)
-                                .ok_or_else(|| anyhow!("Missing group value for param {}", md_param))?;
-
-                            // Only build the gate if we haven't seen this group yet
-                            let group_gate = if let Some(cached) = group_cache.get(group_id) {
-                                cached.clone()
-                            } else {
-                                let new_gate = get_gate_for_filter_container(
-                                    gate_spec, gate_id.clone(), composite_group_id.clone(), 
-                                    params, &x_data_range, &y_data_range, &x_axis_range, &y_axis_range,&subgate_ids
-                                )?;
-                                group_cache.insert(group_id.clone(), new_gate.clone());
-                                new_gate
-                            };
-
-                            // Insert into the final map with the Group key
-                            let meta_key = MetaDataKey {
-                                parameter: md_param.clone(),
-                                group: group_id.clone(),
-                            };
-                            
-                            map.insert(
-                                (group_gate.get_id(), GateSource::Group((group_gate.get_id(), meta_key))),
-                                group_gate
-                            );
-                        }
-                        
-                        
-                    } else if !subgates[0].1.per_file_filters.is_empty(){ // we have file-specific overrides
-
-                        for (file_id, gate_spec) in &subgates[1].1.per_file_filters {
-                            
-
-                            let file_gate_arc = get_gate_for_filter_container(
-                                gate_spec,
-                                gate_id.clone(), 
-                                composite_group_id.clone(), 
-                                params, 
-                                &x_data_range, 
-                                &y_data_range, 
-                                &x_axis_range, &y_axis_range,
-                                &subgate_ids
-                            )?;
-
-                            map.insert(
-                                (file_gate_arc.get_id(), GateSource::Sample((file_gate_arc.get_id(), file_id.clone()))),
-                                file_gate_arc
-                            );
-                        }
-                    }
+                },
+                CompositeType::Quadrant(composite_group_id) => {      
+                    let default_subgate = subgates[1].1.default_filter.clone(); // we only need one of the subgates - we only need a center point for this
+                    let default_gate_arc = get_quadrant_gate_for_filter_container(&default_subgate, gate_id.clone(), composite_group_id.clone(), params, &x_data_range, &y_data_range, &x_axis_range, &y_axis_range,&subgate_ids)?;
+                    map.insert((default_gate_arc.get_id(), GateSource::Global),default_gate_arc);
                 },
                 CompositeType::SkewedQuadrant(composite_group_id) => todo!(),
             };
+
+
+    if subgates[0].1.md.is_some() { // we have metadata-specific overrides
+        let md_param = subgates[0].1.md.as_ref().unwrap().clone();
+        // Cache to ensure we only build the geometry once per metadata group
+        let mut group_cache: FxHashMap<Arc<str>, Arc<dyn DrawableGate>> = FxHashMap::default();
+
+        match composite_type {
+            CompositeType::Bisector(composite_group_id) => {
+                // just look at the first subgate - we just need the center point
+                for (file_id, gate_spec) in &subgates[0].1.per_file_filters {
+                    let file_metadata = metadata_file_to_group_map.get(file_id)
+                        .ok_or_else(|| anyhow!("Missing metadata for file {}", file_id))?;
+                    let group_id = file_metadata.get(&md_param)
+                        .ok_or_else(|| anyhow!("Missing group value for param {}", md_param))?;
+                    // Only build the gate if we haven't seen this group yet
+                    if let None = group_cache.get(group_id) {
+                        let new_gate = get_bisector_gate_for_filter_container(
+                            gate_spec, gate_id.clone(), composite_group_id.clone(), 
+                            params, &subgate_ids
+                        )?;
+                        group_cache.insert(group_id.clone(), new_gate.clone());
+                        // Insert into the final map with the Group key
+                        let meta_key = MetaDataKey {
+                            parameter: md_param.clone(),
+                            group: group_id.clone(),
+                        };
+                        
+                        map.insert(
+                            (new_gate.get_id(), GateSource::Group((new_gate.get_id(), meta_key))),
+                            new_gate
+                        );
+                    };
+                }
+            },
+            CompositeType::Quadrant(composite_group_id) => {
+                // we only need to look at one of the subgates for quadrants, as we only need the center!
+                for (file_id, gate_spec) in &subgates[1].1.per_file_filters {
+                    let file_metadata = metadata_file_to_group_map.get(file_id)
+                        .ok_or_else(|| anyhow!("Missing metadata for file {}", file_id))?;
+                    
+                    let group_id = file_metadata.get(&md_param)
+                        .ok_or_else(|| anyhow!("Missing group value for param {}", md_param))?;
+
+                    // Only build the gate if we haven't seen this group yet
+                    if let None = group_cache.get(group_id) {
+                        
+                        let new_gate = get_quadrant_gate_for_filter_container(
+                            gate_spec, gate_id.clone(), composite_group_id.clone(), 
+                            params, &x_data_range, &y_data_range, &x_axis_range, &y_axis_range,&subgate_ids
+                        )?;
+                        group_cache.insert(group_id.clone(), new_gate.clone());
+                        // Insert into the final map with the Group key
+                        let meta_key = MetaDataKey {
+                            parameter: md_param.clone(),
+                            group: group_id.clone(),
+                        };
+                        
+                        map.insert(
+                            (new_gate.get_id(), GateSource::Group((new_gate.get_id(), meta_key))),
+                            new_gate
+                        );
+                    };
+                }
+            }, 
+            CompositeType::SkewedQuadrant(composite_group_id) => {},
+        }
+        
+        
+        
+    } else if !subgates[0].1.per_file_filters.is_empty(){ // we have file-specific overrides
+        match composite_type {
+            CompositeType::Bisector(composite_group_id) => {
+                for (file_id, gate_spec) in &subgates[0].1.per_file_filters {
+                    let file_gate_arc = get_bisector_gate_for_filter_container(
+                        gate_spec,
+                        gate_id.clone(), 
+                        composite_group_id.clone(), 
+                        params, 
+                        &subgate_ids
+                    )?;
+
+                    map.insert(
+                        (file_gate_arc.get_id(), GateSource::Sample((file_gate_arc.get_id(), file_id.clone()))),
+                        file_gate_arc
+                    );
+                }
+            },
+            CompositeType::Quadrant(composite_group_id) => {
+                for (file_id, gate_spec) in &subgates[1].1.per_file_filters {
+                    let file_gate_arc = get_quadrant_gate_for_filter_container(
+                        gate_spec,
+                        gate_id.clone(), 
+                        composite_group_id.clone(), 
+                        params, 
+                        &x_data_range, 
+                        &y_data_range, 
+                        &x_axis_range, &y_axis_range,
+                        &subgate_ids
+                    )?;
+
+                    map.insert(
+                        (file_gate_arc.get_id(), GateSource::Sample((file_gate_arc.get_id(), file_id.clone()))),
+                        file_gate_arc
+                    );
+                }
+                    },
+                    CompositeType::SkewedQuadrant(composite_group_id) => {},
+                }
+        
+    }
     Ok(map)
 }
 
 
 
-fn get_quadrant_subgate_ids(subgates: &[(u32, FilterContainer)]) -> anyhow::Result<Vec<Arc<str>>> {
+fn get_sorted_subgate_ids(subgates: &[(u32, FilterContainer)]) -> anyhow::Result<Vec<Arc<str>>> {
     let mut sorted = subgates.to_vec();
     // Sort by position descending to match your mapping (0->3, 1->2, 2->1, 3->0)
     sorted.sort_by(|a, b| b.0.cmp(&a.0)); 
@@ -1141,10 +1208,6 @@ fn get_quadrant_subgate_ids(subgates: &[(u32, FilterContainer)]) -> anyhow::Resu
     let ids: Vec<Arc<str>> = sorted.into_iter()
         .map(|(_, fc)| fc.id.clone())
         .collect();
-
-    if ids.len() != 4 {
-        return Err(anyhow::anyhow!("Quadrant must have 4 subgates"));
-    }
     
     Ok(ids)
 }
@@ -1178,7 +1241,7 @@ fn make_data_points_for_quadrant_filter(gate: &GateSerialized, x_data_range: &Ra
     Ok(data_points)
 }
 
-fn get_gate_for_filter_container(filter: &GateSerialized, id: Arc<str>, name: String, params: (&Arc<str>, &Arc<str>), x_data_range: &RangeInclusive<f32>, y_data_range: &RangeInclusive<f32>,x_axis_range: &RangeInclusive<f32>, y_axis_range: &RangeInclusive<f32>, subgate_ids: &[Arc<str>]) -> anyhow::Result<Arc<dyn DrawableGate>> {
+fn get_quadrant_gate_for_filter_container(filter: &GateSerialized, id: Arc<str>, name: String, params: (&Arc<str>, &Arc<str>), x_data_range: &RangeInclusive<f32>, y_data_range: &RangeInclusive<f32>,x_axis_range: &RangeInclusive<f32>, y_axis_range: &RangeInclusive<f32>, subgate_ids: &[Arc<str>]) -> anyhow::Result<Arc<dyn DrawableGate>> {
     let default_data_points = make_data_points_for_quadrant_filter(filter, &x_data_range, &y_data_range, x_axis_range, y_axis_range)?;
     let default_gate = QuadrantGate::try_new_from_data_points(
         id, 
@@ -1189,6 +1252,21 @@ fn get_gate_for_filter_container(filter: &GateSerialized, id: Arc<str>, name: St
         true, 
         Some(subgate_ids.to_vec())
     )?;
+    let default_gate_arc: Arc<dyn DrawableGate> = Arc::new(default_gate);
+    Ok(default_gate_arc)
+}
+
+fn get_bisector_gate_for_filter_container(filter: &GateSerialized, id: Arc<str>, name: String, params: (&Arc<str>, &Arc<str>), subgate_ids: &[Arc<str>]) -> anyhow::Result<Arc<dyn DrawableGate>> {
+    let center = if let GateSerialized::Line {f1max, .. } = filter {
+        *f1max as f32
+    } else {
+        return Err(anyhow::anyhow!("Unexpected gate type for quadrant subgate"));
+    };
+    let subgate_ids: (Arc<str>, Arc<str>) = subgate_ids.iter()
+    .cloned()
+    .collect_tuple()
+    .ok_or_else(|| anyhow::anyhow!("Expected 2 items"))?;
+    let default_gate = BisectorGate::try_new_from_data_center(id, name, center, params.0.clone(), params.1.clone(), subgate_ids.clone())?;
     let default_gate_arc: Arc<dyn DrawableGate> = Arc::new(default_gate);
     Ok(default_gate_arc)
 }

@@ -81,6 +81,54 @@ impl BisectorGate {
         })
     }
 
+    pub fn try_new_from_data_center(
+        id: Arc<str>,
+        name: String,
+        center: f32,
+        x_axis_param: Arc<str>,
+        y_axis_param: Arc<str>,
+        subgate_ids: (Arc<str>, Arc<str>),
+    ) -> anyhow::Result<Self> {
+        let mut gate_map = FxIndexMap::default();
+        let parameters = (x_axis_param.clone(), y_axis_param.clone());
+
+        let geos = create_default_bisector_from_data(center, &x_axis_param, &y_axis_param)?;
+        
+        let id_left_arc = subgate_ids.0.clone();
+        let id_right_arc = subgate_ids.1.clone();
+
+        let gate_left = Gate {
+            id: id_left_arc.clone(),
+            name: id_left_arc.to_string(),
+            geometry: geos.0,
+            mode: flow_gates::GateMode::Global,
+            parameters: parameters.clone(),
+            label_position: None,
+        };
+        let gate_right = Gate {
+            id: id_right_arc.clone(),
+            name: id_right_arc.to_string(),
+            geometry: geos.1,
+            mode: flow_gates::GateMode::Global,
+            parameters,
+            label_position: None,
+        };
+        let lg_l = LineGate::try_new(gate_left, 0f32, false)?;
+        let lg_r = LineGate::try_new(gate_right, 0f32, false)?;
+
+        gate_map.insert(id_left_arc, lg_l);
+        gate_map.insert(id_right_arc, lg_r);
+
+        Ok(Self {
+            gates: gate_map,
+            id,
+            name,
+            points: (center, 0f32),
+            axis_matched: true,
+            parameters: (x_axis_param, y_axis_param),
+        })
+    }
+
     fn clone_with_gates(
         &self,
         gates: FxIndexMap<Arc<str>, LineGate>,
@@ -552,15 +600,25 @@ fn create_default_bisector(
     x_channel: &str,
     y_channel: &str,
 ) -> anyhow::Result<(GateGeometry, GateGeometry)> {
-    let cx = plot_map.pixel_x_to_data(cx_raw, None);
-    let max_left = (cx, f32::MAX);
+    let cx_data = plot_map.pixel_x_to_data(cx_raw, None);
+    create_default_bisector_from_data( cx_data, x_channel, y_channel)
+}
+
+fn create_default_bisector_from_data(
+
+    cx_data: f32,
+    x_channel: &str,
+    y_channel: &str,
+) -> anyhow::Result<(GateGeometry, GateGeometry)> {
+
+    let max_left = (cx_data, f32::MAX);
     let min_left = (f32::MIN, f32::MIN);
     let coords = vec![min_left, max_left];
     let g1 = flow_gates::geometry::create_rectangle_geometry(coords, x_channel, y_channel)
         .map_err(|_| anyhow::anyhow!("failed to create rectangle geometry"))?;
 
     let max_right = (f32::MAX, f32::MAX);
-    let min_right = (cx, f32::MIN);
+    let min_right = (cx_data, f32::MIN);
     let coords = vec![min_right, max_right];
     let g2 = flow_gates::geometry::create_rectangle_geometry(coords, x_channel, y_channel)
         .map_err(|_| anyhow::anyhow!("failed to create rectangle geometry"))?;
