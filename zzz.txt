@@ -1,27 +1,30 @@
 Gates:
-
-check group-specific: seems it is sometimes using the default position instead of the actual position, check keys etc
-
+import booleans from omiq
+import skewed quadrants from omiq
 
 gate axis limits 'niceifying' is not working well - it gives too much above the plot. This is a lib feature??
 Allow choosing other gates at the same level for AND and OR
 Add filter Cache
 
+use gate names on hierarchy and give gate names when creating / importing
 rename gates
 Show names on gates
 
 Linked gates:
 You have no concept of linked gates - but this is just using the same gate at 2 different points in the hierarchy - this may work already by default from omiq.
-
+Allow linking and unlinking gates from the GUI
+Visualise linked gates
 
 Meta:
-Set gates from omiq gating
 Set Scaling from omiq Scaling
 Set Comp from omiq Comp
 
 Paired samples (FMX FS)
 Send Scaling to omiq Scaling
 Save gates to omiq gating
+
+Allow selection of files
+Deal with nested folders for groups
 
 
 Nice to have:
