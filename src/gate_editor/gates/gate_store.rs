@@ -203,7 +203,6 @@ impl<Lens> Store<GateState, Lens> {
                 
                     sample_overrides.get_key_value(&(default_id.clone(), file_id.clone()))
                 {
-                    println!("HERE {} file {}", default_id, key.1);
                     active_gates.insert(default_id.clone(), s_ovr.clone().into());
                     gate_origins.insert(default_id.clone(), GateSource::Sample(key.clone()));
                 } else if let Some((key, g_ovr)) = group_ids.iter().find_map(|gid| {
@@ -1006,7 +1005,6 @@ impl<Lens> Store<GateState, Lens> {
                             .or_insert(vec![])
                             .push(id.clone());
                         w.gate_store.primary_and_subgate_registry.insert(id.clone(), gate.clone());
-                        println!("INSERTING GLOBAL GATE for main gate {} with internal id {}", id, gate.get_id());
                         for sub_id in subgate_ids {
                             w.gate_store.primary_and_subgate_registry.insert(sub_id, gate.clone());
                         }
@@ -1019,13 +1017,10 @@ impl<Lens> Store<GateState, Lens> {
                         }
                     }
                     GateSource::Sample(key) => {
-                        println!("INSERTING SAMPLE SPECIFIC OVERRIDES for main gate {} {} {}",id, key.0, key.1);
                         w.gate_store.sample_position_overrides.insert(key.clone(), gate.clone());
                         for sub_id in subgate_ids {
-                            println!("INSERTING SAMPLE SPECIFIC OVERRIDES for subgate {}", sub_id);
                             w.gate_store.sample_position_overrides.insert((sub_id, key.1.clone()), gate.clone());
                         }
-                        println!("{:#?}", w.gate_store.sample_position_overrides.keys());
                     }
                 }
             }
@@ -1073,18 +1068,6 @@ fn get_composite_gates_from_filter_container(composite_type: CompositeType, subg
                     
                     if subgates[1].1.md.is_some() { // we have metadata-specific overrides
                         let md_param = subgates[1].1.md.as_ref().unwrap().clone();
-                        // let group_specific_gate_arc = subgates[1].1.per_file_filters.iter().next().ok_or_else(|| anyhow::anyhow!("Expected at least one per-file filter for group-specific override"))?.1.clone();
-                        // let group_gate_arc = get_gate_for_filter_container(&group_specific_gate_arc, gate_id.clone(), composite_group_id.clone(), params, &x_data_range, &y_data_range, &subgate_ids)?;
-                        // // we will assume each subgate has the same per file filters!
-                        // for (file_id, _gate_spec) in &subgates[1].1.per_file_filters {
-                        //     let file_metadata = metadata_file_to_group_map.get(file_id).ok_or_else(|| anyhow!("Could not find metadata for file"))?;
-                        //     let group_id = file_metadata.get(&md_param).ok_or_else(|| anyhow!("Could not find metadata group for file"))?;
-                        //     let meta_key = MetaDataKey {
-                        //         parameter: md_param.clone(),
-                        //         group: group_id.clone(),
-                        //     };
-                        //     map.insert(((&group_gate_arc).get_id(), GateSource::Group(((&group_gate_arc).get_id(), meta_key))),group_gate_arc.clone());
-                        // }
                         // Cache to ensure we only build the geometry once per metadata group
                         let mut group_cache: FxHashMap<Arc<str>, Arc<dyn DrawableGate>> = FxHashMap::default();
 
@@ -1095,7 +1078,7 @@ fn get_composite_gates_from_filter_container(composite_type: CompositeType, subg
                             let group_id = file_metadata.get(&md_param)
                                 .ok_or_else(|| anyhow!("Missing group value for param {}", md_param))?;
 
-                            // 1. Only build the gate if we haven't seen this group (e.g., "Treated") yet
+                            // Only build the gate if we haven't seen this group yet
                             let group_gate = if let Some(cached) = group_cache.get(group_id) {
                                 cached.clone()
                             } else {
@@ -1107,7 +1090,7 @@ fn get_composite_gates_from_filter_container(composite_type: CompositeType, subg
                                 new_gate
                             };
 
-                            // 2. Insert into the final map with the Group key
+                            // Insert into the final map with the Group key
                             let meta_key = MetaDataKey {
                                 parameter: md_param.clone(),
                                 group: group_id.clone(),
@@ -1121,17 +1104,12 @@ fn get_composite_gates_from_filter_container(composite_type: CompositeType, subg
                         
                         
                     } else if !subgates[0].1.per_file_filters.is_empty(){ // we have file-specific overrides
-                        // let file_specific_gate_arc = subgates[1].1.per_file_filters.iter().next().ok_or_else(|| anyhow::anyhow!("Expected at least one per-file filter for group-specific override"))?.1.clone();
-                        // let file_gate_arc = get_gate_for_filter_container(&file_specific_gate_arc, gate_id.clone(), composite_group_id.clone(), params, &x_data_range, &y_data_range, &subgate_ids)?;
-                        // // we will assume each subgate has the same per file filters!
-                        // for (file_id, gate_spec) in &subgates[1].1.per_file_filters {
-                        //     map.insert(((&file_gate_arc).get_id(), GateSource::Sample((((&file_gate_arc).get_id()), file_id.clone()))),file_gate_arc.clone());
-                        // }
+
                         for (file_id, gate_spec) in &subgates[1].1.per_file_filters {
                             
-                            // 1. Build a unique DrawableGate for THIS specific file's coordinates
+
                             let file_gate_arc = get_gate_for_filter_container(
-                                gate_spec,                // Use the spec for THIS file
+                                gate_spec,
                                 gate_id.clone(), 
                                 composite_group_id.clone(), 
                                 params, 
@@ -1141,23 +1119,15 @@ fn get_composite_gates_from_filter_container(composite_type: CompositeType, subg
                                 &subgate_ids
                             )?;
 
-                            // 2. Insert the unique gate with the file-specific Key
                             map.insert(
                                 (file_gate_arc.get_id(), GateSource::Sample((file_gate_arc.get_id(), file_id.clone()))),
                                 file_gate_arc
                             );
                         }
-
                     }
-
-                    
-
-
                 },
                 CompositeType::SkewedQuadrant(composite_group_id) => todo!(),
             };
-
-
     Ok(map)
 }
 
@@ -1202,16 +1172,6 @@ fn make_data_points_for_quadrant_filter(gate: &GateSerialized, x_data_range: &Ra
     } else {
         return Err(anyhow::anyhow!("Unexpected gate type for quadrant subgate"));
     };
-
-
-    // let data_points = super::gate_composite::skewed_quadrant_gate::DataPoints{ 
-    //     center: center, 
-    //     left: (*x_data_range.start(), center.1), 
-    //     bottom: (center.0, *y_data_range.start()), 
-    //     right: (*x_data_range.end(), center.1), 
-    //     top: (center.0, *y_data_range.end()), 
-    //     x_data_range: x_data_range.clone(), 
-    //     y_data_range: y_data_range.clone()};
     
     let data_points = DataPoints::new_from_data_center(center.0, center.1, x_axis_range.clone(), y_axis_range.clone(), x_data_range.clone(), y_data_range.clone());
 
@@ -1220,7 +1180,6 @@ fn make_data_points_for_quadrant_filter(gate: &GateSerialized, x_data_range: &Ra
 
 fn get_gate_for_filter_container(filter: &GateSerialized, id: Arc<str>, name: String, params: (&Arc<str>, &Arc<str>), x_data_range: &RangeInclusive<f32>, y_data_range: &RangeInclusive<f32>,x_axis_range: &RangeInclusive<f32>, y_axis_range: &RangeInclusive<f32>, subgate_ids: &[Arc<str>]) -> anyhow::Result<Arc<dyn DrawableGate>> {
     let default_data_points = make_data_points_for_quadrant_filter(filter, &x_data_range, &y_data_range, x_axis_range, y_axis_range)?;
-    // println!("default data points for gate {} are {:#?}", id, default_data_points);
     let default_gate = QuadrantGate::try_new_from_data_points(
         id, 
         name, 
