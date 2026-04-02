@@ -32,7 +32,7 @@ use crate::gate_editor::{
     },
     plots::axis_store::PlotMapper,
 };
-use crate::omiq::decode::{FilterContainer, GateSerialized};
+use crate::omiq::decode::{FilterContainer, GateSerialized, Point};
 use crate::omiq::metadata::{MetaDataFileMap, MetaDataKey, MetaDataParameter};
 
 pub type GateId = std::sync::Arc<str>;
@@ -1054,11 +1054,14 @@ fn get_composite_gates_from_filter_container(composite_type: CompositeType, subg
         }
     }
     let mut map = FxHashMap::default();
-    let params = if let GateSerialized::Rectangle { x_param, y_param, .. } | GateSerialized::Line { x_param, y_param, .. } = &subgates[0].1.default_filter {
-                        (x_param, y_param)
-                        } else {
-                            return Err(anyhow::anyhow!("Unexpected gate type for composite subgate"));
-                        };
+    let params = if let GateSerialized::Rectangle { x_param, y_param, .. } 
+    | GateSerialized::Line { x_param, y_param, .. } 
+    | GateSerialized::Angle { x_param, y_param, .. }
+    = &subgates[0].1.default_filter {
+                    (x_param, y_param)
+                    } else {
+                        return Err(anyhow::anyhow!("Unexpected gate type for composite subgate"));
+                    };
     let (x_data_range, y_data_range) = extract_data_range_from_axis_settings(&params, &axis_settings)?;
     let (x_axis_range, y_axis_range) = extract_axis_range_from_axis_settings(&params, &axis_settings)?;
 
@@ -1082,7 +1085,17 @@ fn get_composite_gates_from_filter_container(composite_type: CompositeType, subg
                     let default_gate_arc = get_quadrant_gate_for_filter_container(&default_subgate, gate_id.clone(), composite_group_id.clone(), params, &x_data_range, &y_data_range, &x_axis_range, &y_axis_range,&subgate_ids)?;
                     map.insert((default_gate_arc.get_id(), GateSource::Global),default_gate_arc);
                 },
-                CompositeType::SkewedQuadrant(composite_group_id) => todo!(),
+                CompositeType::SkewedQuadrant(composite_group_id) => {
+                let default_subgates = subgates.iter().map(|(_quadrant_number, fc)| {
+                    if let GateSerialized::Angle { .. } = &fc.default_filter {
+                        Ok(fc.default_filter.clone())
+                    } else {
+                        Err(anyhow::anyhow!("Unexpected gate type for skewed quadrant composite subgate"))
+                    }
+                }).collect::<anyhow::Result<Vec<_>>>()?;
+                let default_gate_arc = get_skewed_quadrant_gate(gate_id.clone(), composite_group_id.clone(), &default_subgates, params, &x_data_range, &y_data_range, &x_axis_range, &y_axis_range, subgate_ids.clone())?;
+                map.insert((default_gate_arc.get_id(), GateSource::Global),default_gate_arc);
+                },
             };
 
 
@@ -1149,7 +1162,59 @@ fn get_composite_gates_from_filter_container(composite_type: CompositeType, subg
                     };
                 }
             }, 
-            CompositeType::SkewedQuadrant(composite_group_id) => {},
+            CompositeType::SkewedQuadrant(composite_group_id) => {
+                // build the initial map collating subgate overrides by file
+                let mut file_to_specs: FxHashMap<Arc<str>, Vec<GateSerialized>> = FxHashMap::default();
+
+                for (_quad_idx, fc) in subgates {
+                    for (file_id, gate_spec) in &fc.per_file_filters {
+                        file_to_specs
+                            .entry(file_id.clone())
+                            .or_insert_with(Vec::new)
+                            .push(gate_spec.clone());
+                    }
+                }
+
+                for (file_id, specs) in file_to_specs {
+
+                    if specs.len() != 4 {
+                        return Err(anyhow::anyhow!("Skewed quadrant composite gate requires 4 subgates per file, found {} for file {}", specs.len(), file_id));
+                    }
+
+                    let file_metadata = metadata_file_to_group_map.get(&file_id)
+                        .ok_or_else(|| anyhow!("Missing metadata for file {}", file_id))?;
+                    
+                    let group_id = file_metadata.get(&md_param)
+                        .ok_or_else(|| anyhow!("Missing group value for param {}", md_param))?;
+
+                    // Only build the gate if we haven't seen this metadata group yet
+                    if !group_cache.contains_key(group_id) {
+                        let new_gate = get_skewed_quadrant_gate(
+                            gate_id.clone(),
+                            composite_group_id.clone(),
+                            &specs, // Pass the 4 collected Angle gates
+                            params,
+                            &x_axis_range,
+                            &y_axis_range,
+                            &x_data_range,
+                            &y_data_range,
+                            subgate_ids.clone(),
+                        )?;
+
+                        group_cache.insert(group_id.clone(), new_gate.clone());
+
+                        let meta_key = MetaDataKey {
+                            parameter: md_param.clone(),
+                            group: group_id.clone(),
+                        };
+
+                        map.insert(
+                            (new_gate.get_id(), GateSource::Group((new_gate.get_id(), meta_key))),
+                            new_gate
+                        );
+                    }
+                }
+            },
         }
         
         
@@ -1191,7 +1256,44 @@ fn get_composite_gates_from_filter_container(composite_type: CompositeType, subg
                     );
                 }
                     },
-                    CompositeType::SkewedQuadrant(composite_group_id) => {},
+                    CompositeType::SkewedQuadrant(composite_group_id) => {
+                        let mut file_to_specs: FxHashMap<Arc<str>, Vec<GateSerialized>> = FxHashMap::default();
+
+                        for (_quad_idx, fc) in subgates {
+                            for (file_id, gate_spec) in &fc.per_file_filters {
+                                file_to_specs
+                                    .entry(file_id.clone())
+                                    .or_insert_with(Vec::new)
+                                    .push(gate_spec.clone());
+                            }
+                        }
+
+                        for (file_id, specs) in file_to_specs {
+
+                            if specs.len() != 4 {
+                                return Err(anyhow::anyhow!("Skewed quadrant composite gate requires 4 subgates per file, found {} for file {}", specs.len(), file_id));
+                            }
+
+                            let new_gate = get_skewed_quadrant_gate(
+                                gate_id.clone(),
+                                composite_group_id.clone(),
+                                &specs, // Pass the 4 collected Angle gates
+                                params,
+                                &x_axis_range,
+                                &y_axis_range,
+                                &x_data_range,
+                                &y_data_range,
+                                subgate_ids.clone(),
+                            )?;
+
+                            map.insert(
+                                (new_gate.get_id(), GateSource::Sample((new_gate.get_id(), file_id.clone()))),
+                                new_gate
+                            );
+
+                        }
+                    
+                    },
                 }
         
     }
@@ -1271,3 +1373,125 @@ fn get_bisector_gate_for_filter_container(filter: &GateSerialized, id: Arc<str>,
     Ok(default_gate_arc)
 }
 
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum QuadrantPosition {
+    TopLeft,     // Q1 / QUAD0
+    TopRight,    // Q2 / QUAD1
+    BottomRight, // Q3 / QUAD2
+    BottomLeft,  // Q4 / QUAD3
+}
+
+pub fn calculate_skewed_quadrant_polygon(
+    c: Point,
+    v1: Point,
+    v2: Point,
+    x_axis: &RangeInclusive<f32>,
+    y_axis: &RangeInclusive<f32>,
+) -> (QuadrantPosition, Vec<(f32, f32)>) {
+    // 1. Determine the "Direction" of the quadrant using the midpoint of the arms
+    let mid_x = ((v1.x + v2.x) / 2.0) as f32;
+    let mid_y = ((v1.y + v2.y) / 2.0) as f32;
+
+    let is_right = mid_x > c.x as f32;
+    let is_top = mid_y > c.y as f32;
+
+    let quad = match (is_right, is_top) {
+        (false, true)  => QuadrantPosition::TopLeft,     // mid is Left and Up
+        (true, true)   => QuadrantPosition::TopRight,    // mid is Right and Up
+        (true, false)  => QuadrantPosition::BottomRight, // mid is Right and Down
+        (false, false) => QuadrantPosition::BottomLeft,  // mid is Left and Down
+    };
+
+    // 2. Identify the Axis Corner belonging to this quadrant
+    let corner = (
+         if is_right { *x_axis.end() } else { *x_axis.start() },
+         if is_top { *y_axis.end() } else { *y_axis.start() },
+    );
+
+    // 3. Ensure consistent winding order (Counter-Clockwise)
+    // We use the cross product of (v1-c) and (v2-c) to see if they are 
+    // already in CCW order.
+    let cross_product = (v1.x - c.x) * (v2.y - c.y) - (v1.y - c.y) * (v2.x - c.x);
+
+    if cross_product > 0.0 {
+        // Already Counter-Clockwise
+        (quad, vec![c.into(), v1.into(), corner, v2.into()])
+    } else {
+        // Clockwise, so swap v1 and v2 to maintain CCW for the renderer
+        (quad, vec![c.into(), v2.into(), corner, v1.into()])
+    }
+}
+
+fn angle_gates_to_skewed_data_points(
+    angle_gate_map: FxHashMap<QuadrantPosition, Vec<(f32, f32)>>,
+    x_data_range: RangeInclusive<f32>,
+    y_data_range: RangeInclusive<f32>,
+) -> anyhow::Result<DataPoints> {
+    
+    // we need two opposite quadrants to construct the DataPoints
+
+    let Some(top_left) = angle_gate_map.get(&QuadrantPosition::TopLeft) else {
+        return Err(anyhow::anyhow!("Missing top-left quadrant"));
+    };
+    let Some(bottom_right) = angle_gate_map.get(&QuadrantPosition::BottomRight) else {
+        return Err(anyhow::anyhow!("Missing bottom-right quadrant"));
+    };
+    let center = top_left[0];
+
+    let left = top_left[3];
+    let right =  bottom_right[3];
+    let bottom = bottom_right[1];
+    let top = top_left[1];
+
+    Ok(DataPoints{
+        center,
+        left,
+        bottom,
+        right,
+        top,
+        x_data_range,
+        y_data_range,
+    })
+
+
+}
+
+
+fn get_skewed_quadrant_gate(
+    gate_id: Arc<str>,
+    composite_group_id: String,
+    subgates: &[GateSerialized],
+    params: (&Arc<str>, &Arc<str>),
+    x_axis_range: &RangeInclusive<f32>,
+    y_axis_range: &RangeInclusive<f32>,
+    x_data_range: &RangeInclusive<f32>,
+    y_data_range: &RangeInclusive<f32>,
+    subgate_ids: Vec<Arc<str>>,
+) -> anyhow::Result<Arc<dyn DrawableGate>> {
+        let default_gate_map: FxHashMap<_, _> = subgates
+            .iter()
+            .map(|gs| {
+                if let GateSerialized::Angle {  center, v1, v2, .. } = &gs {
+                    Ok(calculate_skewed_quadrant_polygon(center.clone(), v1.clone(), v2.clone(), &x_axis_range, &y_axis_range))
+                } else {
+                    Err(anyhow::anyhow!("Unexpected gate type for skewed quadrant composite subgate"))
+                }
+                
+        })
+            .collect::<anyhow::Result<FxHashMap<_, _>>>()?;
+
+        let data_points = angle_gates_to_skewed_data_points(default_gate_map, x_data_range.clone(), y_data_range.clone())?;
+
+        let gate = SkewedQuadrantGate::try_new_from_data_points(
+            gate_id.clone(), 
+            composite_group_id.clone(), 
+            data_points, 
+            params.0.clone(),
+            params.1.clone(),
+            true,
+            Some(subgate_ids.clone())
+        )?;
+
+    Ok(Arc::new(gate))
+}

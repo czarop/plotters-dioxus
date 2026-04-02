@@ -167,7 +167,7 @@ impl SkewedQuadrantGate {
         )
     }
 
-    fn try_new_from_data_points(
+    pub fn try_new_from_data_points(
         id: Arc<str>,
         name: String,
         data_points: DataPoints,

@@ -3,6 +3,7 @@ use flow_gates::types::LabelPosition;
 use rustc_hash::{FxHashMap};
 use serde::Deserialize;
 use std::collections::HashMap;
+use std::ops::RangeInclusive;
 use std::sync::Arc;
 
 use crate::gate_editor::gates::GateId;
@@ -195,6 +196,21 @@ pub enum GateSerialized {
         #[serde(rename = "labelLoc")]
         label_position: Option<Point>,
     },
+    #[serde(rename = "AngleGate")]
+    Angle {
+        #[serde(rename = "f1")]
+        x_param: Arc<str>,
+        #[serde(rename = "f2")]
+        y_param: Arc<str>,
+        #[serde(rename = "c")]
+        center: Point,
+        #[serde(rename = "v1")]
+        v1: Point,
+        #[serde(rename = "v2")]
+        v2: Point,
+        #[serde(rename = "labelLoc")]
+        label_position: Option<Point>,
+    },
     // Future-proofing for other gate types
     #[serde(other)]
     Unknown,
@@ -290,6 +306,9 @@ impl GateSerialized {
                     label_position,
                 };
                 Ok(Arc::new(LineGate::try_new(gate, 0f32, true)?))
+            },
+            GateSerialized::Angle { .. } => {
+                panic!("Angle gates are only part of composites and should not be directly deserialized into DrawableGates. They are handled separately in the composite gate logic.");
             }
             GateSerialized::Unknown => todo!(),
         }
@@ -384,3 +403,5 @@ fn create_omiq_ellipse_geometry(
         angle: angle as f32,
     })
 }
+
+
