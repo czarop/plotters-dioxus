@@ -6,10 +6,10 @@ use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use dioxus::prelude::*;
 
 use flow_plots::{
-    BasePlotOptions, ColorMaps, DensityPlot, DensityPlotOptions, Plot, render::RenderConfig
+    BasePlotOptions, ColorMaps, DensityPlot, DensityPlotOptions, Plot, render::RenderConfig,
 };
 
-use crate::gate_editor::{AxisInfo, gates::{draw_gates::GateLayer}, plots::axis_store::PlotMapper};
+use crate::gate_editor::{AxisInfo, gates::draw_gates::GateLayer, plots::axis_store::PlotMapper};
 
 #[component]
 pub fn PseudoColourPlot(
@@ -23,86 +23,88 @@ pub fn PseudoColourPlot(
     let mut plot_map = use_signal(|| None::<Arc<PlotMapper>>);
     use_context_provider::<Signal<Option<Arc<PlotMapper>>>>(|| plot_map);
 
-    let render_result = use_resource(move || { 
-
+    let render_result = use_resource(move || {
         async move {
-        let x_axis_info = x_axis_info();
-        let y_axis_info = y_axis_info();
-        let (width, height) = size();
-        let data = data.clone()();
+            let x_axis_info = x_axis_info();
+            let y_axis_info = y_axis_info();
+            let (width, height) = size();
+            let data = data.clone()();
 
-        let result = tokio::task::spawn_blocking(move || -> Result<(String, Arc<PlotMapper>), anyhow::Error> {
-        let plot = DensityPlot::new();
-        let base_options = BasePlotOptions::new()
-            .width(width)
-            .height(height)
-            .title("My Density Plot")
-            // .show_colorbar(false)
-            .build()?;
+            let result = tokio::task::spawn_blocking(
+                move || -> Result<(String, Arc<PlotMapper>), anyhow::Error> {
+                    let plot = DensityPlot::new();
+                    let base_options = BasePlotOptions::new()
+                        .width(width)
+                        .height(height)
+                        .title("My Density Plot")
+                        // .show_colorbar(false)
+                        .build()?;
 
-        let x_axis_options = flow_plots::AxisOptions::new()
-            .range(x_axis_info.axis_lower..=x_axis_info.axis_upper)
-            .transform(x_axis_info.transform.clone())
-            .label(&x_axis_info.param.to_string())
-            .build()?;
-        let y_axis_options = flow_plots::AxisOptions::new()
-            .range(y_axis_info.axis_lower..=y_axis_info.axis_upper)
-            .transform(y_axis_info.transform.clone())
-            .label(y_axis_info.param.to_string())
-            .build()?;
+                    let x_axis_options = flow_plots::AxisOptions::new()
+                        .range(x_axis_info.axis_lower..=x_axis_info.axis_upper)
+                        .transform(x_axis_info.transform.clone())
+                        .label(&x_axis_info.param.to_string())
+                        .build()?;
+                    let y_axis_options = flow_plots::AxisOptions::new()
+                        .range(y_axis_info.axis_lower..=y_axis_info.axis_upper)
+                        .transform(y_axis_info.transform.clone())
+                        .label(y_axis_info.param.to_string())
+                        .build()?;
 
-        let actual_ranges = flow_plots::create_axis_specs(
-            &x_axis_options.range,
-            &y_axis_options.range,
-            &x_axis_info.transform,
-            &y_axis_info.transform,
-        )?;
+                    let actual_ranges = flow_plots::create_axis_specs(
+                        &x_axis_options.range,
+                        &y_axis_options.range,
+                        &x_axis_info.transform,
+                        &y_axis_info.transform,
+                    )?;
 
-        let (inc_x, inc_y) = {
-            (
-                actual_ranges.0.start..=actual_ranges.0.end,
-                actual_ranges.1.start..=actual_ranges.1.end,
+                    let (inc_x, inc_y) = {
+                        (
+                            actual_ranges.0.start..=actual_ranges.0.end,
+                            actual_ranges.1.start..=actual_ranges.1.end,
+                        )
+                    };
+
+                    println!("X Bounds are: {}, {}", inc_x.start(), inc_x.end());
+
+                    let mapper = PlotMapper::new(
+                        width as f32,
+                        height as f32,
+                        inc_x,
+                        inc_y,
+                        RangeInclusive::new(x_axis_info.data_lower, x_axis_info.data_upper),
+                        RangeInclusive::new(y_axis_info.data_lower, y_axis_info.data_upper),
+                        x_axis_info.transform.clone(),
+                        y_axis_info.transform.clone(),
+                    );
+                    let options = DensityPlotOptions::new()
+                        .base(base_options)
+                        // .plot_type(PlotType::Density)
+                        .colormap(ColorMaps::Jet)
+                        .x_axis(x_axis_options)
+                        .y_axis(y_axis_options)
+                        .point_size(0.35)
+                        .build()?;
+
+                    let mut render_config = RenderConfig::default();
+                    let data_final: flow_plots::ScatterPlotData = data.into();
+                    let plot_data = plot.render(data_final, &options, &mut render_config)?;
+
+                    let base64_str = BASE64_STANDARD.encode(&plot_data);
+                    Ok((
+                        format!("data:image/jpeg;base64,{}", base64_str),
+                        Arc::new(mapper),
+                    ))
+                },
             )
-        };
+            .await;
 
-        println!("X Bounds are: {}, {}", inc_x.start(), inc_x.end());
-
-        let mapper = PlotMapper::new(
-            width as f32,
-            height as f32,
-            inc_x,
-            inc_y,
-            RangeInclusive::new(x_axis_info.data_lower, x_axis_info.data_upper),
-            RangeInclusive::new(y_axis_info.data_lower, y_axis_info.data_upper),
-            x_axis_info.transform.clone(),
-            y_axis_info.transform.clone(),
-        );
-        let options = DensityPlotOptions::new()
-            .base(base_options)
-            // .plot_type(PlotType::Density)
-            .colormap(ColorMaps::Jet)
-            .x_axis(x_axis_options)
-            .y_axis(y_axis_options)
-            .point_size(0.35)
-            .build()?;
-
-        let mut render_config = RenderConfig::default();
-        let data_final: flow_plots::ScatterPlotData = data.into();
-        let plot_data = plot
-            .render(data_final, &options, &mut render_config)?;
-
-        let base64_str = BASE64_STANDARD.encode(&plot_data);
-        Ok((format!("data:image/jpeg;base64,{}", base64_str), Arc::new(mapper)))
-    }).await;
-
-    match result{
-        Ok(r) => r,
-        Err(e) => Err(anyhow::anyhow!("Failed to generate plot {}", e)),
-    }
-
-
-} });
-
+            match result {
+                Ok(r) => r,
+                Err(e) => Err(anyhow::anyhow!("Failed to generate plot {}", e)),
+            }
+        }
+    });
 
     rsx! {
         match &*render_result.read() {

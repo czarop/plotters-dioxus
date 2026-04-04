@@ -1,9 +1,12 @@
-use flow_gates::{GateError, GateGeometry, GateNode, create_polygon_geometry, create_rectangle_geometry};
 use flow_gates::types::LabelPosition;
-use rustc_hash::{FxHashMap};
+use flow_gates::{
+    BooleanOperation, GateError, GateGeometry, GateNode, create_polygon_geometry,
+    create_rectangle_geometry,
+};
+use rustc_hash::FxHashMap;
 use serde::Deserialize;
 use std::collections::HashMap;
-use std::ops::RangeInclusive;
+
 use std::sync::Arc;
 
 use crate::gate_editor::gates::GateId;
@@ -29,7 +32,6 @@ pub struct GatingTree {
     pub filter_containers: HashMap<Arc<str>, FilterContainer>,
 }
 
-
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct GatingNode {
@@ -39,10 +41,37 @@ pub struct GatingNode {
 }
 
 //FilterContainer is the actual gate info
+#[derive(Deserialize, Debug, Clone)]
+#[serde(tag = "containerType")] // This tells Serde to look at the "containerType" field
+pub enum FilterContainer {
+    #[serde(rename = "AtomicFilterContainer")]
+    Atomic(AtomicContainer),
+
+    #[serde(rename = "CompoundFilterContainer")]
+    Compound(CompoundContainer),
+}
 
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct FilterContainer {
+pub struct CompoundContainer {
+    pub id: GateId,
+    pub name: Arc<str>,
+    #[serde(rename = "type")]
+    pub operation: BooleanOpType,
+    pub filter_container_ids: Vec<GateId>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum BooleanOpType {
+    And,
+    Or,
+    Not,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct AtomicContainer {
     pub id: GateId,
     pub name: Arc<str>,
 
@@ -67,8 +96,7 @@ pub struct FilterContainer {
     pub per_file_filters: FxHashMap<FileId, GateSerialized>,
 }
 
-impl FilterContainer {
-
+impl AtomicContainer {
     pub fn is_composite(&self) -> bool {
         self.group_id.is_some()
     }
@@ -91,8 +119,17 @@ impl FilterContainer {
         };
 
         // 1. Handle Global (Default)
-        let global_gate = self.default_filter.to_drawable(gate_id.clone(), self.name.clone(), flow_gates::GateMode::Global, rect_to_polygon)?;
-        println!("CREATED GLOBAL GATE! ID: {}, Name: {}", global_gate.get_id(), global_gate.get_name());
+        let global_gate = self.default_filter.to_drawable(
+            gate_id.clone(),
+            self.name.clone(),
+            flow_gates::GateMode::Global,
+            rect_to_polygon,
+        )?;
+        println!(
+            "CREATED GLOBAL GATE! ID: {}, Name: {}",
+            global_gate.get_id(),
+            global_gate.get_name()
+        );
         collections.push((GateSource::Global, global_gate));
 
         if let Some(ref md_parameter) = self.md {
@@ -105,7 +142,6 @@ impl FilterContainer {
                 if let Some(file_metadata) = metadata_file_to_group_map.get(file_id) {
                     // 2. Check if this file has the parameter Omiq is asking for
                     if let Some(group_id) = file_metadata.get(md_parameter) {
-                        
                         let key = MetaDataKey {
                             parameter: md_parameter.clone(),
                             group: group_id.clone(),
@@ -113,8 +149,18 @@ impl FilterContainer {
 
                         // 3. Only create the DrawableGate if we haven't handled this specific Group yet
                         if !group_cache.contains_key(&key) {
-                            let gate = gate_spec.to_drawable(gate_id.clone(), self.name.clone(), flow_gates::GateMode::Global, rect_to_polygon)?;
-                            println!("CREATED GROUP-SPECIFIC GATE! ID: {}, Name: {}, Group: {}", gate.get_id(), gate.get_name(), key.group);
+                            let gate = gate_spec.to_drawable(
+                                gate_id.clone(),
+                                self.name.clone(),
+                                flow_gates::GateMode::Global,
+                                rect_to_polygon,
+                            )?;
+                            println!(
+                                "CREATED GROUP-SPECIFIC GATE! ID: {}, Name: {}, Group: {}",
+                                gate.get_id(),
+                                gate.get_name(),
+                                key.group
+                            );
                             group_cache.insert(key, gate);
                         }
                     }
@@ -131,8 +177,18 @@ impl FilterContainer {
         } else {
             // --- FILE SPECIFIC MODE ---
             for (file_id, gate_spec) in &self.per_file_filters {
-                let file_gate = gate_spec.to_drawable(gate_id.clone(), self.name.clone(), flow_gates::GateMode::Global, rect_to_polygon)?;
-                println!("CREATED FILE-SPECIFIC GATE! ID: {}, Name: {}, File: {}", file_gate.get_id(), file_gate.get_name(), file_id);
+                let file_gate = gate_spec.to_drawable(
+                    gate_id.clone(),
+                    self.name.clone(),
+                    flow_gates::GateMode::Global,
+                    rect_to_polygon,
+                )?;
+                println!(
+                    "CREATED FILE-SPECIFIC GATE! ID: {}, Name: {}, File: {}",
+                    file_gate.get_id(),
+                    file_gate.get_name(),
+                    file_id
+                );
 
                 collections.push((
                     GateSource::Sample((gate_id.clone(), file_id.clone())),
@@ -217,9 +273,41 @@ pub enum GateSerialized {
 }
 
 impl GateSerialized {
-    pub fn to_drawable(&self, id: Arc<str>, name: Arc<str>, gate_mode: flow_gates::GateMode, rect_to_polygon: bool) -> anyhow::Result<Arc<dyn DrawableGate>> {
+    pub fn get_params(&self) -> (Arc<str>, Arc<str>) {
         match self {
-            GateSerialized::Rectangle { x_param, y_param, min, max, label_position } => {
+            GateSerialized::Rectangle {
+                x_param, y_param, ..
+            } => (x_param.clone(), y_param.clone()),
+            GateSerialized::Polygon {
+                x_param, y_param, ..
+            } => (x_param.clone(), y_param.clone()),
+            GateSerialized::Ellipse {
+                x_param, y_param, ..
+            } => (x_param.clone(), y_param.clone()),
+            GateSerialized::Line {
+                x_param, y_param, ..
+            } => (x_param.clone(), y_param.clone()),
+            GateSerialized::Angle {
+                x_param, y_param, ..
+            } => (x_param.clone(), y_param.clone()),
+            GateSerialized::Unknown => panic!("unsupported gate type"),
+        }
+    }
+    pub fn to_drawable(
+        &self,
+        id: Arc<str>,
+        name: Arc<str>,
+        gate_mode: flow_gates::GateMode,
+        rect_to_polygon: bool,
+    ) -> anyhow::Result<Arc<dyn DrawableGate>> {
+        match self {
+            GateSerialized::Rectangle {
+                x_param,
+                y_param,
+                min,
+                max,
+                label_position,
+            } => {
                 let raw_coords = vec![
                     (min.x as f32, min.y as f32),
                     (max.x as f32, min.y as f32),
@@ -246,11 +334,16 @@ impl GateSerialized {
                     parameters,
                     label_position,
                 };
-                
-                Ok(Arc::new(RectangleGate::try_new(gate, true)?))
-            },
 
-            GateSerialized::Polygon { x_param, y_param, points, label_position } => {
+                Ok(Arc::new(RectangleGate::try_new(gate, true)?))
+            }
+
+            GateSerialized::Polygon {
+                x_param,
+                y_param,
+                points,
+                label_position,
+            } => {
                 let parameters = (x_param.clone(), y_param.clone());
                 let points: Vec<(f32, f32)> = points.iter().map(|&p| p.into()).collect();
                 let geom = create_polygon_geometry(points, x_param, y_param)?;
@@ -266,13 +359,26 @@ impl GateSerialized {
                     parameters,
                     label_position,
                 };
-                
+
                 Ok(Arc::new(PolygonGate::try_new(gate, true)?))
-                
             }
-            GateSerialized::Ellipse { x_param, y_param, left, top, right, bottom, label_position } => {
+            GateSerialized::Ellipse {
+                x_param,
+                y_param,
+                left,
+                top,
+                right,
+                bottom,
+                label_position,
+            } => {
                 let parameters = (x_param.clone(), y_param.clone());
-                let geom = create_omiq_ellipse_geometry((*left).into(), (*right).into(), (*top).into(), x_param, y_param)?;
+                let geom = create_omiq_ellipse_geometry(
+                    (*left).into(),
+                    (*right).into(),
+                    (*top).into(),
+                    x_param,
+                    y_param,
+                )?;
                 let label_position = label_position.map(|p| LabelPosition {
                     offset_x: p.x as f32,
                     offset_y: p.y as f32,
@@ -287,12 +393,19 @@ impl GateSerialized {
                 };
                 Ok(Arc::new(EllipseGate::try_new(gate, true)?))
             }
-            GateSerialized::Line { x_param, y_param, f1min, f1max, label_position } => {
+            GateSerialized::Line {
+                x_param,
+                y_param,
+                f1min,
+                f1max,
+                label_position,
+            } => {
                 let parameters = (x_param.clone(), y_param.clone());
                 let max = (*f1max as f32, f32::MAX);
                 let min = (*f1min as f32, f32::MIN);
                 let coords = vec![min, max];
-                let geom = flow_gates::geometry::create_rectangle_geometry(coords, x_param, y_param)?;
+                let geom =
+                    flow_gates::geometry::create_rectangle_geometry(coords, x_param, y_param)?;
                 let label_position = label_position.map(|p| LabelPosition {
                     offset_x: p.x as f32,
                     offset_y: p.y as f32,
@@ -306,9 +419,11 @@ impl GateSerialized {
                     label_position,
                 };
                 Ok(Arc::new(LineGate::try_new(gate, 0f32, true)?))
-            },
+            }
             GateSerialized::Angle { .. } => {
-                panic!("Angle gates are only part of composites and should not be directly deserialized into DrawableGates. They are handled separately in the composite gate logic.");
+                panic!(
+                    "Angle gates are only part of composites and should not be directly deserialized into DrawableGates. They are handled separately in the composite gate logic."
+                );
             }
             GateSerialized::Unknown => todo!(),
         }
@@ -360,7 +475,7 @@ fn create_omiq_ellipse_geometry(
     // These vectors represent the affine skew from the center to the nodes
     let dx1 = right.0 - cx;
     let dy1 = right.1 - cy;
-    
+
     let dx2 = top.0 - cx;
     let dy2 = top.1 - cy;
 
@@ -385,7 +500,11 @@ fn create_omiq_ellipse_geometry(
     // 5. Calculate the True Rotation Angle
     // The angle is derived from the eigenvector corresponding to lambda1
     let angle = if f == 0.0 {
-        if e > g { 0.0 } else { std::f64::consts::PI / 2.0 }
+        if e > g {
+            0.0
+        } else {
+            std::f64::consts::PI / 2.0
+        }
     } else {
         // Rust's atan2 takes (y, x)
         (lambda1 - e).atan2(f)
@@ -403,5 +522,3 @@ fn create_omiq_ellipse_geometry(
         angle: angle as f32,
     })
 }
-
-

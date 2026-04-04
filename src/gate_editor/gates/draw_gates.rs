@@ -1,5 +1,5 @@
 use crate::gate_editor::gates::gate_store::{GateOverrideResolver, GateStateStoreExt};
-use crate::gate_editor::plots::axis_store::{AxisStore};
+use crate::gate_editor::plots::axis_store::AxisStore;
 use crate::gate_editor::plots::axis_store::AxisStoreStoreExt;
 use crate::gate_editor::plots::plot_store::{PlotStore, PlotStoreStoreExt};
 use crate::gate_editor::{
@@ -12,21 +12,25 @@ use crate::gate_editor::{
         gate_traits::DrawableGate,
         gate_types::{Direction, GateRenderShape, GateStats, PrimaryGateType, ShapeType},
     },
-    plots::axis_store::{PlotMapper},
+    plots::axis_store::PlotMapper,
 };
 use dioxus::{prelude::*, stores::SyncStore};
 use rustc_hash::FxHashMap;
-use std::sync::Arc;
 use std::ops::Deref;
+use std::sync::Arc;
 
 #[derive(Clone)]
 struct GateList(Vec<Arc<dyn DrawableGate>>);
 
 impl PartialEq for GateList {
     fn eq(&self, other: &Self) -> bool {
-        if self.0.len() != other.0.len() { return false; }
+        if self.0.len() != other.0.len() {
+            return false;
+        }
         // Check if every Arc pointer is identical to the previous one
-        self.0.iter().zip(other.0.iter())
+        self.0
+            .iter()
+            .zip(other.0.iter())
             .all(|(a, b)| Arc::ptr_eq(a, b))
     }
 }
@@ -38,7 +42,6 @@ impl Deref for GateList {
     }
 }
 
-
 #[component]
 pub fn GateLayer(
     x_channel: ReadSignal<Arc<str>>,
@@ -49,7 +52,6 @@ pub fn GateLayer(
 
     let resolver = use_context::<Signal<Option<Arc<GateOverrideResolver>>>>();
 
-
     let mut gate_store = use_context::<SyncStore<GateState>>();
     let mut draft_gate_coords = use_signal(|| Vec::<(f32, f32)>::new());
 
@@ -59,21 +61,26 @@ pub fn GateLayer(
     let axis_store = use_context::<Store<AxisStore>>();
 
     let gates = use_memo(move || {
-        let Some(resolver) = resolver() else {return GateList(vec![]);};
-        let(x, y, parent) = (x_channel(), y_channel(), parental_gate_id());
-        let g = gate_store.get_gates_for_plot(x, y, parent, &resolver)
+        let Some(resolver) = resolver() else {
+            return GateList(vec![]);
+        };
+        let (x, y, parent) = (x_channel(), y_channel(), parental_gate_id());
+        let g = gate_store
+            .get_gates_for_plot(x, y, parent, &resolver)
             .unwrap_or_default();
         GateList(g)
     });
 
     use_effect(move || {
         println!("matching gates to plot");
-        let(x, y, parent) = (x_channel(), y_channel(), parental_gate_id());
-        let Some(resolver) = resolver.peek().clone() else {return;};
+        let (x, y, parent) = (x_channel(), y_channel(), parental_gate_id());
+        let Some(resolver) = resolver.peek().clone() else {
+            return;
+        };
         let _ = plot_store.current_file_id();
         let _ = gate_store
-                .match_gates_to_plot(x.clone(), y.clone(), parent.clone(), &resolver)
-                .inspect_err(|e| println!("{}", e.to_string()));
+            .match_gates_to_plot(x.clone(), y.clone(), parent.clone(), &resolver)
+            .inspect_err(|e| println!("{}", e.to_string()));
     });
 
     // convert clicked coords into a draft gate
@@ -99,7 +106,6 @@ pub fn GateLayer(
     //     let x_param = x_channel();
     //     let y_param = y_channel();
 
-        
     // });
 
     // the list of finalised gates
@@ -115,22 +121,33 @@ pub fn GateLayer(
     let _ = use_resource(move || async move {
         let x_key = x_channel.read().clone();
         let y_key = y_channel.read().clone();
-        let Some(resolver) = resolver() else {return;};
+        let Some(resolver) = resolver() else {
+            return;
+        };
         let event_index_option = plot_store.event_index_map()();
-        if let Ok(gates_on_plot) = gate_store.get_gates_for_plot(x_key, y_key, parental_gate_id(), &resolver)
+        if let Ok(gates_on_plot) =
+            gate_store.get_gates_for_plot(x_key, y_key, parental_gate_id(), &resolver)
         {
             if let Some(event_index_map) = event_index_option {
-                let join_result = tokio::task::spawn_blocking(move || -> anyhow::Result<FxHashMap<Arc<str>, GateStats>> {
-                    let mut stat_map = FxHashMap::default();
-                    let parental_events = event_index_map.event_index.len() as f32;
-                    for gate in gates_on_plot{
-                        let id = gate.get_id();
-                        let stats = crate::gate_editor::gates::gate_stats::get_percent_and_counts_gate(gate, &event_index_map, parental_events)?;
-                        stat_map.insert(id, stats);
-                    }
+                let join_result = tokio::task::spawn_blocking(
+                    move || -> anyhow::Result<FxHashMap<Arc<str>, GateStats>> {
+                        let mut stat_map = FxHashMap::default();
+                        let parental_events = event_index_map.event_index.len() as f32;
+                        for gate in gates_on_plot {
+                            let id = gate.get_id();
+                            let stats =
+                                crate::gate_editor::gates::gate_stats::get_percent_and_counts_gate(
+                                    gate,
+                                    &event_index_map,
+                                    parental_events,
+                                )?;
+                            stat_map.insert(id, stats);
+                        }
 
-                    Ok(stat_map)
-                }).await;
+                        Ok(stat_map)
+                    },
+                )
+                .await;
 
                 match join_result {
                     Ok(Ok(index)) => *plot_store.gate_stats().write() = index,
@@ -157,9 +174,12 @@ pub fn GateLayer(
     let mut dbl_click_lockout = use_signal(|| false);
     let mut last_processed_pos = use_signal(|| (0.0f32, 0.0f32));
     let mut svg_data: Signal<Option<std::rc::Rc<MountedData>>> = use_signal(|| None);
-    let Some(current_resolver_move) = resolver.peek().clone() else {return rsx!{ "No Gate Resolver" }};
-    let Some(current_resolver_up) = resolver.peek().clone() else {return rsx!{ "No Gate Resolver" }};
-
+    let Some(current_resolver_move) = resolver.peek().clone() else {
+        return rsx! { "No Gate Resolver" };
+    };
+    let Some(current_resolver_up) = resolver.peek().clone() else {
+        return rsx! { "No Gate Resolver" };
+    };
 
     let Some(mapper) = plot_map.read().clone() else {
         return rsx! { "Loading mapper..." };
@@ -508,9 +528,6 @@ pub fn GateLayer(
             }
         }
     }
-
-        
-    
 }
 
 #[derive(Props, Clone)]
@@ -524,14 +541,13 @@ pub struct RenderGateProps {
 }
 
 impl PartialEq for RenderGateProps {
-    
     fn eq(&self, other: &Self) -> bool {
         self.is_selected == other.is_selected
-        && self.gate_index == other.gate_index
-        && Arc::ptr_eq(&self.gate, &other.gate)
-        && self.gate_stats == other.gate_stats
-        && self.drag_data == other.drag_data
-        && Arc::ptr_eq(&self.mapper, &other.mapper)
+            && self.gate_index == other.gate_index
+            && Arc::ptr_eq(&self.gate, &other.gate)
+            && self.gate_stats == other.gate_stats
+            && self.drag_data == other.drag_data
+            && Arc::ptr_eq(&self.mapper, &other.mapper)
     }
 }
 
@@ -618,7 +634,6 @@ fn RenderShape(
     shape_index: usize,
     drag_data: Option<GateDragType>,
 ) -> Element {
-
     let plot_map = use_context::<Signal<Option<Arc<PlotMapper>>>>();
     let mut drag_data_signal = use_context::<Signal<Option<GateDragType>>>();
     if let Some(mapper) = &*plot_map.read() {
@@ -949,5 +964,4 @@ fn RenderShape(
     } else {
         rsx! {}
     }
-    
 }

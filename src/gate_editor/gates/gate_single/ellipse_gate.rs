@@ -335,7 +335,9 @@ impl DrawableGate for EllipseGate {
     fn is_finalised(&self) -> bool {
         true
     }
-
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
     fn draw_self(
         &self,
         is_selected: bool,

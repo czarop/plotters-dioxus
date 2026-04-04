@@ -1,49 +1,39 @@
-
 use crate::file_load::FcsSampleStub;
-use crate::omiq::metadata::MetaDataStoreStoreExt;
-use crate::gate_editor::gates::gate_store::{GateOverrideResolver};
+use crate::gate_editor::gates::gate_store::GateOverrideResolver;
 use crate::gate_editor::plots::data_helpers::{
     get_event_mask_from_scaled_df, get_filtered_dataframe, get_flow_data, zip_cols_from_filtered_df,
 };
 use crate::gate_editor::plots::draw_plot::PseudoColourPlot;
+use crate::omiq::metadata::MetaDataStoreStoreExt;
 
-use crate::gate_editor::plots::plot_store::{PlotStore, PlotStoreStoreExt, EventIndexMapped};
-use crate::omiq::metadata::MetaDataStore;
-use crate::{
-
-    gate_editor::{
-        AxisInfo,
-
-        gates::{
-            GateState,
-            gate_store::{GateStateImplExt},
-        },
-        plots::axis_store::{Param, AxisStore, AxisStoreImplExt, AxisStoreStoreExt},
-    },
+use crate::gate_editor::plots::plot_store::{EventIndexMapped, PlotStore, PlotStoreStoreExt};
+use crate::gate_editor::{
+    AxisInfo,
+    gates::{GateState, gate_store::GateStateImplExt},
+    plots::axis_store::{AxisStore, AxisStoreImplExt, AxisStoreStoreExt, Param},
 };
+use crate::omiq::metadata::MetaDataStore;
 use dioxus::{CapturedError, prelude::*};
 use polars::frame::DataFrame;
 
 use std::sync::Arc;
-
 
 #[component]
 pub fn PlotWindow(
     sample_stub: ReadSignal<FcsSampleStub>,
     x_axis_marker: ReadSignal<Param>,
     y_axis_marker: ReadSignal<Param>,
-    parental_gate: ReadSignal<Option<Arc<str>>>
+    parental_gate: ReadSignal<Option<Arc<str>>>,
 ) -> Element {
-
-
     let mut gate_store = use_context::<Store<GateState, CopyValue<GateState, SyncStorage>>>();
     let mut gate_resolver_store: Signal<Option<Arc<GateOverrideResolver>>> = use_signal(|| None);
     use_context_provider(|| gate_resolver_store);
-    
+
     let plot_store = use_store(|| PlotStore::default());
     use_context_provider(|| plot_store);
 
-    let metadata_store = use_context::<Store<MetaDataStore, CopyValue<MetaDataStore, SyncStorage>>>();
+    let metadata_store =
+        use_context::<Store<MetaDataStore, CopyValue<MetaDataStore, SyncStorage>>>();
 
     let mut axis_store = use_context::<Store<AxisStore>>();
 
@@ -52,14 +42,20 @@ pub fn PlotWindow(
     let _ = use_resource(move || async move {
         let sample = &*sample_stub.read();
 
-        let Some(file_name) = sample.get_filepath().file_name() else {return};
-        let Some(file_name) = file_name.to_str() else {return};
-        let Some(id) = metadata_store.file_name_to_gating_id()
+        let Some(file_name) = sample.get_filepath().file_name() else {
+            return;
+        };
+        let Some(file_name) = file_name.to_str() else {
+            return;
+        };
+        let Some(id) = metadata_store
+            .file_name_to_gating_id()
             .read()
             .get(file_name)
-            .cloned() else {
-                return
-            };
+            .cloned()
+        else {
+            return;
+        };
 
         match get_flow_data(std::path::PathBuf::from(sample.get_filepath())).await {
             Ok(f) => {
@@ -71,12 +67,12 @@ pub fn PlotWindow(
                 println!("error generating fcs file {}", e);
             }
         }
-        
     });
 
     use_effect(move || {
         if let Some(fcs_file) = &*fcs_file.read() {
-            let mut sorted_settings = indexmap::IndexSet::with_hasher(rustc_hash::FxBuildHasher::default());
+            let mut sorted_settings =
+                indexmap::IndexSet::with_hasher(rustc_hash::FxBuildHasher::default());
 
             // 1. Get the parameters and sort them by their internal FCS parameter number once
             let mut params_to_add: Vec<_> = fcs_file.parameters.values().collect();
@@ -88,16 +84,16 @@ pub fn PlotWindow(
                     marker: fcs_param.label_name.clone(),
                     fluoro: fcs_param.channel_name.clone(),
                 };
-                
+
                 // Add settings to the FxHashMap if not present
                 axis_store.add_new_default_axis_settings(&p, &fcs_file);
-                
+
                 // Insert into the IndexSet (Order is preserved automatically)
                 sorted_settings.insert(p.clone());
             }
 
             // 3. Update the store's set
-            *axis_store.sorted_settings().write()= sorted_settings;
+            *axis_store.sorted_settings().write() = sorted_settings;
         }
     });
 
@@ -132,7 +128,6 @@ pub fn PlotWindow(
         }
     });
 
-
     // fetch the axis limits from the settings dict when axis changed
     let x_axis_limits = use_memo(move || {
         let param = x_axis_marker.read();
@@ -150,19 +145,21 @@ pub fn PlotWindow(
         }
     });
 
-
     let resolver = use_memo(move || {
         let id: Arc<str> = plot_store.current_file_id()();
-        let Some(groups) = metadata_store.metadata()().get(&id).cloned() else {return Err(CapturedError::from_display(format!("no metadata for file {}", id)))};
+        let Some(groups) = metadata_store.metadata()().get(&id).cloned() else {
+            return Err(CapturedError::from_display(format!(
+                "no metadata for file {}",
+                id
+            )));
+        };
         match gate_store.get_current_sample(id.clone(), &groups) {
             Ok(resolver) => {
                 gate_resolver_store.set(Some(Arc::new(resolver.clone())));
                 Ok(resolver)
-            },
+            }
             Err(e) => Err(e),
         }
-        
-        
     });
 
     let mut plot_data_signal = use_signal(|| vec![]);
@@ -263,18 +260,20 @@ pub fn PlotWindow(
     });
 
     match &*event_index.read() {
-            Some(Ok(_)) => {}
-            Some(Err(e)) => return rsx! {
+        Some(Ok(_)) => {}
+        Some(Err(e)) => {
+            return rsx! {
                 div { class: "spinner-container", "{e}" }
-            },
-            None => return rsx! {
+            };
+        }
+        None => {
+            return rsx! {
                 div { class: "spinner-container",
                     div { class: "spinner" }
                 }
-            },
+            };
         }
-
-    
+    }
 
     rsx! {
 
@@ -306,11 +305,7 @@ pub fn PlotWindow(
                     rsx! {}
                 }
             }
-        
+
         }
     }
-
-        }
-    
-    
-
+}

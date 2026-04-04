@@ -152,6 +152,9 @@ impl QuadrantGate {
 }
 
 impl DrawableGate for QuadrantGate {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
     fn is_finalised(&self) -> bool {
         true
     }

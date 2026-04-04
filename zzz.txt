@@ -1,6 +1,5 @@
 Gates:
 import booleans from omiq
-import skewed quadrants from omiq
 
 gate axis limits 'niceifying' is not working well - it gives too much above the plot. This is a lib feature??
 Allow choosing other gates at the same level for AND and OR

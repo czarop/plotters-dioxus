@@ -1,7 +1,7 @@
 use crate::components::context_menu::*;
 use crate::gate_editor::gates::GateState;
 use crate::gate_editor::gates::gate_store::{GateStateImplExt, GateStateStoreExt, ROOTGATE};
-use crate::gate_editor::plots::axis_store::{AxisStore, Param, AxisStoreStoreExt};
+use crate::gate_editor::plots::axis_store::{AxisStore, AxisStoreStoreExt, Param};
 use dioxus::prelude::*;
 use dioxus::stores::SyncStore;
 use std::sync::Arc;
@@ -37,7 +37,7 @@ pub fn GateSidebar(
                         }
                     }
                 }
-            
+
             }
         }
     }
@@ -207,7 +207,7 @@ fn GateNode(
                             },
                             "🎯"
                         }
-                    
+
                     }
 
                     // 4. The Children (Recursive call)
@@ -324,7 +324,7 @@ fn GateNode(
                     "Add OR Gate"
                 }
             }
-        
+
         }
     }
 }

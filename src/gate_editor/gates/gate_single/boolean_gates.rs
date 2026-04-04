@@ -43,6 +43,9 @@ impl BooleanGate {
 }
 
 impl DrawableGate for BooleanGate {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
     fn get_gate_ref(&self, _id: Option<&str>) -> Option<&flow_gates::Gate> {
         Some(&self.inner)
     }

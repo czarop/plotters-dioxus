@@ -93,7 +93,7 @@ impl BisectorGate {
         let parameters = (x_axis_param.clone(), y_axis_param.clone());
 
         let geos = create_default_bisector_from_data(center, &x_axis_param, &y_axis_param)?;
-        
+
         let id_left_arc = subgate_ids.0.clone();
         let id_right_arc = subgate_ids.1.clone();
 
@@ -234,6 +234,9 @@ impl BisectorGate {
 }
 
 impl super::super::gate_traits::DrawableGate for BisectorGate {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
     fn is_finalised(&self) -> bool {
         true
     }
@@ -601,16 +604,14 @@ fn create_default_bisector(
     y_channel: &str,
 ) -> anyhow::Result<(GateGeometry, GateGeometry)> {
     let cx_data = plot_map.pixel_x_to_data(cx_raw, None);
-    create_default_bisector_from_data( cx_data, x_channel, y_channel)
+    create_default_bisector_from_data(cx_data, x_channel, y_channel)
 }
 
 fn create_default_bisector_from_data(
-
     cx_data: f32,
     x_channel: &str,
     y_channel: &str,
 ) -> anyhow::Result<(GateGeometry, GateGeometry)> {
-
     let max_left = (cx_data, f32::MAX);
     let min_left = (f32::MIN, f32::MIN);
     let coords = vec![min_left, max_left];

@@ -39,9 +39,8 @@ pub fn MainWindow() -> Element {
     let mut metadata_store = use_store_sync(|| MetaDataStore::default());
     use_context_provider(|| metadata_store);
 
-    let meta_result = use_resource(move || { async move{
+    let meta_result = use_resource(move || async move {
         let result = tokio::task::spawn_blocking(move || -> Result<(), anyhow::Error> {
-            
             let content = std::fs::read_to_string("file_paths.txt")?;
             let second_line = content
                 .lines()
@@ -50,16 +49,14 @@ pub fn MainWindow() -> Element {
                 .ok_or_else(|| anyhow::anyhow!("File does not have a second non-empty line"))?;
             let path = PathBuf::from(second_line);
             metadata_store.set_metadata_from_file(path, "OmiqID", "Filename", MetaDataOrigin::Omiq)
+        })
+        .await;
 
-        }).await;
-        
-        
-
-        match result{
+        match result {
             Ok(r) => r,
             Err(e) => Err(anyhow::anyhow!("Failed to load metadata from file {}", e)),
         }
-    }});
+    });
 
     let mut gate_store: Store<GateState, CopyValue<GateState, SyncStorage>> =
         use_store_sync(|| GateState::default());
@@ -72,7 +69,6 @@ pub fn MainWindow() -> Element {
     use_context_provider(|| axis_store);
 
     let file_result = use_resource(move || async move {
-
         let result = tokio::task::spawn_blocking(move || -> anyhow::Result<FcsFiles> {
             let content = std::fs::read_to_string("file_paths.txt")?;
             let path = content
@@ -81,8 +77,8 @@ pub fn MainWindow() -> Element {
                 .ok_or_else(|| anyhow::anyhow!("No path found"))?;
 
             FcsFiles::create(path.trim())
-        
-        }).await;
+        })
+        .await;
 
         match result {
             Ok(Ok(files)) => {
@@ -97,7 +93,7 @@ pub fn MainWindow() -> Element {
             Err(e) => {
                 message.set(Some(e.to_string()));
                 Err(anyhow::anyhow!("Failed to load files from path {}", e))
-            },
+            }
         }
     });
 
@@ -155,40 +151,41 @@ pub fn MainWindow() -> Element {
     let mut upload_succeded = use_signal(|| false);
     use_effect(move || {
         // spawn(async move {
-            // let path: PathBuf = PathBuf::from("/Users/czarop/Downloads/unscaled_t/test - Gating (2).omiqgt");
+        // let path: PathBuf = PathBuf::from("/Users/czarop/Downloads/unscaled_t/test - Gating (2).omiqgt");
 
-            if *upload_succeded.peek() {
-                return;
+        if *upload_succeded.peek() {
+            return;
+        }
+
+        let metadata = metadata_store.metadata().read().clone();
+        if metadata.is_empty() {
+            println!("Metadata is empty, skipping gate loading");
+            return;
+        }
+
+        let axis_settings = axis_store.settings().read().clone();
+        if axis_settings.is_empty() {
+            println!("Axis settings are empty, skipping gate loading");
+            return;
+        }
+
+        let content = std::fs::read_to_string("file_paths.txt").expect("Failed to read file paths");
+        let third_line = content
+            .lines()
+            .filter(|l| !l.trim().is_empty())
+            .nth(2)
+            .ok_or_else(|| anyhow::anyhow!("File does not have a third non-empty line"))
+            .expect("");
+        let path = PathBuf::from(third_line);
+
+        match gate_store.upload_gates_from_file(path, &metadata, axis_settings) {
+            Ok(_) => {
+                upload_succeded.set(true);
+                println!("Gates loaded successfully")
             }
-
-            let metadata = metadata_store.metadata().read().clone();
-            if metadata.is_empty() {
-                println!("Metadata is empty, skipping gate loading");
-                return;
-            }
-
-            let axis_settings = axis_store.settings().read().clone();
-            if axis_settings.is_empty() {
-                println!("Axis settings are empty, skipping gate loading");
-                return;
-            }
-
-            let content = std::fs::read_to_string("file_paths.txt").expect("Failed to read file paths");
-            let third_line = content
-                .lines()
-                .filter(|l| !l.trim().is_empty())
-                .nth(2)
-                .ok_or_else(|| anyhow::anyhow!("File does not have a third non-empty line")).expect("");
-            let path = PathBuf::from(third_line);
-            
-            
-
-            match gate_store.upload_gates_from_file(path, &metadata, axis_settings){
-                Ok(_) => {upload_succeded.set(true); println!("Gates loaded successfully")},
-                Err(e) => println!("Failed to load gates: {:#?}", e),
-            };
+            Err(e) => println!("Failed to load gates: {:#?}", e),
+        };
         // });
-
     });
 
     let parental_gate: Signal<Option<Arc<str>>> = use_signal(|| Some(ROOTGATE.clone()));
@@ -476,7 +473,7 @@ pub fn MainWindow() -> Element {
                             }
                             None => rsx! {},
                         }
-                    
+
                     }
                 }
 
@@ -511,7 +508,7 @@ pub fn MainWindow() -> Element {
                         }
                     }
                 }
-            
+
             }
         }
     }

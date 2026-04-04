@@ -101,8 +101,8 @@ impl DataPoints {
     }
 
     pub fn new_from_data_center(
-        cx: f32, 
-        cy: f32, 
+        cx: f32,
+        cy: f32,
         x_axis_range: RangeInclusive<f32>,
         y_axis_range: RangeInclusive<f32>,
         x_data_range: RangeInclusive<f32>,
@@ -111,7 +111,7 @@ impl DataPoints {
         let (xmin, xmax) = (*x_axis_range.start(), *x_axis_range.end());
         let (ymin, ymax) = (*y_axis_range.start(), *y_axis_range.end());
 
-        // 1. Clamp the center to the VISUAL axis boundaries 
+        // 1. Clamp the center to the VISUAL axis boundaries
         // This prevents the center handle from being lost if Omiq data is off-plot
         let safe_cx = cx.clamp(xmin, xmax);
         let safe_cy = cy.clamp(ymin, ymax);
@@ -329,6 +329,9 @@ impl SkewedQuadrantGate {
 }
 
 impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
     fn is_finalised(&self) -> bool {
         true
     }

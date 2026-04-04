@@ -23,18 +23,18 @@ fn FPSCounter() -> Element {
         loop {
             // High-frequency measurement (approx 60fps check)
             tokio::time::sleep(std::time::Duration::from_millis(16)).await;
-            
+
             let now = std::time::Instant::now();
             let elapsed = now.duration_since(*last_measured_time.peek()).as_secs_f32();
-            
+
             if elapsed > 0.0 {
                 let current_fps = 1.0 / elapsed;
-                
+
                 // Track frames and time since last UI update
                 frame_count.with_mut(|c| *c += 1);
-                
+
                 let ui_elapsed = now.duration_since(*last_ui_update.peek()).as_secs_f32();
-                
+
                 // Only update the visible signal ~5 times per second (every 200ms)
                 if ui_elapsed >= 0.2 {
                     display_fps.set(current_fps);
@@ -47,7 +47,7 @@ fn FPSCounter() -> Element {
     });
 
     rsx! {
-        div { style: "position: fixed; bottom: 20px; right: 20px; 
+        div { style: "position: fixed; bottom: 20px; right: 20px;
                     background: rgba(20, 20, 20, 0.9); color: #00ff00; 
                     padding: 10px 15px; font-family: monospace; 
                     border: 2px solid #333; border-radius: 8px; 
@@ -76,19 +76,13 @@ fn App() -> Element {
 // #[cfg(feature = "desktop")]
 fn main() {
     unsafe { std::env::set_var("RUST_BACKTRACE", "full") };
-    
-
-
 
     dioxus::LaunchBuilder::new()
         .with_cfg(
-            Config::new()
-            .with_disable_context_menu(true)
-            .with_window(
+            Config::new().with_disable_context_menu(true).with_window(
                 WindowBuilder::new()
                     .with_title("FCS Plot Viewer")
                     .with_inner_size(LogicalSize::new(1600.0, 950.0)),
-                    
             ),
         )
         .launch(App);

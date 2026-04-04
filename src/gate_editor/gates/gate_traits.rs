@@ -1,6 +1,6 @@
-use std::sync::Arc;
-
 use flow_fcs::TransformType;
+use std::any::Any;
+use std::sync::Arc;
 
 use crate::gate_editor::{
     gates::{
@@ -11,6 +11,7 @@ use crate::gate_editor::{
 };
 
 pub trait DrawableGate: Send + Sync {
+    fn as_any(&self) -> &dyn Any;
     fn get_gate_ref(&self, id: Option<&str>) -> Option<&flow_gates::Gate>;
     fn get_name(&self) -> &str;
     fn get_inner_gate_ids(&self) -> Vec<Arc<str>>;

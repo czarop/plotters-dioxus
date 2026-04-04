@@ -1,4 +1,3 @@
-
 use crate::gate_editor::main_window::MainWindow;
 use dioxus::prelude::*;
 
@@ -39,7 +38,7 @@ pub fn NavBar() -> Element {
                     div {
                         div { class: "nav_bar-item", "|" }
                     }
-                
+
                 // div {
                 //     if geolocation::check_geolocation_permission() == PermissionResult::GRANTED {
                 //         Link { to: route::Route::LocationMap,

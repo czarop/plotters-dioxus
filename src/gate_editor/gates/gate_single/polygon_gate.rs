@@ -223,7 +223,9 @@ impl DrawableGate for PolygonGate {
             self.is_primary,
         )?)))
     }
-
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
     fn rotate_gate(&self, _mouse_pos: (f32, f32)) -> anyhow::Result<Option<Box<dyn DrawableGate>>> {
         Ok(None)
     }

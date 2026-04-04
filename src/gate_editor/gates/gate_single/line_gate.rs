@@ -254,7 +254,9 @@ impl DrawableGate for LineGate {
         new_line.axis_matched = self.axis_matched;
         return Ok(Some(Box::new(new_line)));
     }
-
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
     fn rotate_gate(&self, _mouse_pos: (f32, f32)) -> anyhow::Result<Option<Box<dyn DrawableGate>>> {
         Ok(None)
     }

@@ -11,8 +11,8 @@ pub type MetaDataParameter = Arc<str>;
 #[derive(PartialEq, Clone, Hash, Debug, Eq)]
 pub struct MetaDataKey {
     pub parameter: MetaDataParameter,
-    pub group: GroupId
-} 
+    pub group: GroupId,
+}
 // pub type MetaDataFileMap =
 //     im::HashMap<MetaDataParameter, FxHashMap<FileId, GroupId>, FxBuildHasher>;
 pub type MetaDataFileMap =
@@ -92,10 +92,10 @@ impl<Lens> Store<MetaDataStore, Lens> {
         //     master_map.insert(Arc::from(col_name.as_str()), current_column_map);
         // }
 
-
         // 2. Prepare the metadata columns we actually want to process
         // We filter out the ID and Name columns once to save cycles in the row loop
-        let metadata_column_names: Vec<&PlSmallStr> = df.get_column_names()
+        let metadata_column_names: Vec<&PlSmallStr> = df
+            .get_column_names()
             .into_iter()
             .filter(|&name| name != file_id_column && name != file_name_column)
             .collect();
@@ -107,7 +107,7 @@ impl<Lens> Store<MetaDataStore, Lens> {
             for col_name in &metadata_column_names {
                 // Get the value for this specific row in this specific column
                 let col = df.column(col_name.as_str())?.str()?;
-                
+
                 if let Some(val) = col.get(row_idx) {
                     // Clean the parameter name (drop '$' if needed)
                     let param_name = Arc::from(col_name.as_str());
@@ -126,7 +126,6 @@ impl<Lens> Store<MetaDataStore, Lens> {
 
         Ok(())
     }
-
 }
 
 fn fetch_metadata_from_csv(path: PathBuf) -> anyhow::Result<DataFrame> {

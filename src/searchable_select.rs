@@ -257,7 +257,7 @@ pub fn SearchableSelectMap<
 pub fn SearchableSelectSet<
     T: Clone + PartialEq + Eq + std::fmt::Display + std::hash::Hash + 'static,
 >(
-    items: ReadSignal<indexmap::IndexSet<T, rustc_hash::FxBuildHasher> >,
+    items: ReadSignal<indexmap::IndexSet<T, rustc_hash::FxBuildHasher>>,
     on_select: EventHandler<(usize, T)>,
     placeholder: Option<String>,
     selected_index: Option<ReadSignal<usize>>,
