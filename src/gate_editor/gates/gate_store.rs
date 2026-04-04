@@ -11,8 +11,8 @@ use std::sync::{Arc, LazyLock};
 use uuid::Uuid;
 
 use crate::gate_editor::gates::gate_composite::skewed_quadrant_gate::DataPoints;
-use crate::gate_editor::gates::gate_single::boolean_gates::{self, BooleanGate};
-use crate::gate_editor::gates::gate_types::GateStats;
+use crate::gate_editor::gates::gate_single::boolean_gates::{ BooleanGate};
+
 use crate::gate_editor::{
     AxisInfo,
     gates::{
@@ -138,14 +138,14 @@ impl From<Arc<dyn DrawableGate>> for ComparableGate {
 
 // for overides generate a clone of the drawable in new position with the same Uuid
 impl GateOverrideResolver {
-    fn resolve(&self, id: &GateId) -> anyhow::Result<Gate> {
-        self.active_gates
-            .get(id)
-            .ok_or_else(|| anyhow::anyhow!("Gate {} not found in active set", id))?
-            .get_gate_ref(Some(id))
-            .map(|g| g.clone())
-            .ok_or_else(|| anyhow::anyhow!("Gate {} has no internal data", id))
-    }
+    // fn resolve(&self, id: &GateId) -> anyhow::Result<Gate> {
+    //     self.active_gates
+    //         .get(id)
+    //         .ok_or_else(|| anyhow::anyhow!("Gate {} not found in active set", id))?
+    //         .get_gate_ref(Some(id))
+    //         .map(|g| g.clone())
+    //         .ok_or_else(|| anyhow::anyhow!("Gate {} has no internal data", id))
+    // }
 
     fn resolve_drawable(&self, id: &str) -> anyhow::Result<Arc<dyn DrawableGate + 'static>> {
         let drawable = self
@@ -926,7 +926,6 @@ impl<Lens> Store<GateState, Lens> {
             let container = match container {
                 FilterContainer::Atomic(atomic_container) => atomic_container,
                 FilterContainer::Compound(compound_container) => {
-                    println!("inserting boolean into boolean gate list");
                     boolean_gates.push(compound_container.clone());
                     continue;
                 }
@@ -1196,11 +1195,12 @@ fn get_composite_gates_from_filter_container(
     let (x_axis_range, y_axis_range) =
         extract_axis_range_from_axis_settings(&params, &axis_settings)?;
 
-    let (subgate_ids, gate_id): (_, Arc<str>) = match &composite_type {
+    let (subgate_ids, subgate_names, gate_id): (_, _, Arc<str>) = match &composite_type {
         CompositeType::Bisector(id)
         | CompositeType::Quadrant(id)
         | CompositeType::SkewedQuadrant(id) => {
-            (get_sorted_subgate_ids(&subgates)?, Arc::from(id.as_str()))
+            let (ids, names) = get_sorted_subgate_ids_and_names(&subgates);
+            (ids, names, Arc::from(id.as_str()))
         }
     };
 
@@ -1214,6 +1214,7 @@ fn get_composite_gates_from_filter_container(
                 composite_group_id.clone(),
                 params,
                 &subgate_ids,
+                &subgate_names
             )?;
             map.insert(
                 (default_gate_arc.get_id(), GateSource::Global),
@@ -1232,6 +1233,7 @@ fn get_composite_gates_from_filter_container(
                 &x_axis_range,
                 &y_axis_range,
                 &subgate_ids,
+                &subgate_names
             )?;
             map.insert(
                 (default_gate_arc.get_id(), GateSource::Global),
@@ -1261,6 +1263,7 @@ fn get_composite_gates_from_filter_container(
                 &x_axis_range,
                 &y_axis_range,
                 subgate_ids.clone(),
+                &subgate_names
             )?;
             map.insert(
                 (default_gate_arc.get_id(), GateSource::Global),
@@ -1293,6 +1296,7 @@ fn get_composite_gates_from_filter_container(
                             composite_group_id.clone(),
                             params,
                             &subgate_ids,
+                            &subgate_names
                         )?;
                         group_cache.insert(group_id.clone(), new_gate.clone());
                         // Insert into the final map with the Group key
@@ -1334,6 +1338,7 @@ fn get_composite_gates_from_filter_container(
                             &x_axis_range,
                             &y_axis_range,
                             &subgate_ids,
+                            &subgate_names
                         )?;
                         group_cache.insert(group_id.clone(), new_gate.clone());
                         // Insert into the final map with the Group key
@@ -1395,6 +1400,7 @@ fn get_composite_gates_from_filter_container(
                             &x_data_range,
                             &y_data_range,
                             subgate_ids.clone(),
+                            &subgate_names
                         )?;
 
                         group_cache.insert(group_id.clone(), new_gate.clone());
@@ -1426,6 +1432,7 @@ fn get_composite_gates_from_filter_container(
                         composite_group_id.clone(),
                         params,
                         &subgate_ids,
+                        &subgate_names
                     )?;
 
                     map.insert(
@@ -1449,6 +1456,7 @@ fn get_composite_gates_from_filter_container(
                         &x_axis_range,
                         &y_axis_range,
                         &subgate_ids,
+                        &subgate_names
                     )?;
 
                     map.insert(
@@ -1492,6 +1500,7 @@ fn get_composite_gates_from_filter_container(
                         &x_data_range,
                         &y_data_range,
                         subgate_ids.clone(),
+                        &subgate_names
                     )?;
 
                     map.insert(
@@ -1508,14 +1517,15 @@ fn get_composite_gates_from_filter_container(
     Ok(map)
 }
 
-fn get_sorted_subgate_ids(subgates: &[(u32, AtomicContainer)]) -> anyhow::Result<Vec<Arc<str>>> {
+fn get_sorted_subgate_ids_and_names(subgates: &[(u32, AtomicContainer)]) -> (Vec<Arc<str>>, Vec<String>) {
     let mut sorted = subgates.to_vec();
     // Sort by position descending to match your mapping (0->3, 1->2, 2->1, 3->0)
     sorted.sort_by(|a, b| b.0.cmp(&a.0));
 
-    let ids: Vec<Arc<str>> = sorted.into_iter().map(|(_, fc)| fc.id.clone()).collect();
+    let ids: Vec<Arc<str>> = sorted.iter().map(|(_, fc)| fc.id.clone()).collect();
+    let names: Vec<String> = sorted.into_iter().map(|(_, fc)| fc.name.to_string()).collect();
 
-    Ok(ids)
+    (ids, names)
 }
 
 fn extract_data_range_from_axis_settings(
@@ -1583,6 +1593,7 @@ fn get_quadrant_gate_for_filter_container(
     x_axis_range: &RangeInclusive<f32>,
     y_axis_range: &RangeInclusive<f32>,
     subgate_ids: &[Arc<str>],
+    subgate_names: &[String]
 ) -> anyhow::Result<Arc<dyn DrawableGate>> {
     let default_data_points = make_data_points_for_quadrant_filter(
         filter,
@@ -1591,6 +1602,12 @@ fn get_quadrant_gate_for_filter_container(
         x_axis_range,
         y_axis_range,
     )?;
+    let subgate_names: (String, String, String, String) = subgate_names
+        .iter()
+        .cloned()
+        .collect_tuple()
+        .ok_or_else(|| anyhow::anyhow!("Expected 4 items"))?;
+
     let default_gate = QuadrantGate::try_new_from_data_points(
         id,
         name,
@@ -1599,6 +1616,7 @@ fn get_quadrant_gate_for_filter_container(
         params.1.clone(),
         true,
         Some(subgate_ids.to_vec()),
+        Some(subgate_names)
     )?;
     let default_gate_arc: Arc<dyn DrawableGate> = Arc::new(default_gate);
     Ok(default_gate_arc)
@@ -1610,6 +1628,7 @@ fn get_bisector_gate_for_filter_container(
     name: String,
     params: (&Arc<str>, &Arc<str>),
     subgate_ids: &[Arc<str>],
+    subgate_names: &[String],
 ) -> anyhow::Result<Arc<dyn DrawableGate>> {
     let center = if let GateSerialized::Line { f1max, .. } = filter {
         *f1max as f32
@@ -1621,6 +1640,11 @@ fn get_bisector_gate_for_filter_container(
         .cloned()
         .collect_tuple()
         .ok_or_else(|| anyhow::anyhow!("Expected 2 items"))?;
+    let subgate_names: (String, String) = subgate_names
+        .iter()
+        .cloned()
+        .collect_tuple()
+        .ok_or_else(|| anyhow::anyhow!("Expected 2 items"))?;
     let default_gate = BisectorGate::try_new_from_data_center(
         id,
         name,
@@ -1628,6 +1652,7 @@ fn get_bisector_gate_for_filter_container(
         params.0.clone(),
         params.1.clone(),
         subgate_ids.clone(),
+        Some(subgate_names)
     )?;
     let default_gate_arc: Arc<dyn DrawableGate> = Arc::new(default_gate);
     Ok(default_gate_arc)
@@ -1731,6 +1756,7 @@ fn get_skewed_quadrant_gate(
     x_data_range: &RangeInclusive<f32>,
     y_data_range: &RangeInclusive<f32>,
     subgate_ids: Vec<Arc<str>>,
+    subgate_names: &[String]
 ) -> anyhow::Result<Arc<dyn DrawableGate>> {
     let default_gate_map: FxHashMap<_, _> = subgates
         .iter()
@@ -1751,6 +1777,12 @@ fn get_skewed_quadrant_gate(
         })
         .collect::<anyhow::Result<FxHashMap<_, _>>>()?;
 
+    let subgate_names: (String, String, String, String) = subgate_names
+        .iter()
+        .cloned()
+        .collect_tuple()
+        .ok_or_else(|| anyhow::anyhow!("Expected 4 items"))?;
+
     let data_points = angle_gates_to_skewed_data_points(
         default_gate_map,
         x_data_range.clone(),
@@ -1765,7 +1797,29 @@ fn get_skewed_quadrant_gate(
         params.1.clone(),
         true,
         Some(subgate_ids.clone()),
+        Some(subgate_names)
     )?;
 
     Ok(Arc::new(gate))
+}
+
+fn validate_metadata_requirements(
+    containers: &FxHashMap<GateId, FilterContainer>,
+    metadata_headers: &HashSet<Arc<str>>,
+) {
+    for container in containers.values() {
+        if let FilterContainer::Atomic(atomic) = container {
+            if let Some(required_md) = &atomic.md {
+                // Check if the metadata CSV actually has this column
+                if !metadata_headers.contains(required_md) {
+                    println!(
+                        "Gate '{}' ({}) requires metadata column '{}', but it's missing from the CSV!",
+                        atomic.name,
+                        atomic.id,
+                        required_md
+                    );
+                }
+            }
+        }
+    }
 }

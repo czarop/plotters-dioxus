@@ -18,6 +18,7 @@ use dioxus::{prelude::*, stores::SyncStore};
 use rustc_hash::FxHashMap;
 use std::ops::Deref;
 use std::sync::Arc;
+use std::time::Duration;
 
 #[derive(Clone)]
 struct GateList(Vec<Arc<dyn DrawableGate>>);
@@ -172,7 +173,11 @@ pub fn GateLayer(
     });
 
     let mut dbl_click_lockout = use_signal(|| false);
-    let mut last_processed_pos = use_signal(|| (0.0f32, 0.0f32));
+
+    let mut last_processed_pos = use_signal(|| (0.0f64, 0.0f64));
+    let mut last_update = use_signal(|| std::time::Instant::now());
+    let mut cached_rect: Signal<Option<dioxus_elements::geometry::euclid::Rect<f64, dioxus_elements::geometry::Pixels>>> = use_signal(|| None);
+
     let mut svg_data: Signal<Option<std::rc::Rc<MountedData>>> = use_signal(|| None);
     let Some(current_resolver_move) = resolver.peek().clone() else {
         return rsx! { "No Gate Resolver" };
@@ -318,69 +323,72 @@ pub fn GateLayer(
                     evt.stop_propagation();
 
                     if let Some(data) = drag_data() {
-                        let (last_x, last_y) = *last_processed_pos.read();
+                        let now = std::time::Instant::now();
+                        let elapsed = now.duration_since(*last_update.peek());
+                        if elapsed < Duration::from_millis(16) {
+                            return;
+                        }
+
+                        let rect_option = cached_rect.read();
+                        let Some(rect) = rect_option.as_ref() else { return };
+
                         let client = evt.data.client_coordinates();
-                        let div_data = svg_data.read().clone();
+                        let (last_px, last_py) = *last_processed_pos.peek();
+
+                        // --- 2. COORDINATE CALCULATION ---
+                        let rendered_w = rect.width();
+                        let rendered_h = rect.height();
+                        if rendered_w == 0.0 || rendered_h == 0.0 {
+                            return;
+                        }
+                        let Some(map) = plot_map.as_ref() else { return };
+                        let scale_x = map.width() as f64 / rendered_w;
+                        let scale_y = map.height() as f64 / rendered_h;
+                        let px = (client.x - rect.min_x()) * scale_x;
+                        let py = (client.y - rect.min_y()) * scale_y;
+                        let dx = (px - last_px).abs();
+                        let dy = (py - last_py).abs();
+                        if dx < 1.0 && dy < 1.0 {
+                            return;
+                        }
+
                         let selected_gate_op = gate_store.selected_gate().peek().cloned();
                         let current_resolver_move = current_resolver_move.clone();
-                        spawn(async move {
-                            let Some(mount) = div_data else { return };
-
-                            let Ok(rect) = mount.get_client_rect().await else { return };
-
-                            let rendered_w = rect.max_x() as f32 - rect.min_x() as f32;
-                            let rendered_h = rect.max_y() as f32 - rect.min_y() as f32;
-                            if rendered_w == 0.0 || rendered_h == 0.0 {
-                                return;
-                            }
-                            let Some(map) = plot_map.as_ref() else { return };
-                            let scale_x = map.width() as f32 / rendered_w;
-                            let scale_y = map.height() as f32 / rendered_h;
-                            let px = (client.x as f32 - rect.min_x() as f32) * scale_x;
-                            let py = (client.y as f32 - rect.min_y() as f32) * scale_y;
-                            let dx = (px - last_x).abs();
-                            let dy = (py - last_y).abs();
-                            if dx >= 1.0 || dy >= 1.0 {
-                                let data_coords = map.pixel_to_data(px, py, None, None);
-                                let new_data = data.clone_with_point(data_coords);
-
-                                if let Some(selected_gate_id) = selected_gate_op {
-                                    match &new_data {
-                                        GateDragType::Point(point_drag_data) => {
-
-                                            gate_store
-                                                .move_gate_point(
-                                                    selected_gate_id.clone().into(),
-                                                    point_drag_data.point_index(),
-                                                    data_coords,
-                                                    &map,
-                                                    &current_resolver_move,
-                                                )
-                                                .expect("Gate Move Failed");
-
-                                        }
-                                        GateDragType::Gate(gate_drag_data) => {
-                                            gate_store
-                                                .move_gate(gate_drag_data.clone(), &current_resolver_move)
-                                                .expect("Gate Move Failed");
-                                        }
-                                        GateDragType::Rotation(rotation_data) => {
-                                            gate_store
-                                                .rotate_gate(
-                                                    selected_gate_id.clone().into(),
-                                                    rotation_data.current_loc(),
-                                                    &current_resolver_move,
-                                                )
-                                                .expect("Gate Move Failed");
-                                        }
-                                    }
+                        let data_coords = map.pixel_to_data(px as f32, py as f32, None, None);
+                        let new_data = data.clone_with_point(data_coords);
+                        if let Some(selected_gate_id) = selected_gate_op {
+                            match &new_data {
+                                GateDragType::Point(point_drag_data) => {
+                                    gate_store
+                                        .move_gate_point(
+                                            selected_gate_id.clone().into(),
+                                            point_drag_data.point_index(),
+                                            data_coords,
+                                            &map,
+                                            &current_resolver_move,
+                                        )
+                                        .expect("Gate Move Failed");
                                 }
-                                drag_data.set(Some(new_data));
-                                last_processed_pos.set((px, py));
+                                GateDragType::Gate(gate_drag_data) => {
+                                    gate_store
+                                        .move_gate(gate_drag_data.clone(), &current_resolver_move)
+                                        .expect("Gate Move Failed");
+                                }
+                                GateDragType::Rotation(rotation_data) => {
+                                    gate_store
+                                        .rotate_gate(
+                                            selected_gate_id.clone().into(),
+                                            rotation_data.current_loc(),
+                                            &current_resolver_move,
+                                        )
+                                        .expect("Gate Move Failed");
+                                }
                             }
-                        });
+                        }
+                        drag_data.set(Some(new_data));
+                        last_processed_pos.set((px, py));
+                        last_update.set(std::time::Instant::now());
                     }
-
                 },
                 onmouseup: move |evt| {
                     if let Some(data) = drag_data() {
@@ -437,6 +445,15 @@ pub fn GateLayer(
 
                     match evt.trigger_button() {
                         Some(dioxus_elements::input_data::MouseButton::Primary) => {
+                            let div_data = svg_data.read().clone();
+                            spawn(async move {
+                                if let Some(mount) = div_data {
+                                    // MEASURE ONCE at the start of the drag
+                                    if let Ok(rect) = mount.get_client_rect().await {
+                                        cached_rect.set(Some(rect));
+                                    }
+                                }
+                            });
                             if let Some(mapper) = plot_map() {
                                 let local_coords = &evt.data.coordinates().element();
                                 let norm_x = local_coords.x as f32;

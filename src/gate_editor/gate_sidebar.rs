@@ -37,7 +37,7 @@ pub fn GateSidebar(
                         }
                     }
                 }
-
+            
             }
         }
     }
@@ -98,7 +98,16 @@ fn GateNode(
             .primary_and_subgate_registry
             .get(&gate_id)
         {
-            gate.get_name().to_owned()
+            
+            if gate.is_composite(){
+                if let Some(subgate) = gate.get_gate_ref(Some(&gate_id)){
+                    subgate.name.clone()
+                } else {
+                    gate.get_name().to_owned()
+                }
+            } else {
+                gate.get_name().to_owned()
+            }
         } else {
             gate_id.to_string()
         }
@@ -207,7 +216,7 @@ fn GateNode(
                             },
                             "🎯"
                         }
-
+                    
                     }
 
                     // 4. The Children (Recursive call)
@@ -324,7 +333,7 @@ fn GateNode(
                     "Add OR Gate"
                 }
             }
-
+        
         }
     }
 }

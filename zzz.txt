@@ -1,5 +1,6 @@
 Gates:
-import booleans from omiq
+hierarchy doesn't maintain order within a level...
+give a clear error when metadata found in json is not present in metadata store
 
 gate axis limits 'niceifying' is not working well - it gives too much above the plot. This is a lib feature??
 Allow choosing other gates at the same level for AND and OR

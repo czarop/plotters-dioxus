@@ -164,6 +164,7 @@ impl SkewedQuadrantGate {
             y_axis_param,
             true,
             None,
+            None
         )
     }
 
@@ -175,104 +176,151 @@ impl SkewedQuadrantGate {
         y_axis_param: Arc<str>,
         axis_matched: bool,
         subgate_ids: Option<Vec<Arc<str>>>,
+        subgate_names: Option<(String, String, String, String)>
     ) -> anyhow::Result<Self> {
         let mut gate_map = FxIndexMap::default();
         let parameters = (x_axis_param.clone(), y_axis_param.clone());
         let geos = create_skewed_quadrant_geos(data_points.clone(), &x_axis_param, &y_axis_param)?;
-        let (
-            id_bottom_left,
-            id_bottom_right,
-            id_top_right,
-            id_top_left,
-            id_bottom_left_arc,
-            id_bottom_right_arc,
-            id_top_right_arc,
-            id_top_left_arc,
-        ) = if let Some(subgate_ids) = subgate_ids {
-            (
-                subgate_ids[0].to_string(),
-                subgate_ids[1].to_string(),
-                subgate_ids[2].to_string(),
-                subgate_ids[3].to_string(),
-                subgate_ids[0].clone(),
-                subgate_ids[1].clone(),
-                subgate_ids[2].clone(),
-                subgate_ids[3].clone(),
-            )
+        // let (
+        //     id_bottom_left,
+        //     id_bottom_right,
+        //     id_top_right,
+        //     id_top_left,
+        //     id_bottom_left_arc,
+        //     id_bottom_right_arc,
+        //     id_top_right_arc,
+        //     id_top_left_arc,
+        // ) = if let Some(subgate_ids) = subgate_ids {
+        //     (
+        //         subgate_ids[0].to_string(),
+        //         subgate_ids[1].to_string(),
+        //         subgate_ids[2].to_string(),
+        //         subgate_ids[3].to_string(),
+        //         subgate_ids[0].clone(),
+        //         subgate_ids[1].clone(),
+        //         subgate_ids[2].clone(),
+        //         subgate_ids[3].clone(),
+        //     )
+        // } else {
+        //     let (a, b, c, d) = (
+        //         format!("{id}_BL"),
+        //         format!("{id}_BR"),
+        //         format!("{id}_TR"),
+        //         format!("{id}_TL"),
+        //     );
+
+        //     let (astr, bstr, cstr, dstr) = (a.as_str(), b.as_str(), c.as_str(), d.as_str());
+
+        //     (
+        //         a.clone(),
+        //         b.clone(),
+        //         c.clone(),
+        //         d.clone(),
+        //         Arc::from(astr),
+        //         Arc::from(bstr),
+        //         Arc::from(cstr),
+        //         Arc::from(dstr),
+        //     )
+        // };
+        // let gate_bottom_left = Gate {
+        //     id: id_bottom_left_arc.clone(),
+        //     name: id_bottom_left,
+        //     geometry: geos.0,
+        //     mode: flow_gates::GateMode::Global,
+        //     parameters: parameters.clone(),
+        //     label_position: None,
+        // };
+        // let gate_bottom_right = Gate {
+        //     id: id_bottom_right_arc.clone(),
+        //     name: id_bottom_right,
+        //     geometry: geos.1,
+        //     mode: flow_gates::GateMode::Global,
+        //     parameters: parameters.clone(),
+        //     label_position: None,
+        // };
+
+        // let gate_top_right = Gate {
+        //     id: id_top_right_arc.clone(),
+        //     name: id_top_right,
+        //     geometry: geos.2,
+        //     mode: flow_gates::GateMode::Global,
+        //     parameters: parameters.clone(),
+        //     label_position: None,
+        // };
+        // let gate_top_left = Gate {
+        //     id: id_top_left_arc.clone(),
+        //     name: id_top_left,
+        //     geometry: geos.3,
+        //     mode: flow_gates::GateMode::Global,
+        //     parameters: parameters,
+        //     label_position: None,
+        // };
+
+        // let lg_tl = PolygonGate::try_new(gate_top_left, false)?;
+        // let lg_tr = PolygonGate::try_new(gate_top_right, false)?;
+        // let lg_bl = PolygonGate::try_new(gate_bottom_left, false)?;
+        // let lg_br = PolygonGate::try_new(gate_bottom_right, false)?;
+        // // [bottom-left, bottom-right, top-right, top-left]
+        // gate_map.insert(id_bottom_left_arc, lg_bl);
+        // gate_map.insert(id_bottom_right_arc, lg_br);
+        // gate_map.insert(id_top_right_arc, lg_tr);
+        // gate_map.insert(id_top_left_arc, lg_tl);
+
+        // let points = data_points;
+
+        // Ok(Self {
+        //     gates: gate_map,
+        //     id,
+        //     name,
+        //     points,
+        //     axis_matched: axis_matched,
+        //     parameters: (x_axis_param, y_axis_param),
+        // })
+        // let geos = create_skewed_quadrant_geos(data_points.clone(), &x_axis_param, &y_axis_param)?;
+
+        let sub_ids = if let Some(ids) = subgate_ids {
+            ids
         } else {
-            let (a, b, c, d) = (
-                format!("{id}_BL"),
-                format!("{id}_BR"),
-                format!("{id}_TR"),
-                format!("{id}_TL"),
-            );
-
-            let (astr, bstr, cstr, dstr) = (a.as_str(), b.as_str(), c.as_str(), d.as_str());
-
-            (
-                a.clone(),
-                b.clone(),
-                c.clone(),
-                d.clone(),
-                Arc::from(astr),
-                Arc::from(bstr),
-                Arc::from(cstr),
-                Arc::from(dstr),
-            )
-        };
-        let gate_bottom_left = Gate {
-            id: id_bottom_left_arc.clone(),
-            name: id_bottom_left,
-            geometry: geos.0,
-            mode: flow_gates::GateMode::Global,
-            parameters: parameters.clone(),
-            label_position: None,
-        };
-        let gate_bottom_right = Gate {
-            id: id_bottom_right_arc.clone(),
-            name: id_bottom_right,
-            geometry: geos.1,
-            mode: flow_gates::GateMode::Global,
-            parameters: parameters.clone(),
-            label_position: None,
+            vec![
+                Arc::from(format!("{id}_BL")),
+                Arc::from(format!("{id}_BR")),
+                Arc::from(format!("{id}_TR")),
+                Arc::from(format!("{id}_TL")),
+            ]
         };
 
-        let gate_top_right = Gate {
-            id: id_top_right_arc.clone(),
-            name: id_top_right,
-            geometry: geos.2,
-            mode: flow_gates::GateMode::Global,
-            parameters: parameters.clone(),
-            label_position: None,
-        };
-        let gate_top_left = Gate {
-            id: id_top_left_arc.clone(),
-            name: id_top_left,
-            geometry: geos.3,
-            mode: flow_gates::GateMode::Global,
-            parameters: parameters,
-            label_position: None,
+        let names = {
+            match subgate_names{
+                Some((a, b, c, d)) => [a, b, c, d],
+                None => [sub_ids[0].to_string(), sub_ids[1].to_string(), sub_ids[2].to_string(), sub_ids[3].to_string()],
+            }
         };
 
-        let lg_tl = PolygonGate::try_new(gate_top_left, false)?;
-        let lg_tr = PolygonGate::try_new(gate_top_right, false)?;
-        let lg_bl = PolygonGate::try_new(gate_bottom_left, false)?;
-        let lg_br = PolygonGate::try_new(gate_bottom_right, false)?;
-        // [bottom-left, bottom-right, top-right, top-left]
-        gate_map.insert(id_bottom_left_arc, lg_bl);
-        gate_map.insert(id_bottom_right_arc, lg_br);
-        gate_map.insert(id_top_right_arc, lg_tr);
-        gate_map.insert(id_top_left_arc, lg_tl);
-
-        let points = data_points;
+        for (i, (id_arc, name)) in sub_ids.into_iter().zip(names.into_iter()).enumerate() {
+            let geo = match i {
+                0 => geos.0.clone(),
+                1 => geos.1.clone(),
+                2 => geos.2.clone(),
+                _ => geos.3.clone(),
+            };
+            let g = Gate {
+                id: id_arc.clone(),
+                name,
+                geometry: geo,
+                mode: flow_gates::GateMode::Global,
+                parameters: parameters.clone(),
+                label_position: None,
+            };
+            gate_map.insert(id_arc, PolygonGate::try_new(g, false)?);
+        }
 
         Ok(Self {
             gates: gate_map,
             id,
             name,
-            points,
-            axis_matched: axis_matched,
-            parameters: (x_axis_param, y_axis_param),
+            points: data_points,
+            axis_matched,
+            parameters,
         })
     }
 
@@ -310,7 +358,14 @@ impl SkewedQuadrantGate {
         let subgate_br_id = self.gates.index(1).get_id();
         let subgate_tr_id = self.gates.index(2).get_id();
         let subgate_tl_id = self.gates.index(3).get_id();
+        let mut it = self.gates.iter().map(|(_, v)| v.get_name().to_string());
 
+        let gate_names = (
+            it.next().ok_or_else(|| anyhow::anyhow!("Missing gate 1"))?,
+            it.next().ok_or_else(|| anyhow::anyhow!("Missing gate 2"))?,
+            it.next().ok_or_else(|| anyhow::anyhow!("Missing gate 3"))?,
+            it.next().ok_or_else(|| anyhow::anyhow!("Missing gate 4"))?,
+        );
         let gate_ids = vec![subgate_bl_id, subgate_br_id, subgate_tr_id, subgate_tl_id];
         SkewedQuadrantGate::try_new_from_data_points(
             self.id.clone(),
@@ -320,6 +375,7 @@ impl SkewedQuadrantGate {
             y_axis_param,
             self.axis_matched,
             Some(gate_ids),
+            Some(gate_names)
         )
     }
 

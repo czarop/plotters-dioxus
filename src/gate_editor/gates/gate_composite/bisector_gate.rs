@@ -88,6 +88,7 @@ impl BisectorGate {
         x_axis_param: Arc<str>,
         y_axis_param: Arc<str>,
         subgate_ids: (Arc<str>, Arc<str>),
+        subgate_names: Option<(String, String)>
     ) -> anyhow::Result<Self> {
         let mut gate_map = FxIndexMap::default();
         let parameters = (x_axis_param.clone(), y_axis_param.clone());
@@ -97,9 +98,17 @@ impl BisectorGate {
         let id_left_arc = subgate_ids.0.clone();
         let id_right_arc = subgate_ids.1.clone();
 
+        let (name_left, name_right) = {
+            match subgate_names{
+                Some((l, r)) => (l, r),
+                None => (id_left_arc.to_string(), id_right_arc.to_string()),
+            }
+        };
+        
+
         let gate_left = Gate {
             id: id_left_arc.clone(),
-            name: id_left_arc.to_string(),
+            name: name_left,
             geometry: geos.0,
             mode: flow_gates::GateMode::Global,
             parameters: parameters.clone(),
@@ -107,7 +116,7 @@ impl BisectorGate {
         };
         let gate_right = Gate {
             id: id_right_arc.clone(),
-            name: id_right_arc.to_string(),
+            name: name_right,
             geometry: geos.1,
             mode: flow_gates::GateMode::Global,
             parameters,

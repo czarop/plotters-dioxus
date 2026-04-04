@@ -1,6 +1,6 @@
 use flow_gates::types::LabelPosition;
 use flow_gates::{
-    BooleanOperation, GateError, GateGeometry, GateNode, create_polygon_geometry,
+     GateError, GateGeometry, GateNode, create_polygon_geometry,
     create_rectangle_geometry,
 };
 use rustc_hash::FxHashMap;
@@ -368,7 +368,7 @@ impl GateSerialized {
                 left,
                 top,
                 right,
-                bottom,
+                bottom: _bottom,
                 label_position,
             } => {
                 let parameters = (x_param.clone(), y_param.clone());

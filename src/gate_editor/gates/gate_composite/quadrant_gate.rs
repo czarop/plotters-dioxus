@@ -39,7 +39,7 @@ impl QuadrantGate {
         let (cx, cy) = plot_map.pixel_to_data(click_loc_raw.0, click_loc_raw.1, None, None);
         let points = DataPoints::new_from_click(cx, cy, plot_map);
 
-        Self::try_new_from_data_points(id, name, points, x_axis_param, y_axis_param, true, None)
+        Self::try_new_from_data_points(id, name, points, x_axis_param, y_axis_param, true, None, None)
     }
 
     pub fn try_new_from_data_points(
@@ -50,6 +50,7 @@ impl QuadrantGate {
         y_axis_param: Arc<str>,
         axis_matched: bool,
         subgate_ids: Option<Vec<Arc<str>>>,
+        subgate_names: Option<(String, String, String, String)>
     ) -> Result<Self> {
         // FORCE ORTHOGONALITY: Overwrite any skew with center alignment
         data_points.left.1 = data_points.center.1;
@@ -74,12 +75,12 @@ impl QuadrantGate {
             ]
         };
 
-        let names = [
-            format!("{id}_BL"),
-            format!("{id}_BR"),
-            format!("{id}_TR"),
-            format!("{id}_TL"),
-        ];
+        let names = {
+            match subgate_names{
+                Some((a, b, c, d)) => [a, b, c, d],
+                None => [sub_ids[0].to_string(), sub_ids[1].to_string(), sub_ids[2].to_string(), sub_ids[3].to_string()],
+            }
+        };
 
         for (i, (id_arc, name)) in sub_ids.into_iter().zip(names.into_iter()).enumerate() {
             let geo = match i {
@@ -111,6 +112,14 @@ impl QuadrantGate {
 
     fn clone_with_point(&self, data_points: DataPoints) -> Result<Self> {
         let gate_ids = self.gates.keys().cloned().collect();
+        let mut it = self.gates.iter().map(|(_, v)| v.get_name().to_string());
+
+        let gate_names = (
+            it.next().ok_or_else(|| anyhow::anyhow!("Missing gate 1"))?,
+            it.next().ok_or_else(|| anyhow::anyhow!("Missing gate 2"))?,
+            it.next().ok_or_else(|| anyhow::anyhow!("Missing gate 3"))?,
+            it.next().ok_or_else(|| anyhow::anyhow!("Missing gate 4"))?,
+        );
         Self::try_new_from_data_points(
             self.id.clone(),
             self.name.clone(),
@@ -119,6 +128,7 @@ impl QuadrantGate {
             self.parameters.1.clone(),
             self.axis_matched,
             Some(gate_ids),
+            Some(gate_names)
         )
     }
 
