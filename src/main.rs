@@ -1,6 +1,5 @@
 #![allow(non_snake_case)]
 
-use std::path::{Path, PathBuf};
 
 use clingate::gate_editor::route::Route;
 use dioxus::prelude::*;

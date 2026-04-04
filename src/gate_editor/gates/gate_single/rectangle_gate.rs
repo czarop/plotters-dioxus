@@ -240,7 +240,7 @@ impl DrawableGate for RectangleGate {
         &self,
         is_selected: bool,
         drag_point: Option<PointDragData>,
-        plot_map: &PlotMapper,
+        _plot_map: &PlotMapper,
         gate_stats: &Option<GateStats>,
     ) -> Vec<GateRenderShape> {
         let style = if is_selected {

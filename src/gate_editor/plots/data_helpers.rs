@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::gate_editor::gates::GateState;
 use crate::gate_editor::gates::gate_store::{
-    GateOverrideResolver, GateStateImplExt, GateStateStoreExt, ROOTGATE,
+    GateOverrideResolver, GateStateStoreExt, ROOTGATE,
 };
 
 use dioxus::prelude::*;

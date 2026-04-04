@@ -4,7 +4,6 @@ use rustc_hash::FxHashMap;
 use std::{
     collections::{HashMap, HashSet, VecDeque},
     sync::Arc,
-    time::Instant,
 };
 
 /// Manages the hierarchical relationships between gates.

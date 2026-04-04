@@ -3,15 +3,14 @@ use core::f32;
 use dioxus::prelude::*;
 use flow_fcs::TransformType;
 use flow_gates::{
-    EventIndex,
     transforms::{get_plotting_area, pixel_to_raw, pixel_to_raw_y, raw_to_pixel, raw_to_pixel_y},
 };
-use rustc_hash::{FxBuildHasher, FxHashMap};
+use rustc_hash::{FxBuildHasher};
 use std::{ops::RangeInclusive, sync::Arc};
 
 use crate::gate_editor::{
     AxisInfo,
-    gates::{GateId, gate_store::FileId},
+    gates::{GateId},
 };
 
 #[derive(Clone, Debug, PartialEq)]
