@@ -1,5 +1,5 @@
 Gates:
-hierarchy doesn't maintain order within a level...
+hierarchy ordering not implemented for homemade composite gates
 give a clear error when metadata found in json is not present in metadata store
 
 gate axis limits 'niceifying' is not working well - it gives too much above the plot. This is a lib feature??

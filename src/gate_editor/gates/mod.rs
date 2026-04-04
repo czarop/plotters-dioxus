@@ -10,3 +10,4 @@ pub mod gate_composite;
 pub mod gate_filtering;
 pub mod gate_stats;
 pub mod gate_traits;
+pub mod gate_hierarchy;
