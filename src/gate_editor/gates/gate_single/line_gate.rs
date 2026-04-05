@@ -48,7 +48,7 @@ impl LineGate {
         Ok(Self {
             inner: gate,
             points: p,
-            height: height,
+            height,
             axis_matched: true,
             is_primary,
         })
@@ -138,7 +138,7 @@ impl LineGate {
         };
         let mut new_line = LineGate::try_new(new_gate, self.height, self.is_primary)?;
         new_line.axis_matched = self.axis_matched;
-        return Ok(new_line);
+        Ok(new_line)
     }
 
     fn get_points(&self) -> Vec<(f32, f32)> {
@@ -210,7 +210,7 @@ impl DrawableGate for LineGate {
         _mapper: &PlotMapper,
     ) -> anyhow::Result<Box<dyn DrawableGate>> {
         let line = self.clone_line_for_new_point(new_point, point_index)?;
-        return Ok(Box::new(line));
+        Ok(Box::new(line))
     }
 
     fn replace_points(
@@ -252,7 +252,7 @@ impl DrawableGate for LineGate {
         };
         let mut new_line = LineGate::try_new(new_gate, height, self.is_primary)?;
         new_line.axis_matched = self.axis_matched;
-        return Ok(Some(Box::new(new_line)));
+        Ok(Some(Box::new(new_line)))
     }
     fn as_any(&self) -> &dyn std::any::Any {
         self
@@ -345,12 +345,10 @@ impl DrawableGate for LineGate {
                 let xrange = *axis.end() - *axis.start();
                 if let Some(label_pos) = &self.inner.label_position {
                     xrange * label_pos.offset_x
+                } else if self.axis_matched {
+                    0f32
                 } else {
-                    if self.axis_matched {
-                        0f32
-                    } else {
-                        xrange * 0.02
-                    }
+                    xrange * 0.02
                 }
             };
             let y_offset = {
@@ -358,33 +356,28 @@ impl DrawableGate for LineGate {
                 let yrange = *axis.end() - *axis.start();
                 if let Some(label_pos) = &self.inner.label_position {
                     yrange * label_pos.offset_y
+                } else if self.axis_matched {
+                    yrange * 0.02
                 } else {
-                    if self.axis_matched {
-                        yrange * 0.02
-                    } else {
-                        0f32
-                    }
+                    0f32
                 }
             };
             let offset = (x_offset, y_offset);
-            match gate_stats.get_percent_for_id(self.inner.id.clone()) {
-                Some(percent) => {
-                    let origin = if self.axis_matched {
-                        (self.points[0].0, self.height)
-                    } else {
-                        (self.height, self.points[0].1)
-                    };
-                    let shape = GateRenderShape::Text {
-                        origin,
-                        offset,
-                        fontsize: 10f32,
-                        text: format!("{:.2}%", percent),
-                        text_anchor: None,
-                        shape_type: ShapeType::Text,
-                    };
-                    labels.push(shape)
-                }
-                None => {}
+            if let Some(percent) = gate_stats.get_percent_for_id(self.inner.id.clone()) {
+                let origin = if self.axis_matched {
+                    (self.points[0].0, self.height)
+                } else {
+                    (self.height, self.points[0].1)
+                };
+                let shape = GateRenderShape::Text {
+                    origin,
+                    offset,
+                    fontsize: 10f32,
+                    text: format!("{:.2}%", percent),
+                    text_anchor: None,
+                    shape_type: ShapeType::Text,
+                };
+                labels.push(shape)
             }
         }
 
@@ -445,14 +438,14 @@ pub fn bounds_to_line_coords(
         let x1 = min.0;
         let x2 = x1 + width;
         let y = loc;
-        return ((x1, y), (x2, y));
+        ((x1, y), (x2, y))
     } else {
         let width = (max.1 - min.1).abs();
         let x = loc;
 
         let y1 = min.1;
         let y2 = y1 + width;
-        return ((x, y1), (x, y2));
+        ((x, y1), (x, y2))
     }
 }
 
@@ -486,15 +479,15 @@ pub fn draw_line(
 
         vec![
             GateRenderShape::Line {
-                x1: x1,
+                x1,
                 y1: y,
-                x2: x2,
+                x2,
                 y2: y,
                 style,
                 shape_type: shape_type.clone(),
             },
             GateRenderShape::Line {
-                x1: x1,
+                x1,
                 y1: y - tab_height,
                 x2: x1,
                 y2: y + tab_height,
@@ -504,7 +497,7 @@ pub fn draw_line(
             GateRenderShape::Line {
                 x1: x2,
                 y1: y - tab_height,
-                x2: x2,
+                x2,
                 y2: y + tab_height,
                 style,
                 shape_type,
@@ -529,15 +522,15 @@ pub fn draw_line(
         vec![
             GateRenderShape::Line {
                 x1: y_coord,
-                y1: y1,
+                y1,
                 x2: y_coord,
-                y2: y2,
+                y2,
                 style,
                 shape_type: shape_type.clone(),
             },
             GateRenderShape::Line {
                 x1: x - tab_height,
-                y1: y1,
+                y1,
                 x2: x + tab_height,
                 y2: y1,
                 style,
@@ -547,7 +540,7 @@ pub fn draw_line(
                 x1: x - tab_height,
                 y1: y2,
                 x2: x + tab_height,
-                y2: y2,
+                y2,
                 style,
                 shape_type,
             },
@@ -595,18 +588,18 @@ pub fn draw_circles_for_line(
 
             (
                 GateRenderShape::Line {
-                    x1: x1,
-                    y1: y1,
+                    x1,
+                    y1,
                     x2: x1,
-                    y2: y2,
+                    y2,
                     style,
                     shape_type: ShapeType::CompositeGate(Arc::from("test"), !axis_matched),
                 },
                 GateRenderShape::Line {
                     x1: x2,
-                    y1: y1,
-                    x2: x2,
-                    y2: y2,
+                    y1,
+                    x2,
+                    y2,
                     style,
                     shape_type: ShapeType::CompositeGate(Arc::from("test"), !axis_matched),
                 },
@@ -630,18 +623,18 @@ pub fn draw_circles_for_line(
 
             (
                 GateRenderShape::Line {
-                    x1: x1,
-                    y1: y1,
-                    x2: x2,
+                    x1,
+                    y1,
+                    x2,
                     y2: y1,
                     style,
                     shape_type: ShapeType::CompositeGate(Arc::from("test"), !axis_matched),
                 },
                 GateRenderShape::Line {
-                    x1: x1,
+                    x1,
                     y1: y2,
-                    x2: x2,
-                    y2: y2,
+                    x2,
+                    y2,
                     style,
                     shape_type: ShapeType::CompositeGate(Arc::from("test"), !axis_matched),
                 },

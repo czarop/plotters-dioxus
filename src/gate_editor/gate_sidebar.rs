@@ -37,7 +37,7 @@ pub fn GateSidebar(
                         }
                     }
                 }
-            
+
             }
         }
     }
@@ -98,9 +98,8 @@ fn GateNode(
             .primary_and_subgate_registry
             .get(&gate_id)
         {
-            
-            if gate.is_composite(){
-                if let Some(subgate) = gate.get_gate_ref(Some(&gate_id)){
+            if gate.is_composite() {
+                if let Some(subgate) = gate.get_gate_ref(Some(&gate_id)) {
                     subgate.name.clone()
                 } else {
                     gate.get_name().to_owned()
@@ -121,7 +120,7 @@ fn GateNode(
 
     let gate_id_clone = gate_id.clone();
     let gate_id_delete_clone = gate_id.clone();
-    let gate_id_rename_clone = gate_id.clone();
+    // let gate_id_rename_clone = gate_id.clone();
     let parent_for_delete = parent.clone();
     let gate_id_for_not_gate = gate_id.clone();
     let parent_for_not_gate = parent.clone();
@@ -147,7 +146,7 @@ fn GateNode(
                                 .peek()
                                 .primary_and_subgate_registry
                                 .get(&gate_id_clone)
-                                .and_then(|g| { Some(g.get_params()) }) else { return };
+                                .map(|g| g.get_params()) else { return };
                             let (new_x, new_y);
                             if let Some(x_axis_settings) = axis_store.settings().peek().get(&x) {
                                 new_x = Some(x_axis_settings.param.clone());
@@ -195,7 +194,7 @@ fn GateNode(
                                     .peek()
                                     .primary_and_subgate_registry
                                     .get(&gate_id)
-                                    .and_then(|g| { Some(g.get_params()) }) else { return };
+                                    .map(|g| g.get_params()) else { return };
                                 let (new_x, new_y);
                                 if let Some(x_axis_settings) = axis_store.settings().peek().get(&x) {
                                     new_x = Some(x_axis_settings.param.clone());
@@ -216,7 +215,7 @@ fn GateNode(
                             },
                             "🎯"
                         }
-                    
+
                     }
 
                     // 4. The Children (Recursive call)
@@ -290,7 +289,7 @@ fn GateNode(
                     value: "and".to_string(),
                     index: 3usize,
                     on_select: move |_| {
-                        let id = format!("AND_{}", gate_id_for_and_gate.clone());
+                        // let id = format!("AND_{}", gate_id_for_and_gate.clone());
                         let x_axis_param = x_axis_param.peek().fluoro.clone();
                         let y_axis_param = y_axis_param.peek().fluoro.clone();
                         match gate_store
@@ -333,7 +332,7 @@ fn GateNode(
                     "Add OR Gate"
                 }
             }
-        
+
         }
     }
 }

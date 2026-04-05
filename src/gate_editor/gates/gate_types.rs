@@ -170,8 +170,8 @@ impl GateRenderShape {
                 shape_type: _,
             } => Self::PolyLine {
                 points: points.clone(),
-                style: style,
-                shape_type: shape_type,
+                style,
+                shape_type,
             },
             GateRenderShape::Circle {
                 center,
@@ -181,8 +181,8 @@ impl GateRenderShape {
             } => Self::Circle {
                 center: *center,
                 radius: *radius,
-                fill: fill,
-                shape_type: shape_type.clone(),
+                fill,
+                shape_type,
             },
             GateRenderShape::Polygon {
                 points,
@@ -190,8 +190,8 @@ impl GateRenderShape {
                 shape_type: _,
             } => Self::Polygon {
                 points: points.clone(),
-                style: style,
-                shape_type: shape_type.clone(),
+                style,
+                shape_type,
             },
             GateRenderShape::Ellipse {
                 center,
@@ -205,8 +205,8 @@ impl GateRenderShape {
                 radius_x: *radius_x,
                 radius_y: *radius_y,
                 degrees_rotation: *degrees_rotation,
-                style: style,
-                shape_type: shape_type.clone(),
+                style,
+                shape_type,
             },
             GateRenderShape::Handle {
                 center,
@@ -217,7 +217,7 @@ impl GateRenderShape {
                 center: *center,
                 size: *size,
                 shape_center: *shape_center,
-                shape_type: shape_type.clone(),
+                shape_type,
             },
             GateRenderShape::Rectangle {
                 x,
@@ -231,8 +231,8 @@ impl GateRenderShape {
                 y: *y,
                 width: *width,
                 height: *height,
-                style: *style,
-                shape_type: shape_type.clone(),
+                style,
+                shape_type,
             },
             GateRenderShape::Line {
                 x1,
@@ -240,14 +240,14 @@ impl GateRenderShape {
                 x2,
                 y2,
                 style,
-                shape_type,
+                shape_type: _,
             } => Self::Line {
                 x1: *x1,
                 y1: *y1,
                 x2: *x2,
                 y2: *y2,
-                style: *style,
-                shape_type: shape_type.clone(),
+                style,
+                shape_type,
             },
             GateRenderShape::Text { .. } => self.clone(),
         }
@@ -266,7 +266,7 @@ impl GateRenderShape {
                     .collect();
                 Self::PolyLine {
                     points: p,
-                    style: style,
+                    style,
                     shape_type: shape_type.clone(),
                 }
             }
@@ -278,7 +278,7 @@ impl GateRenderShape {
             } => Self::Circle {
                 center: (center.0 + offset.0, center.1 + offset.1),
                 radius: *radius,
-                fill: fill,
+                fill,
                 shape_type: shape_type.clone(),
             },
             GateRenderShape::Polygon {
@@ -292,7 +292,7 @@ impl GateRenderShape {
                     .collect();
                 Self::Polygon {
                     points: Arc::new(p),
-                    style: style,
+                    style,
                     shape_type: shape_type.clone(),
                 }
             }
@@ -311,7 +311,7 @@ impl GateRenderShape {
                     radius_x: *radius_x,
                     radius_y: *radius_y,
                     degrees_rotation: *degrees_rotation,
-                    style: style,
+                    style,
                     shape_type: shape_type.clone(),
                 }
             }
@@ -341,7 +341,7 @@ impl GateRenderShape {
                     y: new_y,
                     width: *width,
                     height: *height,
-                    style: *style,
+                    style,
                     shape_type: shape_type.clone(),
                 }
             }
@@ -357,7 +357,7 @@ impl GateRenderShape {
                 y1: *y1 + offset.1,
                 x2: *x2 + offset.0,
                 y2: *y2 + offset.1,
-                style: *style,
+                style,
                 shape_type: shape_type.clone(),
             },
             GateRenderShape::Text { .. } => self.clone(),

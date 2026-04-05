@@ -1,6 +1,5 @@
 #![allow(non_snake_case)]
 
-
 use clingate::gate_editor::route::Route;
 use dioxus::prelude::*;
 
@@ -13,10 +12,10 @@ static COMPONENTS_STYLE_2: Asset = asset!("assets/searchable_select.css");
 
 #[component]
 fn FPSCounter() -> Element {
-    let mut last_measured_time = use_signal(|| std::time::Instant::now());
+    let mut last_measured_time = use_signal(std::time::Instant::now);
     let mut display_fps = use_signal(|| 0.0);
     let mut frame_count = use_signal(|| 0);
-    let mut last_ui_update = use_signal(|| std::time::Instant::now());
+    let mut last_ui_update = use_signal(std::time::Instant::now);
 
     use_future(move || async move {
         loop {

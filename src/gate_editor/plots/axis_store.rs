@@ -2,16 +2,13 @@ use anyhow::anyhow;
 use core::f32;
 use dioxus::prelude::*;
 use flow_fcs::TransformType;
-use flow_gates::{
-    transforms::{get_plotting_area, pixel_to_raw, pixel_to_raw_y, raw_to_pixel, raw_to_pixel_y},
+use flow_gates::transforms::{
+    get_plotting_area, pixel_to_raw, pixel_to_raw_y, raw_to_pixel, raw_to_pixel_y,
 };
-use rustc_hash::{FxBuildHasher};
+use rustc_hash::FxBuildHasher;
 use std::{ops::RangeInclusive, sync::Arc};
 
-use crate::gate_editor::{
-    AxisInfo,
-    gates::{GateId},
-};
+use crate::gate_editor::{AxisInfo, gates::GateId};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct PlotMapper {
@@ -74,43 +71,21 @@ impl PlotMapper {
         x_t: Option<TransformType>,
         y_t: Option<TransformType>,
     ) -> (f32, f32) {
-        let xt;
-        if x_t.is_none() {
-            xt = TransformType::Linear;
-        } else {
-            xt = x_t.unwrap();
-        }
-        let yt;
-        if y_t.is_none() {
-            yt = TransformType::Linear;
-        } else {
-            yt = y_t.unwrap();
-        }
+        let xt = x_t.unwrap_or(TransformType::Linear);
+        let yt = y_t.unwrap_or(TransformType::Linear);
         let dx_raw = pixel_to_raw(px, &self.x_data_axis_range, &self.x_pix_range, &xt);
         let dy_raw = pixel_to_raw_y(py, &self.y_data_axis_range, &self.y_pix_range, &yt);
         (dx_raw, dy_raw)
     }
 
     pub fn pixel_x_to_data(&self, x: f32, t: Option<TransformType>) -> f32 {
-        let xt;
-        if t.is_none() {
-            xt = TransformType::Linear;
-        } else {
-            xt = t.unwrap();
-        }
-        let dx = pixel_to_raw(x, &self.x_data_axis_range, &self.x_pix_range, &xt);
-        dx
+        let xt = t.unwrap_or(TransformType::Linear);
+        pixel_to_raw(x, &self.x_data_axis_range, &self.x_pix_range, &xt)
     }
 
     pub fn pixel_y_to_data(&self, y: f32, t: Option<TransformType>) -> f32 {
-        let yt;
-        if t.is_none() {
-            yt = TransformType::Linear;
-        } else {
-            yt = t.unwrap();
-        }
-        let dy = pixel_to_raw_y(y, &self.y_data_axis_range, &self.y_pix_range, &yt);
-        dy
+        let yt = t.unwrap_or(TransformType::Linear);
+        pixel_to_raw_y(y, &self.y_data_axis_range, &self.y_pix_range, &yt)
     }
 
     pub fn data_to_pixel(
@@ -120,18 +95,8 @@ impl PlotMapper {
         x_t: Option<TransformType>,
         y_t: Option<TransformType>,
     ) -> (f32, f32) {
-        let xt;
-        if x_t.is_none() {
-            xt = TransformType::Linear;
-        } else {
-            xt = x_t.unwrap();
-        }
-        let yt;
-        if y_t.is_none() {
-            yt = TransformType::Linear;
-        } else {
-            yt = y_t.unwrap();
-        }
+        let xt = x_t.unwrap_or(TransformType::Linear);
+        let yt = y_t.unwrap_or(TransformType::Linear);
 
         let px = raw_to_pixel(dx, &self.x_data_axis_range, &self.x_pix_range, &xt);
         let py = raw_to_pixel_y(dy, &self.y_data_axis_range, &self.y_pix_range, &yt);
@@ -174,12 +139,11 @@ impl std::fmt::Display for Param {
         if self.marker == self.fluoro {
             write!(f, "{}", self.marker)
         } else {
-            let trimmed;
-            if self.fluoro.ends_with("-A") {
-                trimmed = &self.fluoro[..self.fluoro.len().saturating_sub(2)]
+            let trimmed = if self.fluoro.ends_with("-A") {
+                &self.fluoro[..self.fluoro.len().saturating_sub(2)]
             } else {
-                trimmed = &self.fluoro
-            }
+                &self.fluoro
+            };
             write!(f, "{}-{}", self.marker, trimmed)
         }
     }
@@ -249,7 +213,7 @@ impl<Lens> Store<AxisStore, Lens> {
             .and_modify(|axis| {
                 if let TransformType::Arcsinh { .. } = axis.transform {
                     let old_axis = std::mem::take(axis);
-                    let new_axis = (&old_axis)
+                    let new_axis = (old_axis)
                         .into_archsinh(cofactor)
                         .unwrap_or(old_axis.clone());
                     new = Some(new_axis.clone());
@@ -258,8 +222,8 @@ impl<Lens> Store<AxisStore, Lens> {
                 }
             });
 
-        if new.is_some() && old.is_some() {
-            return Ok((old.unwrap(), new.unwrap()));
+        if let (Some(new), Some(old)) = (new, old) {
+            return Ok((old, new));
         }
 
         Err(anyhow!("Could not find axis"))

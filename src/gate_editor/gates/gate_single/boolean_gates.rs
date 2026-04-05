@@ -115,14 +115,14 @@ impl DrawableGate for BooleanGate {
         _data_range: (f32, f32),
         _axis_range: (f32, f32),
     ) -> anyhow::Result<Box<dyn DrawableGate>> {
-        return Ok(self.clone_box());
+        Ok(self.clone_box())
     }
 
     fn rotate_gate(
         &self,
         _mouse_position: (f32, f32),
     ) -> anyhow::Result<Option<Box<dyn DrawableGate>>> {
-        return Ok(None);
+        Ok(None)
     }
 
     fn replace_point(
@@ -131,14 +131,14 @@ impl DrawableGate for BooleanGate {
         _point_index: usize,
         _plot_map: &crate::gate_editor::plots::axis_store::PlotMapper,
     ) -> anyhow::Result<Box<dyn DrawableGate>> {
-        return Ok(self.clone_box());
+        Ok(self.clone_box())
     }
 
     fn replace_points(
         &self,
         _gate_drag_data: crate::gate_editor::gates::gate_drag::GateDragData,
     ) -> anyhow::Result<Option<Box<dyn DrawableGate>>> {
-        return Ok(None);
+        Ok(None)
     }
 
     fn clone_box(&self) -> Box<dyn DrawableGate> {

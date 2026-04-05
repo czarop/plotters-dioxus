@@ -1,3 +1,5 @@
+use crate::gate_editor::gates::gate_hierarchy::GateHierarchy;
+use crate::gate_editor::gates::gate_single::boolean_gates::BooleanGate;
 use anyhow::anyhow;
 use dioxus::prelude::*;
 use flow_fcs::TransformType;
@@ -8,8 +10,6 @@ use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 use std::sync::{Arc, LazyLock};
 use uuid::Uuid;
-use crate::gate_editor::gates::gate_hierarchy::GateHierarchy;
-use crate::gate_editor::gates::gate_single::boolean_gates::{ BooleanGate};
 
 use crate::gate_editor::{
     AxisInfo,
@@ -30,7 +30,10 @@ use crate::gate_editor::{
     },
     plots::axis_store::PlotMapper,
 };
-use crate::omiq::deserialise::{BooleanOpType, CompositeType, FilterContainer, find_atomic_params, get_composite_gates_from_filter_container};
+use crate::omiq::deserialise::{
+    BooleanOpType, CompositeType, FilterContainer, find_atomic_params,
+    get_composite_gates_from_filter_container,
+};
 use crate::omiq::metadata::{MetaDataKey, MetaDataParameter};
 
 pub type GateId = std::sync::Arc<str>;
@@ -50,20 +53,21 @@ impl GatesOnPlotKey {
     pub fn new(param_1: Arc<str>, param_2: Arc<str>, parental_gate_id: Option<GateId>) -> Self {
         if param_1 <= param_2 {
             Self {
-                param_1: param_1,
-                param_2: param_2,
-                parental_gate_id: parental_gate_id,
+                param_1,
+                param_2,
+                parental_gate_id,
             }
         } else {
             Self {
                 param_1: param_2,
                 param_2: param_1,
-                parental_gate_id: parental_gate_id,
+                parental_gate_id,
             }
         }
     }
 }
 
+#[derive(Default)]
 pub struct GateMap(pub FxHashMap<GateId, Arc<dyn DrawableGate + 'static>>);
 
 impl Deref for GateMap {
@@ -77,12 +81,6 @@ impl Deref for GateMap {
 impl DerefMut for GateMap {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
-    }
-}
-
-impl Default for GateMap {
-    fn default() -> Self {
-        Self(Default::default())
     }
 }
 
@@ -269,7 +267,7 @@ impl<Lens> Store<GateState, Lens> {
             }
             PrimaryGateType::Ellipse => {
                 let geo = create_default_ellipse(
-                    &mapper, click_x, click_y, 50f32, 30f32, &x_param, &y_param,
+                    mapper, click_x, click_y, 50f32, 30f32, &x_param, &y_param,
                 )?;
                 let gate = Gate {
                     id: id_arc,
@@ -283,7 +281,7 @@ impl<Lens> Store<GateState, Lens> {
             }
             PrimaryGateType::Rectangle => {
                 let geo = create_default_rectangle(
-                    &mapper, click_x, click_y, 50f32, 50f32, &x_param, &y_param,
+                    mapper, click_x, click_y, 50f32, 50f32, &x_param, &y_param,
                 )?;
                 let gate = Gate {
                     id: id_arc,
@@ -296,7 +294,7 @@ impl<Lens> Store<GateState, Lens> {
                 Arc::new(RectangleGate::try_new(gate, true)?)
             }
             PrimaryGateType::Line(y_coord) => {
-                let geo = create_default_line(&mapper, click_x, 50f32, &x_param, &y_param)?;
+                let geo = create_default_line(mapper, click_x, 50f32, &x_param, &y_param)?;
                 if let Some(y_coord) = y_coord {
                     let gate = Gate {
                         id: id_arc,
@@ -349,7 +347,7 @@ impl<Lens> Store<GateState, Lens> {
 
         w.gate_ids_by_view
             .entry(key)
-            .or_insert(vec![])
+            .or_default()
             .push(gate_key.clone());
 
         if g.is_composite() {
@@ -363,7 +361,7 @@ impl<Lens> Store<GateState, Lens> {
                 w.hierarchy.add_gate_child(
                     parental_gate_id.clone().unwrap_or(ROOTGATE.clone()),
                     sg.clone(),
-                    None
+                    None,
                 )?;
                 w.gate_store
                     .primary_and_subgate_registry
@@ -375,8 +373,11 @@ impl<Lens> Store<GateState, Lens> {
                 g.get_id(),
                 parental_gate_id.as_ref().unwrap_or(&ROOTGATE)
             );
-            w.hierarchy
-                .add_gate_child(parental_gate_id.unwrap_or(ROOTGATE.clone()), g.get_id(), None)?;
+            w.hierarchy.add_gate_child(
+                parental_gate_id.unwrap_or(ROOTGATE.clone()),
+                g.get_id(),
+                None,
+            )?;
         }
 
         w.gate_store
@@ -418,7 +419,7 @@ impl<Lens> Store<GateState, Lens> {
         self.hierarchy().write().add_gate_child(
             parental_gate_id.unwrap_or(ROOTGATE.clone()),
             gate_id.clone(),
-            None
+            None,
         )?;
 
         self.gate_store()
@@ -450,10 +451,10 @@ impl<Lens> Store<GateState, Lens> {
         let mut roots: HashSet<Arc<str>> = HashSet::default();
         // and any boolean gates that depend on these gates - and any that depend on them etc
         while let Some(id) = brothers.pop() {
-            if roots.insert(id.clone()) {
-                if let Some(deps) = state.boolean_gate_links.remove(&id) {
-                    brothers.extend(deps);
-                }
+            if roots.insert(id.clone())
+                && let Some(deps) = state.boolean_gate_links.remove(&id)
+            {
+                brothers.extend(deps);
             }
         }
 
@@ -669,17 +670,17 @@ impl<Lens> Store<GateState, Lens> {
             let ids = key_store.read().clone();
 
             for k in ids {
-                if let Ok(gate_store_entry) = resolver.resolve_drawable(&k) {
-                    if gate_store_entry.is_primary() {
-                        gate_list.push(gate_store_entry.clone());
-                    }
+                if let Ok(gate_store_entry) = resolver.resolve_drawable(&k)
+                    && gate_store_entry.is_primary()
+                {
+                    gate_list.push(gate_store_entry.clone());
                 }
             }
         } else {
             return Err(anyhow::anyhow!("No keys found").into());
         }
 
-        return Ok(gate_list);
+        Ok(gate_list)
     }
 
     fn match_gates_to_plot<T>(
@@ -747,7 +748,7 @@ impl<Lens> Store<GateState, Lens> {
             }
         });
 
-        return Ok(());
+        Ok(())
     }
 
     // to do
@@ -961,7 +962,7 @@ impl<Lens> Store<GateState, Lens> {
             };
             composite_gates
                 .entry(composite_type)
-                .or_insert(vec![])
+                .or_default()
                 .push((group_position, container.clone()));
         }
 
@@ -1009,7 +1010,7 @@ impl<Lens> Store<GateState, Lens> {
                         let key = GatesOnPlotKey::new(params.0, params.1, Some(parent));
                         w.gate_ids_by_view
                             .entry(key)
-                            .or_insert(vec![])
+                            .or_default()
                             .push(gate.get_id());
                         w.gate_store
                             .primary_and_subgate_registry
@@ -1031,7 +1032,7 @@ impl<Lens> Store<GateState, Lens> {
                 composite_type,
                 &subgates,
                 &axis_settings,
-                &metadata,
+                metadata,
             )?;
             for ((id, source), gate) in to_add {
                 let subgate_ids = gate.get_inner_gate_ids();
@@ -1050,10 +1051,7 @@ impl<Lens> Store<GateState, Lens> {
                         let params = gate.get_params();
                         let key = GatesOnPlotKey::new(params.0, params.1, Some(parent));
 
-                        w.gate_ids_by_view
-                            .entry(key)
-                            .or_insert(vec![])
-                            .push(id.clone());
+                        w.gate_ids_by_view.entry(key).or_default().push(id.clone());
                         w.gate_store
                             .primary_and_subgate_registry
                             .insert(id.clone(), gate.clone());
@@ -1114,7 +1112,7 @@ impl<Lens> Store<GateState, Lens> {
             for link_id in &boolean_gate.filter_container_ids {
                 w.boolean_gate_links
                     .entry(link_id.clone())
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(boolean_gate.id.clone());
             }
             w.gate_store

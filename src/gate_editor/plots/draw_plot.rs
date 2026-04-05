@@ -28,7 +28,7 @@ pub fn PseudoColourPlot(
             let x_axis_info = x_axis_info();
             let y_axis_info = y_axis_info();
             let (width, height) = size();
-            let data = data.clone()();
+            let data = data();
 
             let result = tokio::task::spawn_blocking(
                 move || -> Result<(String, Arc<PlotMapper>), anyhow::Error> {
@@ -43,7 +43,7 @@ pub fn PseudoColourPlot(
                     let x_axis_options = flow_plots::AxisOptions::new()
                         .range(x_axis_info.axis_lower..=x_axis_info.axis_upper)
                         .transform(x_axis_info.transform.clone())
-                        .label(&x_axis_info.param.to_string())
+                        .label(x_axis_info.param.to_string())
                         .build()?;
                     let y_axis_options = flow_plots::AxisOptions::new()
                         .range(y_axis_info.axis_lower..=y_axis_info.axis_upper)

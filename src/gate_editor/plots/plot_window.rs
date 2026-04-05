@@ -29,7 +29,7 @@ pub fn PlotWindow(
     let mut gate_resolver_store: Signal<Option<Arc<GateOverrideResolver>>> = use_signal(|| None);
     use_context_provider(|| gate_resolver_store);
 
-    let plot_store = use_store(|| PlotStore::default());
+    let plot_store = use_store(PlotStore::default);
     use_context_provider(|| plot_store);
 
     let metadata_store =
@@ -71,8 +71,7 @@ pub fn PlotWindow(
 
     use_effect(move || {
         if let Some(fcs_file) = &*fcs_file.read() {
-            let mut sorted_settings =
-                indexmap::IndexSet::with_hasher(rustc_hash::FxBuildHasher::default());
+            let mut sorted_settings = indexmap::IndexSet::with_hasher(rustc_hash::FxBuildHasher);
 
             // 1. Get the parameters and sort them by their internal FCS parameter number once
             let mut params_to_add: Vec<_> = fcs_file.parameters.values().collect();
@@ -86,7 +85,7 @@ pub fn PlotWindow(
                 };
 
                 // Add settings to the FxHashMap if not present
-                axis_store.add_new_default_axis_settings(&p, &fcs_file);
+                axis_store.add_new_default_axis_settings(&p, fcs_file);
 
                 // Insert into the IndexSet (Order is preserved automatically)
                 sorted_settings.insert(p.clone());
@@ -162,7 +161,7 @@ pub fn PlotWindow(
         }
     });
 
-    let mut plot_data_signal = use_signal(|| vec![]);
+    let mut plot_data_signal = use_signal(Vec::new);
 
     let filtered_dataframe: Resource<std::result::Result<Arc<DataFrame>, anyhow::Error>> =
         use_resource(move || {
@@ -175,15 +174,14 @@ pub fn PlotWindow(
                     return Err(anyhow::anyhow!("No resolver"));
                 };
                 if let Some(Ok(d)) = &*scaled_data.read() {
-                    let filtered_data = match get_filtered_dataframe(d.clone(), parental, resolver)
-                        .await
-                    {
-                        Ok(d) => d.clone(),
-                        Err(e) => {
-                            plot_data_signal.set(vec![]);
-                            return Err(anyhow::anyhow!("No data to display {}", e.to_string()));
-                        }
-                    };
+                    let filtered_data =
+                        match get_filtered_dataframe(d.clone(), parental, resolver).await {
+                            Ok(d) => d.clone(),
+                            Err(e) => {
+                                plot_data_signal.set(vec![]);
+                                return Err(anyhow::anyhow!("No data to display {}", e));
+                            }
+                        };
 
                     match zip_cols_from_filtered_df(filtered_data.clone(), x_fluoro, y_fluoro).await
                     {

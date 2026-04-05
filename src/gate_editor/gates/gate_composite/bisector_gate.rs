@@ -88,7 +88,7 @@ impl BisectorGate {
         x_axis_param: Arc<str>,
         y_axis_param: Arc<str>,
         subgate_ids: (Arc<str>, Arc<str>),
-        subgate_names: Option<(String, String)>
+        subgate_names: Option<(String, String)>,
     ) -> anyhow::Result<Self> {
         let mut gate_map = FxIndexMap::default();
         let parameters = (x_axis_param.clone(), y_axis_param.clone());
@@ -99,12 +99,11 @@ impl BisectorGate {
         let id_right_arc = subgate_ids.1.clone();
 
         let (name_left, name_right) = {
-            match subgate_names{
+            match subgate_names {
                 Some((l, r)) => (l, r),
                 None => (id_left_arc.to_string(), id_right_arc.to_string()),
             }
         };
-        
 
         let gate_left = Gate {
             id: id_left_arc.clone(),
@@ -373,69 +372,66 @@ impl super::super::gate_traits::DrawableGate for BisectorGate {
             let x_axis_offset = ((x_axis_min_max.end() - x_axis_min_max.start()) / 100f32) * 1f32;
             let y_axis_offset = ((y_axis_min_max.end() - y_axis_min_max.start()) / 100f32) * 1f32;
             for (i, (id, _)) in self.gates.iter().enumerate() {
-                match gate_stats.get_percent_for_id(id.clone()) {
-                    Some(percent) => {
-                        let text = format!("{:.2}%", percent);
-                        let (origin, offset, text_anchor) = if i == 0 {
-                            // LEFT LABEL
-                            if self.axis_matched {
+                if let Some(percent) = gate_stats.get_percent_for_id(id.clone()) {
+                    let text = format!("{:.2}%", percent);
+                    let (origin, offset, text_anchor) = if i == 0 {
+                        // LEFT LABEL
+                        if self.axis_matched {
+                            (
                                 (
-                                    (
-                                        *x_axis_min_max.start() + x_axis_offset,
-                                        self.points.1 + y_axis_offset,
-                                    ),
-                                    (0.0, 0.0),
-                                    Some(String::from("start")),
-                                )
-                            } else {
-                                // BOTTOM LABEL
-                                (
-                                    (
-                                        self.points.0 + x_axis_offset,
-                                        *y_axis_min_max.start() + y_axis_offset,
-                                    ),
-                                    (0.0, 0.0),
-                                    None,
-                                )
-                            }
+                                    *x_axis_min_max.start() + x_axis_offset,
+                                    self.points.1 + y_axis_offset,
+                                ),
+                                (0.0, 0.0),
+                                Some(String::from("start")),
+                            )
                         } else {
-                            // RIGHT LABEL
-                            if self.axis_matched {
+                            // BOTTOM LABEL
+                            (
                                 (
-                                    (
-                                        *x_axis_min_max.end() - y_axis_offset,
-                                        self.points.1 + y_axis_offset,
-                                    ),
-                                    (0.0, 0.0),
-                                    Some(String::from("end")),
-                                )
-                            } else {
-                                // TOP LABEL
+                                    self.points.0 + x_axis_offset,
+                                    *y_axis_min_max.start() + y_axis_offset,
+                                ),
+                                (0.0, 0.0),
+                                None,
+                            )
+                        }
+                    } else {
+                        // RIGHT LABEL
+                        if self.axis_matched {
+                            (
                                 (
-                                    (
-                                        self.points.0 + x_axis_offset,
-                                        *y_axis_min_max.end() - 2f32 * y_axis_offset,
-                                    ),
-                                    (0.0, 0.0),
-                                    None,
-                                )
-                            }
-                        };
-                        let shape = GateRenderShape::Text {
-                            origin,
-                            offset,
-                            fontsize: 10f32,
-                            text,
-                            text_anchor,
-                            shape_type: if self.axis_matched {
-                                ShapeType::UndraggableText(gate_types::Direction::X)
-                            } else {
-                                ShapeType::UndraggableText(gate_types::Direction::Y)
-                            },
-                        };
-                        labels.push(shape)
-                    }
-                    None => {}
+                                    *x_axis_min_max.end() - y_axis_offset,
+                                    self.points.1 + y_axis_offset,
+                                ),
+                                (0.0, 0.0),
+                                Some(String::from("end")),
+                            )
+                        } else {
+                            // TOP LABEL
+                            (
+                                (
+                                    self.points.0 + x_axis_offset,
+                                    *y_axis_min_max.end() - 2f32 * y_axis_offset,
+                                ),
+                                (0.0, 0.0),
+                                None,
+                            )
+                        }
+                    };
+                    let shape = GateRenderShape::Text {
+                        origin,
+                        offset,
+                        fontsize: 10f32,
+                        text,
+                        text_anchor,
+                        shape_type: if self.axis_matched {
+                            ShapeType::UndraggableText(gate_types::Direction::X)
+                        } else {
+                            ShapeType::UndraggableText(gate_types::Direction::Y)
+                        },
+                    };
+                    labels.push(shape)
                 }
             }
         }
@@ -566,7 +562,7 @@ impl super::super::gate_traits::DrawableGate for BisectorGate {
     ) -> anyhow::Result<Option<Box<dyn super::super::gate_traits::DrawableGate>>> {
         let (x_offset, y_offset) = gate_drag_data.offset();
         let mut new_self = self.clone();
-        let mut new_points = self.points.clone();
+        let mut new_points = self.points;
         if self.axis_matched {
             new_points.1 = self.points.1 - y_offset;
         } else {
@@ -594,7 +590,7 @@ impl super::super::gate_traits::DrawableGate for BisectorGate {
     }
 
     fn get_inner_gate_ids(&self) -> Vec<Arc<str>> {
-        self.gates.keys().map(|k| k.clone()).collect()
+        self.gates.keys().cloned().collect()
     }
 
     fn get_name(&self) -> &str {

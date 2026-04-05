@@ -30,8 +30,8 @@ impl GateDraft {
     pub fn new_polygon(points: Vec<(f32, f32)>, x_param: Arc<str>, y_param: Arc<str>) -> Self {
         GateDraft::Polygon {
             points,
-            x_param: x_param,
-            y_param: y_param,
+            x_param,
+            y_param,
         }
     }
 }
@@ -62,7 +62,7 @@ fn draw_draft_polygon(points: &[(f32, f32)]) -> Vec<GateRenderShape> {
             let mut points_local: Vec<(f32, f32)> = points.to_vec();
             // close the loop
             if let Some(first) = points_local.first() {
-                points_local.push(first.clone());
+                points_local.push(*first);
             }
 
             vec![GateRenderShape::Polygon {

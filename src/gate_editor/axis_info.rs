@@ -1,4 +1,4 @@
-use std::{f32::INFINITY, sync::Arc};
+use std::sync::Arc;
 
 use dioxus::prelude::*;
 use flow_fcs::TransformType;
@@ -80,9 +80,9 @@ impl AxisInfo {
             },
             TransformType::Arcsinh { cofactor } => {
                 let lower = asinh_transform_f32(lower_raw, cofactor).unwrap_or(0f32);
-                let upper = asinh_transform_f32(upper_raw, cofactor).unwrap_or(INFINITY);
+                let upper = asinh_transform_f32(upper_raw, cofactor).unwrap_or(f32::INFINITY);
                 let data_lower = asinh_transform_f32(data_lower, cofactor).unwrap_or(0f32);
-                let data_upper = asinh_transform_f32(data_upper, cofactor).unwrap_or(INFINITY);
+                let data_upper = asinh_transform_f32(data_upper, cofactor).unwrap_or(f32::INFINITY);
                 Self {
                     param,
                     axis_lower: lower,
@@ -154,7 +154,6 @@ impl AxisInfo {
             TransformType::Arcsinh {
                 cofactor: old_cofactor,
             } => {
-                let old_cofactor = old_cofactor;
                 let upper_untransformed = asinh_reverse_f32(old_upper, old_cofactor)?;
                 let lower_untransformed = asinh_reverse_f32(old_lower, old_cofactor)?;
                 let data_lower = asinh_reverse_f32(old_dl, old_cofactor)?;
@@ -181,17 +180,11 @@ impl AxisInfo {
     }
 
     pub fn is_linear(&self) -> bool {
-        match self.transform {
-            TransformType::Linear => true,
-            _ => false,
-        }
+        matches!(self.transform, TransformType::Linear)
     }
 
     pub fn is_arcsinh(&self) -> bool {
-        match self.transform {
-            TransformType::Arcsinh { .. } => true,
-            _ => false,
-        }
+        matches!(self.transform, TransformType::Arcsinh { .. })
     }
 
     pub fn get_untransformed_bounds(&self) -> (f32, f32) {

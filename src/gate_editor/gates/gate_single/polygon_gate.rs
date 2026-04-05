@@ -93,7 +93,7 @@ impl PolygonGate {
             name: self.inner.name.clone(),
             mode: self.inner.mode.clone(),
         };
-        Ok(PolygonGate::try_new(new_gate, self.is_primary)?)
+        PolygonGate::try_new(new_gate, self.is_primary)
     }
 
     pub fn clone_polygon_for_new_point(
@@ -116,7 +116,7 @@ impl PolygonGate {
             name: self.inner.name.clone(),
             mode: self.inner.mode.clone(),
         };
-        Ok(PolygonGate::try_new(new_gate, self.is_primary)?)
+        PolygonGate::try_new(new_gate, self.is_primary)
     }
 
     fn get_points(&self) -> Vec<(f32, f32)> {
@@ -291,25 +291,22 @@ impl DrawableGate for PolygonGate {
                 }
             };
             let offset = (x_offset, y_offset);
-            match gate_stats.get_percent_for_id(self.inner.id.clone()) {
-                Some(percent) => {
-                    let params = self.get_params();
-                    let origin = self
-                        .inner
-                        .geometry
-                        .calculate_center(&params.0, &params.1)
-                        .expect("should not fail");
-                    let shape = GateRenderShape::Text {
-                        origin,
-                        offset,
-                        fontsize: 10f32,
-                        text: format!("{:.2}%", percent),
-                        text_anchor: None,
-                        shape_type: ShapeType::Text,
-                    };
-                    labels.push(shape)
-                }
-                None => {}
+            if let Some(percent) = gate_stats.get_percent_for_id(self.inner.id.clone()) {
+                let params = self.get_params();
+                let origin = self
+                    .inner
+                    .geometry
+                    .calculate_center(&params.0, &params.1)
+                    .expect("should not fail");
+                let shape = GateRenderShape::Text {
+                    origin,
+                    offset,
+                    fontsize: 10f32,
+                    text: format!("{:.2}%", percent),
+                    text_anchor: None,
+                    shape_type: ShapeType::Text,
+                };
+                labels.push(shape)
             }
         }
 
@@ -331,7 +328,7 @@ pub fn draw_polygon(
 ) -> Vec<GateRenderShape> {
     vec![GateRenderShape::Polygon {
         points: Arc::new(points.to_vec()),
-        style: style,
+        style,
         shape_type,
     }]
 }
@@ -375,7 +372,7 @@ pub fn is_point_on_polygon_perimeter(
     if points.len() < 2 {
         return None;
     }
-    let mut closest = std::f32::INFINITY;
+    let mut closest = f32::INFINITY;
     for segment in points.windows(2) {
         if let Some(dis) = shape.is_near_segment(point, segment[0], segment[1], tolerance) {
             closest = closest.min(dis);
@@ -385,14 +382,14 @@ pub fn is_point_on_polygon_perimeter(
     let first = points[0];
     let last = points[points.len() - 1];
 
-    if first != last {
-        if let Some(dis) = shape.is_near_segment(point, last, first, tolerance) {
-            closest = closest.min(dis);
-        }
+    if first != last
+        && let Some(dis) = shape.is_near_segment(point, last, first, tolerance)
+    {
+        closest = closest.min(dis);
     }
-    if closest == std::f32::INFINITY {
-        return None;
+    if closest == f32::INFINITY {
+        None
     } else {
-        return Some(closest);
+        Some(closest)
     }
 }

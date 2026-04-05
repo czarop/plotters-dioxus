@@ -7,6 +7,7 @@ use itertools::Itertools;
 use rustc_hash::{FxBuildHasher, FxHashMap};
 use serde::Deserialize;
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use std::ops::RangeInclusive;
 use std::sync::Arc;
 
@@ -157,20 +158,15 @@ impl AtomicContainer {
                         };
 
                         // 3. Only create the DrawableGate if we haven't handled this specific Group yet
-                        if !group_cache.contains_key(&key) {
+                        if let Entry::Vacant(e) = group_cache.entry(key) {
                             let gate = gate_spec.to_drawable(
                                 gate_id.clone(),
                                 self.name.clone(),
                                 flow_gates::GateMode::Global,
                                 rect_to_polygon,
                             )?;
-                            println!(
-                                "CREATED GROUP-SPECIFIC GATE! ID: {}, Name: {}, Group: {}",
-                                gate.get_id(),
-                                gate.get_name(),
-                                key.group
-                            );
-                            group_cache.insert(key, gate);
+
+                            e.insert(gate);
                         }
                     }
                 }
@@ -571,13 +567,12 @@ pub fn get_composite_gates_from_filter_container(
     if matches!(
         composite_type,
         CompositeType::Quadrant(_) | CompositeType::SkewedQuadrant(_)
-    ) {
-        if subgates.len() != 4 {
-            return Err(anyhow::anyhow!(
-                "Quadrant composite gate must have exactly 4 subgates, found {}",
-                subgates.len()
-            ));
-        }
+    ) && subgates.len() != 4
+    {
+        return Err(anyhow::anyhow!(
+            "Quadrant composite gate must have exactly 4 subgates, found {}",
+            subgates.len()
+        ));
     }
     let mut map = FxHashMap::default();
     let params = if let GateSerialized::Rectangle {
@@ -597,15 +592,15 @@ pub fn get_composite_gates_from_filter_container(
         ));
     };
     let (x_data_range, y_data_range) =
-        extract_data_range_from_axis_settings(&params, &axis_settings)?;
+        extract_data_range_from_axis_settings(&params, axis_settings)?;
     let (x_axis_range, y_axis_range) =
-        extract_axis_range_from_axis_settings(&params, &axis_settings)?;
+        extract_axis_range_from_axis_settings(&params, axis_settings)?;
 
     let (subgate_ids, subgate_names, gate_id): (_, _, Arc<str>) = match &composite_type {
         CompositeType::Bisector(id)
         | CompositeType::Quadrant(id)
         | CompositeType::SkewedQuadrant(id) => {
-            let (ids, names) = get_sorted_subgate_ids_and_names(&subgates);
+            let (ids, names) = get_sorted_subgate_ids_and_names(subgates);
             (ids, names, Arc::from(id.as_str()))
         }
     };
@@ -695,7 +690,7 @@ pub fn get_composite_gates_from_filter_container(
                         .get(&md_param)
                         .ok_or_else(|| anyhow!("Missing group value for param {}", md_param))?;
                     // Only build the gate if we haven't seen this group yet
-                    if let None = group_cache.get(group_id) {
+                    if !group_cache.contains_key(group_id) {
                         let new_gate = get_bisector_gate_for_filter_container(
                             gate_spec,
                             gate_id.clone(),
@@ -733,7 +728,7 @@ pub fn get_composite_gates_from_filter_container(
                         .ok_or_else(|| anyhow!("Missing group value for param {}", md_param))?;
 
                     // Only build the gate if we haven't seen this group yet
-                    if let None = group_cache.get(group_id) {
+                    if !group_cache.contains_key(group_id) {
                         let new_gate = get_quadrant_gate_for_filter_container(
                             gate_spec,
                             gate_id.clone(),
@@ -772,7 +767,7 @@ pub fn get_composite_gates_from_filter_container(
                     for (file_id, gate_spec) in &fc.per_file_filters {
                         file_to_specs
                             .entry(file_id.clone())
-                            .or_insert_with(Vec::new)
+                            .or_default()
                             .push(gate_spec.clone());
                     }
                 }
@@ -882,7 +877,7 @@ pub fn get_composite_gates_from_filter_container(
                     for (file_id, gate_spec) in &fc.per_file_filters {
                         file_to_specs
                             .entry(file_id.clone())
-                            .or_insert_with(Vec::new)
+                            .or_default()
                             .push(gate_spec.clone());
                     }
                 }
@@ -1008,8 +1003,8 @@ pub fn get_quadrant_gate_for_filter_container(
 ) -> anyhow::Result<Arc<dyn DrawableGate>> {
     let default_data_points = make_data_points_for_quadrant_filter(
         filter,
-        &x_data_range,
-        &y_data_range,
+        x_data_range,
+        y_data_range,
         x_axis_range,
         y_axis_range,
     )?;
@@ -1174,11 +1169,11 @@ pub fn get_skewed_quadrant_gate(
         .map(|gs| {
             if let GateSerialized::Angle { center, v1, v2, .. } = &gs {
                 Ok(calculate_skewed_quadrant_polygon(
-                    center.clone(),
-                    v1.clone(),
-                    v2.clone(),
-                    &x_axis_range,
-                    &y_axis_range,
+                    *center,
+                    *v1,
+                    *v2,
+                    x_axis_range,
+                    y_axis_range,
                 ))
             } else {
                 Err(anyhow::anyhow!(
@@ -1219,15 +1214,15 @@ pub fn validate_metadata_requirements(
     metadata_headers: &std::collections::HashSet<Arc<str>>,
 ) {
     for container in containers.values() {
-        if let FilterContainer::Atomic(atomic) = container {
-            if let Some(required_md) = &atomic.md {
-                // Check if the metadata CSV actually has this column
-                if !metadata_headers.contains(required_md) {
-                    println!(
-                        "Gate '{}' ({}) requires metadata column '{}', but it's missing from the CSV!",
-                        atomic.name, atomic.id, required_md
-                    );
-                }
+        if let FilterContainer::Atomic(atomic) = container
+            && let Some(required_md) = &atomic.md
+        {
+            // Check if the metadata CSV actually has this column
+            if !metadata_headers.contains(required_md) {
+                println!(
+                    "Gate '{}' ({}) requires metadata column '{}', but it's missing from the CSV!",
+                    atomic.name, atomic.id, required_md
+                );
             }
         }
     }

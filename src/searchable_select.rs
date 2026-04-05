@@ -9,7 +9,7 @@ pub fn SearchableSelectList<T: Clone + PartialEq + std::fmt::Display + 'static>(
 ) -> Element {
     // In your component
     let mut is_open = use_signal(|| false);
-    let mut search = use_signal(|| String::new());
+    let mut search = use_signal(String::new);
     let mut local_selected_value: Signal<Option<(usize, T)>> = use_signal(|| None);
 
     let filtered = use_memo(move || {
@@ -23,7 +23,7 @@ pub fn SearchableSelectList<T: Clone + PartialEq + std::fmt::Display + 'static>(
             .collect::<Vec<(usize, T)>>()
     });
 
-    let mut display_text = use_signal(|| String::new());
+    let mut display_text = use_signal(String::new);
 
     use_effect(move || {
         let text = local_selected_value
@@ -115,7 +115,7 @@ pub fn SearchableSelectList<T: Clone + PartialEq + std::fmt::Display + 'static>(
                         }
                     }
                     // Handle empty state
-                    if filtered.read().len() == 0 {
+                    if filtered.is_empty() {
                         div { class: "combobox-empty", "No results" }
                     }
                 }
@@ -138,7 +138,7 @@ pub fn SearchableSelectMap<
 ) -> Element {
     // In your component
     let mut is_open = use_signal(|| false);
-    let mut search = use_signal(|| String::new());
+    let mut search = use_signal(String::new);
     let mut local_selected_value: Signal<Option<(usize, T)>> = use_signal(|| None);
 
     let filtered = use_memo(move || {
@@ -152,7 +152,7 @@ pub fn SearchableSelectMap<
             .collect::<Vec<(usize, S, T)>>()
     });
 
-    let mut display_text = use_signal(|| String::new());
+    let mut display_text = use_signal(String::new);
 
     use_effect(move || {
         let text = local_selected_value
@@ -244,7 +244,7 @@ pub fn SearchableSelectMap<
                         }
                     }
                     // Handle empty state
-                    if filtered.read().len() == 0 {
+                    if filtered.is_empty() {
                         div { class: "combobox-empty", "No results" }
                     }
                 }
@@ -264,7 +264,7 @@ pub fn SearchableSelectSet<
 ) -> Element {
     // In your component
     let mut is_open = use_signal(|| false);
-    let mut search = use_signal(|| String::new());
+    let mut search = use_signal(String::new);
     let mut local_selected_value: Signal<Option<(usize, T)>> = use_signal(|| None);
 
     let filtered = use_memo(move || {
@@ -272,13 +272,13 @@ pub fn SearchableSelectSet<
         items
             .read()
             .iter()
-            .enumerate() // Capture the REAL index in the master map
+            .enumerate()
             .filter(|(_, v)| v.to_string().to_lowercase().contains(&q))
-            .map(|(i, v)| (i, v.clone())) // Store (Index, Key, Value)
+            .map(|(i, v)| (i, v.clone()))
             .collect::<Vec<(usize, T)>>()
     });
 
-    let mut display_text = use_signal(|| String::new());
+    let mut display_text = use_signal(String::new);
 
     use_effect(move || {
         let text = local_selected_value
@@ -370,7 +370,7 @@ pub fn SearchableSelectSet<
                         }
                     }
                     // Handle empty state
-                    if filtered.read().len() == 0 {
+                    if filtered.is_empty() {
                         div { class: "combobox-empty", "No results" }
                     }
                 }

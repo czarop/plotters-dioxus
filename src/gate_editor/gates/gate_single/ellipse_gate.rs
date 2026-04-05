@@ -392,7 +392,7 @@ impl DrawableGate for EllipseGate {
 
             let main = Some(vec![GateRenderShape::Polygon {
                 points: path_points.into(),
-                style: style,
+                style,
                 shape_type: ShapeType::Gate(self.inner.id.clone()),
             }]);
 
@@ -438,19 +438,16 @@ impl DrawableGate for EllipseGate {
                     }
                 };
                 let offset = (x_offset, y_offset);
-                match gate_stats.get_percent_for_id(self.inner.id.clone()) {
-                    Some(percent) => {
-                        let shape = GateRenderShape::Text {
-                            origin: self.points[1],
-                            offset: offset,
-                            fontsize: 10f32,
-                            text: format!("{:.2}%", percent),
-                            text_anchor: None,
-                            shape_type: ShapeType::Text,
-                        };
-                        labels.push(shape)
-                    }
-                    None => {}
+                if let Some(percent) = gate_stats.get_percent_for_id(self.inner.id.clone()) {
+                    let shape = GateRenderShape::Text {
+                        origin: self.points[1],
+                        offset,
+                        fontsize: 10f32,
+                        text: format!("{:.2}%", percent),
+                        text_anchor: None,
+                        shape_type: ShapeType::Text,
+                    };
+                    labels.push(shape);
                 }
             }
 

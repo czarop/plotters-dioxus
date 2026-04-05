@@ -101,7 +101,7 @@ impl RectangleGate {
             name: self.inner.name.clone(),
             mode: self.inner.mode.clone(),
         };
-        Ok(RectangleGate::try_new(new_gate, self.is_primary)?)
+        RectangleGate::try_new(new_gate, self.is_primary)
     }
 
     pub fn clone_rectangle_for_new_point(
@@ -126,7 +126,7 @@ impl RectangleGate {
             name: self.inner.name.clone(),
             mode: self.inner.mode.clone(),
         };
-        Ok(RectangleGate::try_new(new_gate, self.is_primary)?)
+        RectangleGate::try_new(new_gate, self.is_primary)
     }
 }
 
@@ -256,13 +256,13 @@ impl DrawableGate for RectangleGate {
             ShapeType::Gate(self.inner.id.clone()),
         );
         let selected = if is_selected {
-            Some(draw_circles_for_selected_gate(&pts, 0))
+            Some(draw_circles_for_selected_gate(pts, 0))
         } else {
             None
         };
         let ghost = drag_point
             .as_ref()
-            .and_then(|d| draw_ghost_point_for_rectangle(d, &pts));
+            .and_then(|d| draw_ghost_point_for_rectangle(d, pts));
 
         let mut labels = vec![];
 
@@ -288,24 +288,21 @@ impl DrawableGate for RectangleGate {
             // };
             // let offset = (x_offset, y_offset);
             let offset = (0f32, 0f32);
-            match gate_stats.get_percent_for_id(self.inner.id.clone()) {
-                Some(percent) => {
-                    let center = {
-                        let bl = self.points[0];
-                        let tr = self.points[2];
-                        ((bl.0 + tr.0) / 2.0, (bl.1 + tr.1) / 2.0)
-                    };
-                    let shape = GateRenderShape::Text {
-                        origin: center,
-                        offset: offset,
-                        fontsize: 10f32,
-                        text: format!("{:.2}%", percent),
-                        text_anchor: None,
-                        shape_type: ShapeType::Text,
-                    };
-                    labels.push(shape)
-                }
-                None => {}
+            if let Some(percent) = gate_stats.get_percent_for_id(self.inner.id.clone()) {
+                let center = {
+                    let bl = self.points[0];
+                    let tr = self.points[2];
+                    ((bl.0 + tr.0) / 2.0, (bl.1 + tr.1) / 2.0)
+                };
+                let shape = GateRenderShape::Text {
+                    origin: center,
+                    offset,
+                    fontsize: 10f32,
+                    text: format!("{:.2}%", percent),
+                    text_anchor: None,
+                    shape_type: ShapeType::Text,
+                };
+                labels.push(shape)
             }
         }
 
@@ -407,7 +404,7 @@ pub fn is_point_on_rectangle_perimeter(
     if points.len() < 2 {
         return None;
     }
-    let mut closest = std::f32::INFINITY;
+    let mut closest = f32::INFINITY;
     for segment in points.windows(2) {
         if let Some(dis) = shape.is_near_segment(point, segment[0], segment[1], tolerance) {
             closest = closest.min(dis);
@@ -417,15 +414,15 @@ pub fn is_point_on_rectangle_perimeter(
     let first = points[0];
     let last = points[points.len() - 1];
 
-    if first != last {
-        if let Some(dis) = shape.is_near_segment(point, last, first, tolerance) {
-            closest = closest.min(dis);
-        }
+    if first != last
+        && let Some(dis) = shape.is_near_segment(point, last, first, tolerance)
+    {
+        closest = closest.min(dis);
     }
-    if closest == std::f32::INFINITY {
-        return None;
+    if closest == f32::INFINITY {
+        None
     } else {
-        return Some(closest);
+        Some(closest)
     }
 }
 

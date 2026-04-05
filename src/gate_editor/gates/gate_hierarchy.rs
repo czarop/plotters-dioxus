@@ -86,10 +86,10 @@ impl GateHierarchy {
         self.orders.insert(child_id.clone(), order);
 
         // Remove child from previous parent if it exists
-        if let Some(old_parent) = self.parents.get(&child_id) {
-            if let Some(siblings) = self.children.get_mut(old_parent) {
-                siblings.retain(|id| id != &child_id);
-            }
+        if let Some(old_parent) = self.parents.get(&child_id)
+            && let Some(siblings) = self.children.get_mut(old_parent)
+        {
+            siblings.retain(|id| id != &child_id);
         }
 
         // Add new relationship
@@ -110,10 +110,10 @@ impl GateHierarchy {
     /// Children of the removed gate become orphans (no parent)
     pub fn remove_node(&mut self, gate_id: &str) {
         // Remove as a child
-        if let Some(parent_id) = self.parents.remove(gate_id) {
-            if let Some(siblings) = self.children.get_mut(&parent_id) {
-                siblings.retain(|id| id.as_ref() != gate_id);
-            }
+        if let Some(parent_id) = self.parents.remove(gate_id)
+            && let Some(siblings) = self.children.get_mut(&parent_id)
+        {
+            siblings.retain(|id| id.as_ref() != gate_id);
         }
 
         // Remove as a parent (orphan the children)
@@ -226,7 +226,7 @@ impl GateHierarchy {
             in_degree.insert(gate.clone(), 0);
         }
 
-        for (_, children) in &self.children {
+        for children in self.children.values() {
             for child in children {
                 *in_degree.entry(child.clone()).or_insert(0) += 1;
             }
@@ -373,10 +373,10 @@ impl GateHierarchy {
         }
 
         // Remove from current parent if it exists
-        if let Some(old_parent) = self.parents.remove(&gate_id) {
-            if let Some(siblings) = self.children.get_mut(&old_parent) {
-                siblings.retain(|id| id != &gate_id);
-            }
+        if let Some(old_parent) = self.parents.remove(&gate_id)
+            && let Some(siblings) = self.children.get_mut(&old_parent)
+        {
+            siblings.retain(|id| id != &gate_id);
         }
 
         // Add to new parent
@@ -501,22 +501,22 @@ impl GateHierarchy {
             if let Some(children) = self.children.get(old_id) {
                 let new_parent_id = id_map.get(old_id).unwrap();
                 for child in children {
-                    if let Some(new_child_id) = id_map.get(child) {
-                        if let Some(ord) = self.orders.get(child) {
-                            if !new_hierarchy.add_child(
-                                new_parent_id.clone(),
-                                new_child_id.clone(),
-                                *ord,
-                            ) {
-                                return Err(anyhow!(
-                                    "Failed to add child in cloned hierarchy - possible cycle",
-                                ));
-                            } else {
-                                return Err(anyhow!(
-                                    "Failed to add child in cloned hierarchy - no order for child {}",
-                                    child
-                                ));
-                            }
+                    if let Some(new_child_id) = id_map.get(child)
+                        && let Some(ord) = self.orders.get(child)
+                    {
+                        if !new_hierarchy.add_child(
+                            new_parent_id.clone(),
+                            new_child_id.clone(),
+                            *ord,
+                        ) {
+                            return Err(anyhow!(
+                                "Failed to add child in cloned hierarchy - possible cycle",
+                            ));
+                        } else {
+                            return Err(anyhow!(
+                                "Failed to add child in cloned hierarchy - no order for child {}",
+                                child
+                            ));
                         }
                     }
                 }
@@ -624,7 +624,8 @@ impl GateHierarchy {
         let children: Vec<Arc<str>> = self
             .get_children(gate_id)
             .into_iter()
-            .map(|id| id.clone())
+            .cloned()
+            // .map(|id| id)
             .collect();
 
         if children.is_empty() {
@@ -668,7 +669,7 @@ impl GateHierarchy {
         } else {
             // Make children root nodes (remove their parent relationship)
             for child in &children {
-                if let Some(_) = self.parents.remove(child) {
+                if self.parents.remove(child).is_some() {
                     // Also remove from old parent's children list
                     // (This is already handled by reparent, but we need to do it manually here)
                 }
@@ -741,15 +742,12 @@ impl GateHierarchy {
     ) -> Result<()> {
         let parent_id = parent_id.into();
         let child_id = child_id.into();
-        let ord = if order.is_some() {
-            order.unwrap()
-        } else {
-            let now = std::time::SystemTime::now();
-            let since_the_epoch = now
+        let ord = order.unwrap_or_else(|| {
+            std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .expect("Time went backwards");
-            since_the_epoch.as_millis() as u64
-        };
+                .expect("Time went backwards")
+                .as_millis() as u64
+        });
         if !self.add_child(parent_id.clone(), child_id.clone(), ord) {
             return Err(anyhow!(
                 "failed to add gate to hierarchy {} {}",

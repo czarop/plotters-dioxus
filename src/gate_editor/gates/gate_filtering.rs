@@ -186,7 +186,7 @@ pub fn filter_events_to_mask(
                 }
                 let mut final_mask: Option<BooleanChunked> = None;
                 for gate in operands {
-                    let current_mask = filter_events_to_mask(df, gate.clone().into(), resolver)?;
+                    let current_mask = filter_events_to_mask(df, gate.clone(), resolver)?;
                     match final_mask {
                         None => final_mask = Some(current_mask),
                         Some(ref mut acc) => {
@@ -209,7 +209,7 @@ pub fn filter_events_to_mask(
                 }
                 let mut final_mask: Option<BooleanChunked> = None;
                 for gate in operands {
-                    let current_mask = filter_events_to_mask(df, gate.clone().into(), resolver)?;
+                    let current_mask = filter_events_to_mask(df, gate.clone(), resolver)?;
                     match final_mask {
                         None => final_mask = Some(current_mask),
                         Some(ref mut acc) => *acc = &*acc | &current_mask,
@@ -224,9 +224,9 @@ pub fn filter_events_to_mask(
                 if operands.len() != 1 {
                     return Err(anyhow::anyhow!("Not gates can only have 1 operand"));
                 }
-                let other_id = operands[0].clone().into();
+                let other_id = operands[0].clone();
                 let mask = !filter_events_to_mask(df, other_id, resolver)?;
-                return Ok(mask);
+                Ok(mask)
             }
         },
     }

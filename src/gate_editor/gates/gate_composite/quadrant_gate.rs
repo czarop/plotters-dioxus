@@ -39,7 +39,16 @@ impl QuadrantGate {
         let (cx, cy) = plot_map.pixel_to_data(click_loc_raw.0, click_loc_raw.1, None, None);
         let points = DataPoints::new_from_click(cx, cy, plot_map);
 
-        Self::try_new_from_data_points(id, name, points, x_axis_param, y_axis_param, true, None, None)
+        Self::try_new_from_data_points(
+            id,
+            name,
+            points,
+            x_axis_param,
+            y_axis_param,
+            true,
+            None,
+            None,
+        )
     }
 
     pub fn try_new_from_data_points(
@@ -50,7 +59,7 @@ impl QuadrantGate {
         y_axis_param: Arc<str>,
         axis_matched: bool,
         subgate_ids: Option<Vec<Arc<str>>>,
-        subgate_names: Option<(String, String, String, String)>
+        subgate_names: Option<(String, String, String, String)>,
     ) -> Result<Self> {
         // FORCE ORTHOGONALITY: Overwrite any skew with center alignment
         data_points.left.1 = data_points.center.1;
@@ -76,9 +85,14 @@ impl QuadrantGate {
         };
 
         let names = {
-            match subgate_names{
+            match subgate_names {
                 Some((a, b, c, d)) => [a, b, c, d],
-                None => [sub_ids[0].to_string(), sub_ids[1].to_string(), sub_ids[2].to_string(), sub_ids[3].to_string()],
+                None => [
+                    sub_ids[0].to_string(),
+                    sub_ids[1].to_string(),
+                    sub_ids[2].to_string(),
+                    sub_ids[3].to_string(),
+                ],
             }
         };
 
@@ -128,7 +142,7 @@ impl QuadrantGate {
             self.parameters.1.clone(),
             self.axis_matched,
             Some(gate_ids),
-            Some(gate_names)
+            Some(gate_names),
         )
     }
 
@@ -139,7 +153,7 @@ impl QuadrantGate {
     ) -> Box<dyn DrawableGate> {
         if swap_axis {
             let new_parameters = (self.parameters.1.clone(), self.parameters.0.clone());
-            let new_points = self.points.clone_for_swap_axis(self.axis_matched);
+            let new_points = self.points.clone_for_swap_axis();
             Box::new(Self {
                 gates,
                 id: self.id.clone(),
@@ -273,91 +287,88 @@ impl DrawableGate for QuadrantGate {
             let y_axis_offset = ((y_axis_min_max.end() - y_axis_min_max.start()) / 100f32) * 1f32;
             for (i, (id, _)) in self.gates.iter().enumerate() {
                 // order: bl, br, tr, tl
-                match gate_stats.get_percent_for_id(id.clone()) {
-                    Some(percent) => {
-                        let text = format!("{:.2}%", percent);
-                        let (origin, offset, text_anchor) = match i {
-                            0 => {
-                                // ALWAYS BOTTOM LEFT
+                if let Some(percent) = gate_stats.get_percent_for_id(id.clone()) {
+                    let text = format!("{:.2}%", percent);
+                    let (origin, offset, text_anchor) = match i {
+                        0 => {
+                            // ALWAYS BOTTOM LEFT
+                            (
+                                (
+                                    *x_axis_min_max.start() + x_axis_offset,
+                                    *y_axis_min_max.start() + y_axis_offset,
+                                ),
+                                self.gates.get(id).expect("").get_label_offset(),
+                                Some(String::from("start")),
+                            )
+                        }
+                        1 => {
+                            // BOTTOM RIGHT LABEL
+                            if self.axis_matched {
+                                (
+                                    (
+                                        *x_axis_min_max.end() - x_axis_offset,
+                                        *y_axis_min_max.start() + y_axis_offset,
+                                    ),
+                                    self.gates.get(id).expect("").get_label_offset(),
+                                    Some(String::from("end")),
+                                )
+                            } else {
+                                // TOP LEFT LABEL
                                 (
                                     (
                                         *x_axis_min_max.start() + x_axis_offset,
-                                        *y_axis_min_max.start() + y_axis_offset,
+                                        *y_axis_min_max.end() - 2f32 * y_axis_offset,
                                     ),
                                     self.gates.get(id).expect("").get_label_offset(),
                                     Some(String::from("start")),
                                 )
                             }
-                            1 => {
+                        }
+                        2 => {
+                            // ALWAYS TOP RIGHT
+                            (
+                                (
+                                    *x_axis_min_max.end() - x_axis_offset,
+                                    *y_axis_min_max.end() - 2f32 * y_axis_offset,
+                                ),
+                                self.gates.get(id).expect("").get_label_offset(),
+                                Some(String::from("end")),
+                            )
+                        }
+                        3 => {
+                            // TOP LEFT LABEL
+                            if self.axis_matched {
+                                (
+                                    (
+                                        *x_axis_min_max.start() + x_axis_offset,
+                                        *y_axis_min_max.end() - 2f32 * y_axis_offset,
+                                    ),
+                                    self.gates.get(id).expect("").get_label_offset(),
+                                    Some(String::from("start")),
+                                )
+                            } else {
                                 // BOTTOM RIGHT LABEL
-                                if self.axis_matched {
-                                    (
-                                        (
-                                            *x_axis_min_max.end() - x_axis_offset,
-                                            *y_axis_min_max.start() + y_axis_offset,
-                                        ),
-                                        self.gates.get(id).expect("").get_label_offset(),
-                                        Some(String::from("end")),
-                                    )
-                                } else {
-                                    // TOP LEFT LABEL
-                                    (
-                                        (
-                                            *x_axis_min_max.start() + x_axis_offset,
-                                            *y_axis_min_max.end() - 2f32 * y_axis_offset,
-                                        ),
-                                        self.gates.get(id).expect("").get_label_offset(),
-                                        Some(String::from("start")),
-                                    )
-                                }
-                            }
-                            2 => {
-                                // ALWAYS TOP RIGHT
                                 (
                                     (
                                         *x_axis_min_max.end() - x_axis_offset,
-                                        *y_axis_min_max.end() - 2f32 * y_axis_offset,
+                                        *y_axis_min_max.start() + y_axis_offset,
                                     ),
                                     self.gates.get(id).expect("").get_label_offset(),
                                     Some(String::from("end")),
                                 )
                             }
-                            3 => {
-                                // TOP LEFT LABEL
-                                if self.axis_matched {
-                                    (
-                                        (
-                                            *x_axis_min_max.start() + x_axis_offset,
-                                            *y_axis_min_max.end() - 2f32 * y_axis_offset,
-                                        ),
-                                        self.gates.get(id).expect("").get_label_offset(),
-                                        Some(String::from("start")),
-                                    )
-                                } else {
-                                    // BOTTOM RIGHT LABEL
-                                    (
-                                        (
-                                            *x_axis_min_max.end() - x_axis_offset,
-                                            *y_axis_min_max.start() + y_axis_offset,
-                                        ),
-                                        self.gates.get(id).expect("").get_label_offset(),
-                                        Some(String::from("end")),
-                                    )
-                                }
-                            }
-                            _ => unreachable!(),
-                        };
-                        let shape = GateRenderShape::Text {
-                            origin,
-                            offset,
-                            fontsize: 10f32,
-                            text,
-                            text_anchor,
-                            shape_type: ShapeType::UndraggableText(gate_types::Direction::Both),
-                        };
-                        labels.push(shape)
-                    }
-                    None => {}
+                        }
+                        _ => unreachable!(),
+                    };
+                    let shape = GateRenderShape::Text {
+                        origin,
+                        offset,
+                        fontsize: 10f32,
+                        text,
+                        text_anchor,
+                        shape_type: ShapeType::UndraggableText(gate_types::Direction::Both),
+                    };
+                    labels.push(shape)
                 }
             }
         }
@@ -552,7 +563,7 @@ impl DrawableGate for QuadrantGate {
             )
         };
 
-        let mut closest = std::f32::INFINITY;
+        let mut closest = f32::INFINITY;
 
         if let Some(dis) = self.is_near_segment(point, left.1, center, tolerance) {
             closest = closest.min(dis);
@@ -567,10 +578,10 @@ impl DrawableGate for QuadrantGate {
             closest = closest.min(dis);
         }
 
-        if closest == std::f32::INFINITY {
-            return None;
+        if closest == f32::INFINITY {
+            None
         } else {
-            return Some(closest);
+            Some(closest)
         }
     }
 

@@ -36,7 +36,7 @@ pub fn MainWindow() -> Element {
     let mut filehandler: Signal<Option<FcsFiles>> = use_signal(|| None);
     let mut message = use_signal(|| None::<String>);
 
-    let mut metadata_store = use_store_sync(|| MetaDataStore::default());
+    let mut metadata_store = use_store_sync(MetaDataStore::default);
     use_context_provider(|| metadata_store);
 
     let meta_result = use_resource(move || async move {
@@ -59,13 +59,13 @@ pub fn MainWindow() -> Element {
     });
 
     let mut gate_store: Store<GateState, CopyValue<GateState, SyncStorage>> =
-        use_store_sync(|| GateState::default());
+        use_store_sync(GateState::default);
     use_context_provider(|| gate_store);
 
     let mut current_gate_type = use_signal(|| PrimaryGateType::Polygon);
     use_context_provider(|| current_gate_type);
 
-    let mut axis_store = use_store(|| AxisStore::default());
+    let mut axis_store = use_store(AxisStore::default);
     use_context_provider(|| axis_store);
 
     let file_result = use_resource(move || async move {
@@ -244,7 +244,7 @@ pub fn MainWindow() -> Element {
                             input {
                                 r#type: "number",
                                 value: "{x_axis_limits.read().get_cofactor().unwrap_or_default().round()}",
-                                disabled: if x_axis_limits.read().is_linear() { true } else { false },
+                                disabled: x_axis_limits.read().is_linear(),
                                 oninput: move |evt| {
                                     if let Ok(val) = evt.value().parse::<i32>() {
                                         if val >= 1 {
@@ -278,7 +278,7 @@ pub fn MainWindow() -> Element {
                             input {
                                 r#type: "number",
                                 value: "{x_axis_limits.read().get_untransformed_lower().round()}",
-                                disabled: if x_axis_limits.read().is_linear() { true } else { false },
+                                disabled: x_axis_limits.read().is_linear(),
                                 oninput: move |e| {
                                     if let Ok(lower) = e.value().parse::<i32>() {
                                         let param = x_axis_marker.peek();
@@ -348,7 +348,7 @@ pub fn MainWindow() -> Element {
                             input {
                                 r#type: "number",
                                 value: "{y_axis_limits.read().get_cofactor().unwrap_or_default().round()}",
-                                disabled: if y_axis_limits.read().is_linear() { true } else { false },
+                                disabled: y_axis_limits.read().is_linear(),
                                 oninput: move |evt| {
                                     if let Ok(val) = evt.value().parse::<i32>() {
                                         if val >= 1 {
@@ -382,7 +382,7 @@ pub fn MainWindow() -> Element {
                             input {
                                 r#type: "number",
                                 value: "{y_axis_limits.read().get_untransformed_lower().round()}",
-                                disabled: if y_axis_limits.read().is_linear() { true } else { false },
+                                disabled: y_axis_limits.read().is_linear(),
                                 oninput: move |e| {
                                     if let Ok(lower) = e.value().parse::<i32>() {
                                         let param = y_axis_marker.peek();
