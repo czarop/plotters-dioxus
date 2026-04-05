@@ -1,4 +1,5 @@
 use anyhow::anyhow;
+use polars::{frame::DataFrame, prelude::{CsvReadOptions, DataType, Field, Schema}};
 use core::f32;
 use dioxus::prelude::*;
 use flow_fcs::TransformType;
@@ -6,8 +7,8 @@ use flow_gates::transforms::{
     get_plotting_area, pixel_to_raw, pixel_to_raw_y, raw_to_pixel, raw_to_pixel_y,
 };
 use rustc_hash::FxBuildHasher;
-use std::{ops::RangeInclusive, sync::Arc};
-
+use std::{ops::RangeInclusive, path::PathBuf, sync::Arc};
+use polars::prelude::SerReader;
 use crate::gate_editor::{AxisInfo, gates::GateId};
 
 #[derive(Clone, Debug, PartialEq)]
@@ -280,4 +281,35 @@ impl<Lens> Store<AxisStore, Lens> {
             Err(anyhow!("error modifying axis for {}", id.clone()))
         }
     }
+
+    fn set_axes_from_file(&mut self, path: PathBuf) -> anyhow::Result<()> {
+        let df = fetch_metadata_from_csv(path)?;
+        Ok(())
+    }
+}
+
+fn fetch_metadata_from_csv(path: PathBuf) -> anyhow::Result<DataFrame> {
+    // 1. Read just the first row to get the column names
+    let schema_df = CsvReadOptions::default()
+        .with_has_header(true)
+        .with_n_rows(Some(0)) // Only get headers
+        .try_into_reader_with_file_path(Some(path.clone()))?
+        .finish()?;
+
+    // 2. Map every column name to DataType::String
+    let schema = Schema::from_iter(
+        schema_df
+            .get_column_names()
+            .iter()
+            .map(|&name| Field::new(name.clone(), DataType::String)),
+    );
+
+    // 3. Read the actual data using our "All-String" schema
+    let csv = CsvReadOptions::default()
+        .with_has_header(true)
+        .with_schema(Some(Arc::new(schema))) // Tell Polars: "Everything is a string"
+        .try_into_reader_with_file_path(Some(path))?
+        .finish()?;
+
+    Ok(csv)
 }

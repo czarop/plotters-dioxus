@@ -58,6 +58,8 @@ pub fn MainWindow() -> Element {
         }
     });
 
+    
+
     let mut gate_store: Store<GateState, CopyValue<GateState, SyncStorage>> =
         use_store_sync(GateState::default);
     use_context_provider(|| gate_store);
@@ -65,8 +67,27 @@ pub fn MainWindow() -> Element {
     let mut current_gate_type = use_signal(|| PrimaryGateType::Polygon);
     use_context_provider(|| current_gate_type);
 
-    let mut axis_store = use_store(AxisStore::default);
+    let mut axis_store: Store<AxisStore, CopyValue<AxisStore, SyncStorage>> = use_store_sync(AxisStore::default);
     use_context_provider(|| axis_store);
+
+    let axis_result = use_resource(move || async move {
+        let result = tokio::task::spawn_blocking(move || -> Result<(), anyhow::Error> {
+            let content = std::fs::read_to_string("file_paths.txt")?;
+            let forth_line = content
+                .lines()
+                .filter(|l| !l.trim().is_empty())
+                .nth(3)
+                .ok_or_else(|| anyhow::anyhow!("File does not have a forth non-empty line"))?;
+            let path = PathBuf::from(forth_line);
+            axis_store.set_axes_from_file(path)
+        })
+        .await;
+
+        match result {
+            Ok(r) => r,
+            Err(e) => Err(anyhow::anyhow!("Failed to load axis settings from file {}", e)),
+        }
+    });
 
     let file_result = use_resource(move || async move {
         let result = tokio::task::spawn_blocking(move || -> anyhow::Result<FcsFiles> {
@@ -149,43 +170,45 @@ pub fn MainWindow() -> Element {
     });
 
     let mut upload_succeded = use_signal(|| false);
-    use_effect(move || {
-        // spawn(async move {
-        // let path: PathBuf = PathBuf::from("/Users/czarop/Downloads/unscaled_t/test - Gating (2).omiqgt");
-
-        if *upload_succeded.peek() {
-            return;
-        }
-
+    let gate_resource = use_resource(move || {
+        // cheap im clones
         let metadata = metadata_store.metadata().read().clone();
-        if metadata.is_empty() {
-            println!("Metadata is empty, skipping gate loading");
-            return;
-        }
-
         let axis_settings = axis_store.settings().read().clone();
-        if axis_settings.is_empty() {
-            println!("Axis settings are empty, skipping gate loading");
-            return;
-        }
-
-        let content = std::fs::read_to_string("file_paths.txt").expect("Failed to read file paths");
-        let third_line = content
-            .lines()
-            .filter(|l| !l.trim().is_empty())
-            .nth(2)
-            .ok_or_else(|| anyhow::anyhow!("File does not have a third non-empty line"))
-            .expect("");
-        let path = PathBuf::from(third_line);
-
-        match gate_store.upload_gates_from_file(path, &metadata, axis_settings) {
-            Ok(_) => {
-                upload_succeded.set(true);
-                println!("Gates loaded successfully")
+        async move {
+            if *upload_succeded.peek() {
+                return Ok(());
             }
-            Err(e) => println!("Failed to load gates: {:#?}", e),
-        };
-        // });
+
+            if metadata.is_empty() || axis_settings.is_empty() {
+                return Err(anyhow::anyhow!("Metadata or Axis settings are empty"));
+            }
+
+            let result = tokio::task::spawn_blocking(move || {
+                let content = std::fs::read_to_string("file_paths.txt")
+                    .map_err(|e| anyhow::anyhow!("Failed to read file: {}", e))?;
+                
+                let path_str = content.lines()
+                    .filter(|l| !l.trim().is_empty())
+                    .nth(2)
+                    .ok_or_else(|| anyhow::anyhow!("File does not have a third line"))?;
+                
+                let path = PathBuf::from(path_str);
+
+                gate_store.upload_gates_from_file(path, &metadata, axis_settings)
+                    .map_err(|e| anyhow::anyhow!("Upload failed: {}", e))
+
+            }).await;
+
+            // 5. Handle the thread result and update UI signals
+            match result {
+                Ok(Ok(_)) => {
+                    upload_succeded.set(true);
+                    Ok(())
+                }
+                Ok(Err(e)) => Err(e),
+                Err(e) => Err(anyhow::anyhow!("Thread joined with error: {}", e)),
+            }
+        }
     });
 
     let parental_gate: Signal<Option<Arc<str>>> = use_signal(|| Some(ROOTGATE.clone()));
@@ -231,7 +254,7 @@ pub fn MainWindow() -> Element {
                     div { class: "axis-controls-grid", style: "width: 600px;",
                         div { class: "grid-label", "X-Axis" }
                         SearchableSelectSet {
-                            items: axis_store.sorted_settings(),
+                            items: axis_store.sorted_settings()(),
                             on_select: move |(_, k): (_, Param)| {
                                 x_axis_marker.set(k.clone());
                             },
@@ -333,7 +356,7 @@ pub fn MainWindow() -> Element {
 
                         div { class: "grid-label", "Y-Axis" }
                         SearchableSelectSet {
-                            items: axis_store.sorted_settings(),
+                            items: axis_store.sorted_settings()(),
                             on_select: move |(_, k): (_, Param)| {
                                 // if let Some(axis) = axis_store.settings().peek().get(&k.clone()) {
                                 y_axis_marker.set(k.clone());
@@ -473,7 +496,7 @@ pub fn MainWindow() -> Element {
                             }
                             None => rsx! {},
                         }
-
+                    
                     }
                 }
 
@@ -508,7 +531,7 @@ pub fn MainWindow() -> Element {
                         }
                     }
                 }
-
+            
             }
         }
     }

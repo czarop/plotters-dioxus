@@ -35,7 +35,7 @@ pub fn PlotWindow(
     let metadata_store =
         use_context::<Store<MetaDataStore, CopyValue<MetaDataStore, SyncStorage>>>();
 
-    let mut axis_store = use_context::<Store<AxisStore>>();
+    let mut axis_store = use_context::<Store<AxisStore, CopyValue<AxisStore, SyncStorage>>>();
 
     // RESOURCE 1: Load FCS File
     let mut fcs_file: Signal<Option<flow_fcs::Fcs>> = use_signal(|| None);
@@ -303,7 +303,7 @@ pub fn PlotWindow(
                     rsx! {}
                 }
             }
-
+        
         }
     }
 }

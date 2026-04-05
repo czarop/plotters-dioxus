@@ -37,7 +37,7 @@ pub fn GateSidebar(
                         }
                     }
                 }
-
+            
             }
         }
     }
@@ -69,7 +69,7 @@ fn GateNode(
     y_axis_param: Signal<Param>,
 ) -> Element {
     let mut gate_store = use_context::<SyncStore<GateState>>();
-    let axis_store: Store<AxisStore> = use_context::<Store<AxisStore>>();
+    let axis_store: SyncStore<AxisStore> = use_context::<SyncStore<AxisStore>>();
     let mut is_expanded = use_signal(|| true);
 
     // Fetch children
@@ -215,7 +215,7 @@ fn GateNode(
                             },
                             "🎯"
                         }
-
+                    
                     }
 
                     // 4. The Children (Recursive call)
@@ -332,7 +332,7 @@ fn GateNode(
                     "Add OR Gate"
                 }
             }
-
+        
         }
     }
 }

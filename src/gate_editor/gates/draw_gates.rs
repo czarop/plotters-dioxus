@@ -59,7 +59,7 @@ pub fn GateLayer(
     let current_gate_type = use_context::<Signal<PrimaryGateType>>();
 
     let plot_store = use_context::<Store<PlotStore>>();
-    let axis_store = use_context::<Store<AxisStore>>();
+    let axis_store = use_context::<Store<AxisStore, CopyValue<AxisStore, SyncStorage>>>();;
 
     let gates = use_memo(move || {
         let Some(resolver) = resolver() else {
