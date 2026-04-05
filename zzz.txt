@@ -1,4 +1,7 @@
 Gates:
+
+move away from flow-plots and flow-gates?
+
 hierarchy ordering not implemented for homemade composite gates
 give a clear error when metadata found in json is not present in metadata store
 

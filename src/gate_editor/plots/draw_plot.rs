@@ -37,7 +37,7 @@ pub fn PseudoColourPlot(
                         .width(width)
                         .height(height)
                         .title("My Density Plot")
-                        // .show_colorbar(false)
+                        .show_colorbar(false)
                         .build()?;
 
                     let x_axis_options = flow_plots::AxisOptions::new()
@@ -51,17 +51,24 @@ pub fn PseudoColourPlot(
                         .label(y_axis_info.param.to_string())
                         .build()?;
 
-                    let actual_ranges = flow_plots::create_axis_specs(
-                        &x_axis_options.range,
-                        &y_axis_options.range,
-                        &x_axis_info.transform,
-                        &y_axis_info.transform,
-                    )?;
+                    // let actual_ranges = flow_plots::create_axis_specs(
+                    //     &x_axis_options.range,
+                    //     &y_axis_options.range,
+                    //     &x_axis_info.transform,
+                    //     &y_axis_info.transform,
+                    // )?;
+
+                    // let (inc_x, inc_y) = {
+                    //     (
+                    //         actual_ranges.0.start..=actual_ranges.0.end,
+                    //         actual_ranges.1.start..=actual_ranges.1.end,
+                    //     )
+                    // };
 
                     let (inc_x, inc_y) = {
                         (
-                            actual_ranges.0.start..=actual_ranges.0.end,
-                            actual_ranges.1.start..=actual_ranges.1.end,
+                            *(x_axis_options.range.start())..=*(x_axis_options.range.end()),
+                            *(y_axis_options.range.start())..=*(y_axis_options.range.end()),
                         )
                     };
 
@@ -79,11 +86,11 @@ pub fn PseudoColourPlot(
                     );
                     let options = DensityPlotOptions::new()
                         .base(base_options)
-                        // .plot_type(PlotType::Density)
+                        .plot_type(flow_plots::PlotType::Density)
                         .colormap(ColorMaps::Jet)
                         .x_axis(x_axis_options)
                         .y_axis(y_axis_options)
-                        .point_size(0.35)
+                        .point_size(0.5)
                         .build()?;
 
                     let mut render_config = RenderConfig::default();
