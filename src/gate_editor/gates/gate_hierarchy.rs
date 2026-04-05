@@ -621,12 +621,7 @@ impl GateHierarchy {
         new_parent_id: Option<Arc<str>>,
     ) -> Result<Vec<Arc<str>>> {
         // Get children before deletion
-        let children: Vec<Arc<str>> = self
-            .get_children(gate_id)
-            .into_iter()
-            .cloned()
-            // .map(|id| id)
-            .collect();
+        let children: Vec<Arc<str>> = self.get_children(gate_id).into_iter().cloned().collect();
 
         if children.is_empty() {
             // No children, just delete the node
