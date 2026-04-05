@@ -47,7 +47,7 @@ impl FcsFiles {
                     .to_str()
                     .ok_or_else(|| anyhow!("Invalid UTF-8 in filename"))?;
                 if name_str.ends_with(".fcs") {
-                    let full_path = buf.join(&name_str);
+                    let full_path = buf.join(name_str);
                     match FcsSampleStub::open(full_path.to_str().unwrap_or_default()) {
                         Ok(s) => Ok(Some(s)),
                         Err(e) => {
@@ -64,29 +64,28 @@ impl FcsFiles {
             .flatten() // Removes the Nones, leaving just the Strings
             .collect();
 
-        return Ok(FcsFiles {
+        Ok(FcsFiles {
             directory: buf,
             file_list: files,
-        });
+        })
     }
 
     pub fn file_list(&self) -> &[FcsSampleStub] {
-        return &self.file_list;
+        &self.file_list
     }
 
     pub fn get_file_names(&self) -> Vec<String> {
-        return self
-            .file_list
+        self.file_list
             .iter()
             .map(|f| match f.get_fil_keyword() {
                 Ok(n) => n.to_string(),
                 Err(_) => f.get_filepath().to_string_lossy().to_string(),
             })
-            .collect();
+            .collect()
     }
 
     pub fn directory_path(&self) -> &str {
-        return self.directory.to_str().unwrap_or("");
+        self.directory.to_str().unwrap_or("")
     }
 
     pub fn sample_count(&self) -> usize {
@@ -208,7 +207,7 @@ impl FcsSampleStub {
             .parameters
             .keys()
             .find(|k| k.as_ref() == parameter_name)
-            .map(|k| k.clone());
+            .cloned();
 
         if let Some(key) = exact_key {
             return self
@@ -222,7 +221,7 @@ impl FcsSampleStub {
             .parameters
             .keys()
             .find(|key| key.eq_ignore_ascii_case(parameter_name))
-            .map(|k| k.clone());
+            .cloned();
 
         if let Some(key) = matching_key {
             return self

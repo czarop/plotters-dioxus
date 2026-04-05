@@ -5,23 +5,24 @@ edition = "2024"
 resolver = "2"
 
 [dependencies]
-dioxus = { version = "0.7.3", features = ["router"] }
-plotters = "0.3.5"
+dioxus = { version = "0.7.4", features = ["router"] }
 thiserror = "2.0.12"
 tokio = { version = "1", default-features = false, features = ["macros", "sync", "rt-multi-thread"] }
 anyhow = "1"
-flow-fcs = {git="https://github.com/jrmoynihan/flow", rev="44a0537"}
-flow-plots = {git="https://github.com/jrmoynihan/flow", rev="44a0537"}
-flow-gates = {git="https://github.com/jrmoynihan/flow", rev="44a0537"}
+flow-fcs = { git = "https://github.com/czarop/flow" }
+flow-plots = { git = "https://github.com/czarop/flow", default-features = false }
+flow-gates = { git = "https://github.com/czarop/flow" }
 base64 = "0.22.1"
-plotters-bitmap = "0.3.3"
 dioxus-primitives = { git = "https://github.com/DioxusLabs/components", version = "0.0.1", default-features = false }
 rustc-hash = "2.1"
 indexmap = "2.1"
-polars = {version = "0.53", default-features = false, features = ["lazy", "performant"]}
+polars = {version = "0.53", default-features = false, features = ["lazy", "performant", "csv", "temporal"]}
 rayon = "1"
 im = "15"
 uuid = { version = "1.0", features = ["v4"] }
+serde = {version = "1"}
+serde_json = "1"
+itertools = "0.14.0"
 
 [features]
 default = ["desktop"]

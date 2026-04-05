@@ -1,41 +1,33 @@
 Gates:
 
-gateresolver should not be a part of the store and should not be a store.
-the gatestore has a method, - its current set_current_file method except it RETURNS a gatestore.
-This method watches the 3 gate_maps
-The gate_layer holds its own resolver in a use_memo and queries it for plots
-On plot updates the resolver is a middleman that knows the origin map of the gate
-This does mean the whole resolver is remade on each gate move etc but its relatively quick
+move away from flow-plots and flow-gates?
 
+hierarchy ordering not implemented for homemade composite gates
+give a clear error when metadata found in json is not present in metadata store
 
+gate axis limits 'niceifying' is not working well - it gives too much above the plot. This is a lib feature??
 Allow choosing other gates at the same level for AND and OR
-stats for boolean gates??
-
 Add filter Cache
 
+use gate names on hierarchy and give gate names when creating / importing
 rename gates
 Show names on gates
 
+Linked gates:
+You have no concept of linked gates - but this is just using the same gate at 2 different points in the hierarchy - this may work already by default from omiq.
+Allow linking and unlinking gates from the GUI
+Visualise linked gates
 
 Meta:
-
-Metadata
-Metadata Groups
-Set Metadata from FCS or Omiq
-
+Set Scaling from omiq Scaling
+Set Comp from omiq Comp
 
 Paired samples (FMX FS)
-
-
-Omiq Integration:
-
-Set gates from omiq gating
+Send Scaling to omiq Scaling
 Save gates to omiq gating
 
-Set Scaling from omiq Scaling
-Send Scaling to omiq Scaling
-
-Set Comp from omiq Comp
+Allow selection of files
+Deal with nested folders for groups
 
 
 Nice to have:

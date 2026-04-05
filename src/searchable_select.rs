@@ -9,7 +9,7 @@ pub fn SearchableSelectList<T: Clone + PartialEq + std::fmt::Display + 'static>(
 ) -> Element {
     // In your component
     let mut is_open = use_signal(|| false);
-    let mut search = use_signal(|| String::new());
+    let mut search = use_signal(String::new);
     let mut local_selected_value: Signal<Option<(usize, T)>> = use_signal(|| None);
 
     let filtered = use_memo(move || {
@@ -23,7 +23,7 @@ pub fn SearchableSelectList<T: Clone + PartialEq + std::fmt::Display + 'static>(
             .collect::<Vec<(usize, T)>>()
     });
 
-    let mut display_text = use_signal(|| String::new());
+    let mut display_text = use_signal(String::new);
 
     use_effect(move || {
         let text = local_selected_value
@@ -115,7 +115,7 @@ pub fn SearchableSelectList<T: Clone + PartialEq + std::fmt::Display + 'static>(
                         }
                     }
                     // Handle empty state
-                    if filtered.read().len() == 0 {
+                    if filtered.is_empty() {
                         div { class: "combobox-empty", "No results" }
                     }
                 }
@@ -138,22 +138,9 @@ pub fn SearchableSelectMap<
 ) -> Element {
     // In your component
     let mut is_open = use_signal(|| false);
-    let mut search = use_signal(|| String::new());
+    let mut search = use_signal(String::new);
     let mut local_selected_value: Signal<Option<(usize, T)>> = use_signal(|| None);
 
-    // Filter logic
-    // let filtered = use_memo(move || {
-    //     let q = search.read().to_lowercase();
-    //     items
-    //     .read()
-    //     .iter()
-    //     .filter(|&(&ref _k, &ref item)| {
-    //         item.to_string().to_lowercase().contains(&q)
-    //     })
-    //     // Manually clone the key and value from the tuple
-    //     .map(|(k, v)| (k.clone(), v.clone()))
-    //     .collect::<FxIndexMap<S, T>>()
-    // });
     let filtered = use_memo(move || {
         let q = search.read().to_lowercase();
         items
@@ -165,7 +152,7 @@ pub fn SearchableSelectMap<
             .collect::<Vec<(usize, S, T)>>()
     });
 
-    let mut display_text = use_signal(|| String::new());
+    let mut display_text = use_signal(String::new);
 
     use_effect(move || {
         let text = local_selected_value
@@ -234,7 +221,7 @@ pub fn SearchableSelectMap<
             if is_open() {
                 div { class: "combobox-list scrollable",
                     // Iterate directly over items. We use enumerate just for the key.
-                    for (i , (original_i , _k , item)) in filtered().into_iter().enumerate() {
+                    for (original_i , _k , item) in filtered().into_iter() {
                         // Capture the item for the closure
                         {
                             let current_item = item.clone();
@@ -257,7 +244,133 @@ pub fn SearchableSelectMap<
                         }
                     }
                     // Handle empty state
-                    if filtered.read().len() == 0 {
+                    if filtered.is_empty() {
+                        div { class: "combobox-empty", "No results" }
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[component]
+pub fn SearchableSelectSet<
+    T: Clone + PartialEq + Eq + std::fmt::Display + std::hash::Hash + 'static,
+>(
+    items: ReadSignal<indexmap::IndexSet<T, rustc_hash::FxBuildHasher>>,
+    on_select: EventHandler<(usize, T)>,
+    placeholder: Option<String>,
+    selected_index: Option<ReadSignal<usize>>,
+) -> Element {
+    // In your component
+    let mut is_open = use_signal(|| false);
+    let mut search = use_signal(String::new);
+    let mut local_selected_value: Signal<Option<(usize, T)>> = use_signal(|| None);
+
+    let filtered = use_memo(move || {
+        let q = search.read().to_lowercase();
+        items
+            .read()
+            .iter()
+            .enumerate()
+            .filter(|(_, v)| v.to_string().to_lowercase().contains(&q))
+            .map(|(i, v)| (i, v.clone()))
+            .collect::<Vec<(usize, T)>>()
+    });
+
+    let mut display_text = use_signal(String::new);
+
+    use_effect(move || {
+        let text = local_selected_value
+            .read()
+            .as_ref()
+            .map(|(_, v)| v.to_string())
+            .or(placeholder.clone())
+            .unwrap_or_else(|| "Select an item...".to_string());
+        display_text.set(text);
+    });
+
+    use_effect(move || {
+        if let Some((i, val)) = local_selected_value() {
+            on_select((i, val));
+        };
+    });
+
+    use_effect(move || {
+        if let Some(sig) = selected_index {
+            let i = sig();
+            let items = &*items.peek();
+            if i < items.len() {
+                display_text.set(items[i].to_string())
+            }
+        }
+    });
+
+    rsx! {
+        div {
+            class: "combobox-container",
+            // Close when clicking outside (you might need a window listener for robust closing)
+            onmouseleave: move |_| is_open.set(false),
+
+            // The Trigger / Input
+            div { class: "combobox-input-wrapper",
+                input {
+                    class: "combobox-input",
+                    value: "{search}",
+                    placeholder: "{display_text}", // Show selected if empty
+
+                    autocorrect: "off",
+                    autocapitalize: "none",
+                    autocomplete: "off",
+                    spellcheck: "false",
+
+                    // Open on click or focus
+                    onfocus: move |_| is_open.set(true),
+                    onclick: move |_| is_open.set(true),
+
+                    // Handle typing
+                    oninput: move |e| {
+                        search.set(e.value());
+                        is_open.set(true);
+                    },
+                }
+                // Optional: Arrow icon
+                div {
+                    class: "combobox-arrow",
+                    onclick: move |_| is_open.toggle(),
+                    "▼"
+                }
+            }
+
+            // The Dropdown List
+            // Only render if open
+            if is_open() {
+                div { class: "combobox-list scrollable",
+                    // Iterate directly over items. We use enumerate just for the key.
+                    for (original_i , item) in filtered().into_iter() {
+                        // Capture the item for the closure
+                        {
+                            let current_item = item.clone();
+                            rsx! {
+                                div {
+                                    key: "{original_i}", // React/Dioxus likes keys
+                                    class: "combobox-option", // Use the Display implementation
+                                    onclick: move |_| {
+                                        // Set the actual item, not the index
+                                        local_selected_value.set(Some((original_i, current_item.clone())));
+
+                                        // Reset search so the placeholder (selected value) shows again
+                                        search.set(String::new());
+                                        is_open.set(false);
+                                    },
+                                    // Use the Display implementation
+                                    "{item}"
+                                }
+                            }
+                        }
+                    }
+                    // Handle empty state
+                    if filtered.is_empty() {
                         div { class: "combobox-empty", "No results" }
                     }
                 }
