@@ -1,5 +1,6 @@
 use flow_fcs::TransformType;
 
+use flow_gates::transforms::{raw_to_transformed, transformed_to_raw};
 use flow_gates::{Gate, GateGeometry};
 use indexmap::IndexMap;
 use rustc_hash::FxBuildHasher;
@@ -26,8 +27,8 @@ pub struct DataPoints {
     pub bottom: (f32, f32),
     pub right: (f32, f32),
     pub top: (f32, f32),
-    pub x_data_range: RangeInclusive<f32>,
-    pub y_data_range: RangeInclusive<f32>,
+    // pub x_data_range: RangeInclusive<f32>,
+    // pub y_data_range: RangeInclusive<f32>,
 }
 
 impl DataPoints {
@@ -71,8 +72,8 @@ impl DataPoints {
             bottom,
             right,
             top,
-            x_data_range: plot_map.x_data_min_max(),
-            y_data_range: plot_map.y_data_min_max(),
+            // x_data_range: plot_map.x_data_min_max(),
+            // y_data_range: plot_map.y_data_min_max(),
         }
     }
 
@@ -83,8 +84,8 @@ impl DataPoints {
             right: (self.top.1, self.top.0),
             bottom: (self.left.1, self.left.0),
             top: (self.right.1, self.right.0),
-            x_data_range: self.y_data_range.clone(),
-            y_data_range: self.x_data_range.clone(),
+            // x_data_range: self.y_data_range.clone(),
+            // y_data_range: self.x_data_range.clone(),
         }
     }
 
@@ -93,8 +94,8 @@ impl DataPoints {
         cy: f32,
         x_axis_range: RangeInclusive<f32>,
         y_axis_range: RangeInclusive<f32>,
-        x_data_range: RangeInclusive<f32>,
-        y_data_range: RangeInclusive<f32>,
+        // x_data_range: RangeInclusive<f32>,
+        // y_data_range: RangeInclusive<f32>,
     ) -> Self {
         let (xmin, xmax) = (*x_axis_range.start(), *x_axis_range.end());
         let (ymin, ymax) = (*y_axis_range.start(), *y_axis_range.end());
@@ -116,8 +117,6 @@ impl DataPoints {
             bottom,
             right,
             top,
-            x_data_range,
-            y_data_range,
         }
     }
 }
@@ -130,6 +129,7 @@ pub struct SkewedQuadrantGate {
     points: DataPoints,
     axis_matched: bool,
     parameters: (Arc<str>, Arc<str>),
+    infs: (f32, f32)
 }
 
 impl SkewedQuadrantGate {
@@ -144,6 +144,12 @@ impl SkewedQuadrantGate {
         let (cx, cy) = plot_map.pixel_to_data(click_loc_raw.0, click_loc_raw.1, None, None);
         let points = DataPoints::new_from_click(cx, cy, plot_map);
 
+        let x_inf = get_infinite_bounds(&plot_map.get_x_transform());
+
+        let y_inf = get_infinite_bounds(&plot_map.get_y_transform());
+
+        let infs = (x_inf, y_inf);
+
         SkewedQuadrantGate::try_new_from_data_points(
             id,
             name,
@@ -153,6 +159,7 @@ impl SkewedQuadrantGate {
             true,
             None,
             None,
+            infs
         )
     }
 
@@ -165,106 +172,11 @@ impl SkewedQuadrantGate {
         axis_matched: bool,
         subgate_ids: Option<Vec<Arc<str>>>,
         subgate_names: Option<(String, String, String, String)>,
+        infs: (f32, f32)
     ) -> anyhow::Result<Self> {
         let mut gate_map = FxIndexMap::default();
         let parameters = (x_axis_param.clone(), y_axis_param.clone());
-        let geos = create_skewed_quadrant_geos(data_points.clone(), &x_axis_param, &y_axis_param)?;
-        // let (
-        //     id_bottom_left,
-        //     id_bottom_right,
-        //     id_top_right,
-        //     id_top_left,
-        //     id_bottom_left_arc,
-        //     id_bottom_right_arc,
-        //     id_top_right_arc,
-        //     id_top_left_arc,
-        // ) = if let Some(subgate_ids) = subgate_ids {
-        //     (
-        //         subgate_ids[0].to_string(),
-        //         subgate_ids[1].to_string(),
-        //         subgate_ids[2].to_string(),
-        //         subgate_ids[3].to_string(),
-        //         subgate_ids[0].clone(),
-        //         subgate_ids[1].clone(),
-        //         subgate_ids[2].clone(),
-        //         subgate_ids[3].clone(),
-        //     )
-        // } else {
-        //     let (a, b, c, d) = (
-        //         format!("{id}_BL"),
-        //         format!("{id}_BR"),
-        //         format!("{id}_TR"),
-        //         format!("{id}_TL"),
-        //     );
-
-        //     let (astr, bstr, cstr, dstr) = (a.as_str(), b.as_str(), c.as_str(), d.as_str());
-
-        //     (
-        //         a.clone(),
-        //         b.clone(),
-        //         c.clone(),
-        //         d.clone(),
-        //         Arc::from(astr),
-        //         Arc::from(bstr),
-        //         Arc::from(cstr),
-        //         Arc::from(dstr),
-        //     )
-        // };
-        // let gate_bottom_left = Gate {
-        //     id: id_bottom_left_arc.clone(),
-        //     name: id_bottom_left,
-        //     geometry: geos.0,
-        //     mode: flow_gates::GateMode::Global,
-        //     parameters: parameters.clone(),
-        //     label_position: None,
-        // };
-        // let gate_bottom_right = Gate {
-        //     id: id_bottom_right_arc.clone(),
-        //     name: id_bottom_right,
-        //     geometry: geos.1,
-        //     mode: flow_gates::GateMode::Global,
-        //     parameters: parameters.clone(),
-        //     label_position: None,
-        // };
-
-        // let gate_top_right = Gate {
-        //     id: id_top_right_arc.clone(),
-        //     name: id_top_right,
-        //     geometry: geos.2,
-        //     mode: flow_gates::GateMode::Global,
-        //     parameters: parameters.clone(),
-        //     label_position: None,
-        // };
-        // let gate_top_left = Gate {
-        //     id: id_top_left_arc.clone(),
-        //     name: id_top_left,
-        //     geometry: geos.3,
-        //     mode: flow_gates::GateMode::Global,
-        //     parameters: parameters,
-        //     label_position: None,
-        // };
-
-        // let lg_tl = PolygonGate::try_new(gate_top_left, false)?;
-        // let lg_tr = PolygonGate::try_new(gate_top_right, false)?;
-        // let lg_bl = PolygonGate::try_new(gate_bottom_left, false)?;
-        // let lg_br = PolygonGate::try_new(gate_bottom_right, false)?;
-        // // [bottom-left, bottom-right, top-right, top-left]
-        // gate_map.insert(id_bottom_left_arc, lg_bl);
-        // gate_map.insert(id_bottom_right_arc, lg_br);
-        // gate_map.insert(id_top_right_arc, lg_tr);
-        // gate_map.insert(id_top_left_arc, lg_tl);
-
-        // let points = data_points;
-
-        // Ok(Self {
-        //     gates: gate_map,
-        //     id,
-        //     name,
-        //     points,
-        //     axis_matched: axis_matched,
-        //     parameters: (x_axis_param, y_axis_param),
-        // })
-        // let geos = create_skewed_quadrant_geos(data_points.clone(), &x_axis_param, &y_axis_param)?;
+        let geos = create_skewed_quadrant_geos(data_points.clone(), &x_axis_param, &y_axis_param, infs.0, infs.1)?;
 
         let sub_ids = if let Some(ids) = subgate_ids {
             ids
@@ -314,6 +226,7 @@ impl SkewedQuadrantGate {
             points: data_points,
             axis_matched,
             parameters,
+            infs
         })
     }
 
@@ -325,6 +238,7 @@ impl SkewedQuadrantGate {
         if swap_axis {
             let new_parameters = (self.parameters.1.clone(), self.parameters.0.clone());
             let new_points = self.points.clone_for_swap_axis();
+            let infs = (self.infs.1, self.infs.0);
             Box::new(Self {
                 gates,
                 id: self.id.clone(),
@@ -332,6 +246,7 @@ impl SkewedQuadrantGate {
                 points: new_points,
                 axis_matched: !self.axis_matched,
                 parameters: new_parameters,
+                infs
             })
         } else {
             Box::new(Self {
@@ -341,11 +256,12 @@ impl SkewedQuadrantGate {
                 points: self.points.clone(),
                 axis_matched: self.axis_matched,
                 parameters: self.parameters.clone(),
+                infs: self.infs
             })
         }
     }
 
-    fn clone_with_point(&self, data_points: DataPoints) -> anyhow::Result<Self> {
+    fn clone_with_point(&self, data_points: DataPoints, infs: Option<(f32, f32)>) -> anyhow::Result<Self> {
         let (x_axis_param, y_axis_param) = self.parameters.clone();
         let subgate_bl_id = self.gates.index(0).get_id();
         let subgate_br_id = self.gates.index(1).get_id();
@@ -369,6 +285,7 @@ impl SkewedQuadrantGate {
             self.axis_matched,
             Some(gate_ids),
             Some(gate_names),
+            if infs.is_some() {infs.unwrap()} else {self.infs}
         )
     }
 
@@ -711,7 +628,7 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
         param: std::sync::Arc<str>,
         old_transform: &TransformType,
         new_transform: &TransformType,
-        data_range: (f32, f32),
+        // data_range: (f32, f32),
         axis_range: (f32, f32),
     ) -> anyhow::Result<Box<dyn super::super::gate_traits::DrawableGate>> {
         let (x_param, _) = &self.parameters;
@@ -804,42 +721,19 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
             bottom: b,
             right: r,
             top: t,
-            // Update the data ranges (raw space)
-            x_data_range: if is_x {
-                RangeInclusive::new(data_range.0, data_range.1)
-            } else {
-                self.points.x_data_range.clone()
-            },
-            y_data_range: if !is_x {
-                RangeInclusive::new(data_range.0, data_range.1)
-            } else {
-                self.points.y_data_range.clone()
-            },
         };
+        let infs = {
+            
+            let new_inf = get_infinite_bounds(&new_transform);
+            if is_x {
+                (new_inf, self.infs.1)
+            } else {
+                (self.infs.0, new_inf)
+            }
+    };
 
-        // let new = if is_x {
-        //     DataPoints {
-        //         center: c,
-        //         left: l,
-        //         bottom: b,
-        //         right: r,
-        //         top: t,
-        //         x_data_range: RangeInclusive::new(data_range.0, data_range.1),
-        //         y_data_range: self.points.y_data_range.clone(),
-        //     }
-        // } else {
-        //     DataPoints {
-        //         center: c,
-        //         left: l,
-        //         bottom: b,
-        //         right: r,
-        //         top: t,
-        //         x_data_range: self.points.x_data_range.clone(),
-        //         y_data_range: RangeInclusive::new(data_range.0, data_range.1),
-        //     }
-        // };
 
-        Ok(Box::new(self.clone_with_point(new)?))
+        Ok(Box::new(self.clone_with_point(new, Some(infs))?))
     }
 
     fn rotate_gate(
@@ -895,8 +789,8 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
                     bottom: b,
                     right: r,
                     top: t,
-                    x_data_range: self.points.x_data_range.clone(),
-                    y_data_range: self.points.y_data_range.clone(),
+                    // x_data_range: self.points.x_data_range.clone(),
+                    // y_data_range: self.points.y_data_range.clone(),
                 }
             }
             1 => {
@@ -907,8 +801,8 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
                     bottom: b,
                     right: r,
                     top: t,
-                    x_data_range: self.points.x_data_range.clone(),
-                    y_data_range: self.points.y_data_range.clone(),
+                    // x_data_range: self.points.x_data_range.clone(),
+                    // y_data_range: self.points.y_data_range.clone(),
                 }
             }
             2 => {
@@ -919,8 +813,8 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
                     bottom: (new_point.0.clamp(x_min_safe, x_max_safe), ymin),
                     right: r,
                     top: t,
-                    x_data_range: self.points.x_data_range.clone(),
-                    y_data_range: self.points.y_data_range.clone(),
+                    // x_data_range: self.points.x_data_range.clone(),
+                    // y_data_range: self.points.y_data_range.clone(),
                 }
             }
             3 => {
@@ -931,8 +825,8 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
                     bottom: b,
                     right: (xmax, new_point.1.clamp(y_min_safe, y_max_safe)),
                     top: t,
-                    x_data_range: self.points.x_data_range.clone(),
-                    y_data_range: self.points.y_data_range.clone(),
+                    // x_data_range: self.points.x_data_range.clone(),
+                    // y_data_range: self.points.y_data_range.clone(),
                 }
             }
             4 => {
@@ -943,14 +837,14 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
                     bottom: b,
                     right: r,
                     top: (new_point.0.clamp(x_min_safe, x_max_safe), ymax),
-                    x_data_range: self.points.x_data_range.clone(),
-                    y_data_range: self.points.y_data_range.clone(),
+                    // x_data_range: self.points.x_data_range.clone(),
+                    // y_data_range: self.points.y_data_range.clone(),
                 }
             }
             _ => unreachable!(),
         };
 
-        Ok(Box::new(self.clone_with_point(new)?))
+        Ok(Box::new(self.clone_with_point(new, None)?))
     }
 
     fn replace_points(
@@ -1027,7 +921,7 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
             new_points.bottom.1 = lower;
         }
 
-        let new_self = self.clone_with_point(new_points)?;
+        let new_self = self.clone_with_point(new_points, None)?;
         Ok(Some(Box::new(new_self)))
     }
 
@@ -1036,91 +930,222 @@ impl super::super::gate_traits::DrawableGate for SkewedQuadrantGate {
     }
 }
 
+// pub fn create_skewed_quadrant_geos(
+//     data_points: DataPoints,
+//     x_channel: &str,
+//     y_channel: &str,
+// ) -> anyhow::Result<(GateGeometry, GateGeometry, GateGeometry, GateGeometry)> {
+//     let c = data_points.center;
+//     let b_x = data_points.bottom.0;
+//     let l_y = data_points.left.1;
+//     let t_x = data_points.top.0;
+//     let r_y = data_points.right.1;
+
+//     let x_min = data_points.left.0;
+//     let x_max = data_points.right.0;
+//     let y_min = data_points.bottom.1;
+//     let y_max = data_points.top.1;
+
+//     let x_limit_min = data_points.x_data_range.start().min(x_min).min(c.0);
+//     let x_limit_max = data_points.x_data_range.end().max(x_max).max(c.0);
+//     let y_limit_min = data_points.y_data_range.start().min(y_min).min(c.1);
+//     let y_limit_max = data_points.y_data_range.end().max(y_max).max(c.1);
+
+
+//     // Projected points (Spoke Ends)
+//     let p_t = project_to_boundary(
+//         c,
+//         (t_x, y_max),
+//         (x_limit_min, y_limit_min),
+//         (x_limit_max, y_limit_max),
+//     );
+//     let p_b = project_to_boundary(
+//         c,
+//         (b_x, y_min),
+//         (x_limit_min, y_limit_min),
+//         (x_limit_max, y_limit_max),
+//     );
+//     let p_l = project_to_boundary(
+//         c,
+//         (x_min, l_y),
+//         (x_limit_min, y_limit_min),
+//         (x_limit_max, y_limit_max),
+//     );
+//     let p_r = project_to_boundary(
+//         c,
+//         (x_max, r_y),
+//         (x_limit_min, y_limit_min),
+//         (x_limit_max, y_limit_max),
+//     );
+
+//     // Universe Corners
+//     let tl_c = (x_limit_min, y_limit_max);
+//     let tr_c = (x_limit_max, y_limit_max);
+//     let bl_c = (x_limit_min, y_limit_min);
+//     let br_c = (x_limit_max, y_limit_min);
+
+//     let tl = vec![c, p_l, tl_c, p_t];
+
+//     let tr = vec![c, p_t, tr_c, p_r];
+
+//     let br = vec![c, p_r, br_c, p_b];
+
+//     let bl = vec![c, p_b, bl_c, p_l];
+
+//     // Bottom-Left (BL)
+//     let bl = flow_gates::geometry::create_polygon_geometry(bl, x_channel, y_channel)
+//         .map_err(|_| anyhow::anyhow!("failed bl"))?;
+
+//     // Bottom-Right (BR)
+//     let br = flow_gates::geometry::create_polygon_geometry(br, x_channel, y_channel)
+//         .map_err(|_| anyhow::anyhow!("failed br"))?;
+
+//     // Top-Right (TR)
+//     let tr = flow_gates::geometry::create_polygon_geometry(tr, x_channel, y_channel)
+//         .map_err(|_| anyhow::anyhow!("failed tr"))?;
+
+//     // Top-Left (TL)
+//     let tl = flow_gates::geometry::create_polygon_geometry(tl, x_channel, y_channel)
+//         .map_err(|_| anyhow::anyhow!("failed tl"))?;
+
+//     println!("gates created");
+//     Ok((bl, br, tr, tl))
+// }
+
+
+
+// const INF: f32 = 1e10; 
+// const NEG_INF: f32 = -1e10;
+// pub fn create_skewed_quadrant_geos(
+//     datapoints: DataPoints,
+//     x_channel: &str,
+//     y_channel: &str,
+// ) -> anyhow::Result<(GateGeometry, GateGeometry, GateGeometry, GateGeometry)> {
+//     let center = datapoints.center;
+//     let top_handle = datapoints.top;
+//     let bottom_handle = datapoints.bottom;
+//     let left_handle = datapoints.left;
+//     let right_handle = datapoints.right;
+//     // Define the "Universe" - ignore the data range entirely.
+//     // This ensures the gate works for every file in the experiment.
+//     let min_x = NEG_INF;
+//     let max_x = INF;
+//     let min_y = NEG_INF;
+//     let max_y = INF;
+
+//     // 1. Project the 4 handles to the "Infinite" boundaries
+//     let p_t = project_to_boundary(center, top_handle, (min_x, min_y), (max_x, max_y));
+//     let p_b = project_to_boundary(center, bottom_handle, (min_x, min_y), (max_x, max_y));
+//     let p_l = project_to_boundary(center, left_handle, (min_x, min_y), (max_x, max_y));
+//     let p_r = project_to_boundary(center, right_handle, (min_x, min_y), (max_x, max_y));
+
+//     // 2. Define the corners of our infinite universe
+//     let tl_corner = (min_x, max_y);
+//     let tr_corner = (max_x, max_y);
+//     let bl_corner = (min_x, min_y);
+//     let br_corner = (max_x, min_y);
+
+//     // 3. Construct the 4 Polygons
+//     // Note: The order of points matters (Clockwise or Counter-Clockwise)
+//     let tl_poly = vec![center, p_l, tl_corner, p_t];
+//     let tr_poly = vec![center, p_t, tr_corner, p_r];
+//     let br_poly = vec![center, p_r, br_corner, p_b];
+//     let bl_poly = vec![center, p_b, bl_corner, p_l];
+
+//     Ok((
+//         flow_gates::geometry::create_polygon_geometry(bl_poly, x_channel, y_channel)?,
+//         flow_gates::geometry::create_polygon_geometry(br_poly, x_channel, y_channel)?,
+//         flow_gates::geometry::create_polygon_geometry(tr_poly, x_channel, y_channel)?,
+//         flow_gates::geometry::create_polygon_geometry(tl_poly, x_channel, y_channel)?,
+//     ))
+// }
+
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+#[repr(usize)]
+enum Wall { 
+    Top = 0, 
+    Right = 1, 
+    Bottom = 2, 
+    Left = 3 
+}
+
+fn get_wall(p: (f32, f32), x_inf: f32, y_inf: f32) -> Wall {
+    let epsilon = 1.0; 
+    // Check Y boundaries first for Top/Bottom, then X for Right/Left
+    if (p.1 - y_inf).abs() < epsilon { Wall::Top }
+    else if (p.0 - x_inf).abs() < epsilon { Wall::Right }
+    else if (p.1 + y_inf).abs() < epsilon { Wall::Bottom }
+    else { Wall::Left }
+}
+
+// Corners ordered Clockwise: TR, BR, BL, TL
+fn get_corners(x_inf: f32, y_inf: f32) -> [(f32, f32); 4] {
+    [
+        (x_inf, y_inf),   // Top-Right
+        (x_inf, -y_inf),  // Bottom-Right
+        (-x_inf, -y_inf), // Bottom-Left
+        (-x_inf, y_inf),  // Top-Left
+    ]
+}
+
+fn build_poly(
+    center: (f32, f32), 
+    start: (f32, f32), 
+    end: (f32, f32), 
+    x_inf: f32, 
+    y_inf: f32
+) -> Vec<(f32, f32)> {
+    let mut poly = vec![center, start];
+    
+    let corners = get_corners(x_inf, y_inf);
+    let start_wall_idx = get_wall(start, x_inf, y_inf) as usize;
+    let end_wall_idx = get_wall(end, x_inf, y_inf) as usize;
+
+    let mut current_wall = start_wall_idx;
+    
+    // Walk corners clockwise until we reach the wall of the 'end' spoke
+    while current_wall != end_wall_idx {
+        poly.push(corners[current_wall]);
+        current_wall = (current_wall + 1) % 4; 
+    }
+
+    poly.push(end);
+    poly.push(center);
+    poly
+}
+
 pub fn create_skewed_quadrant_geos(
-    data_points: DataPoints,
+    datapoints: DataPoints,
     x_channel: &str,
     y_channel: &str,
+    x_inf: f32,
+    y_inf: f32
 ) -> anyhow::Result<(GateGeometry, GateGeometry, GateGeometry, GateGeometry)> {
-    let c = data_points.center;
-    let b_x = data_points.bottom.0;
-    let l_y = data_points.left.1;
-    let t_x = data_points.top.0;
-    let r_y = data_points.right.1;
+    let c = datapoints.center;
 
-    let x_min = data_points.left.0;
-    let x_max = data_points.right.0;
-    let y_min = data_points.bottom.1;
-    let y_max = data_points.top.1;
+    // 1. Project spokes to the rectangular boundary
+    let p_t = project_to_boundary(c, datapoints.top, (-x_inf, -y_inf), (x_inf, y_inf));
+    let p_r = project_to_boundary(c, datapoints.right, (-x_inf, -y_inf), (x_inf, y_inf));
+    let p_b = project_to_boundary(c, datapoints.bottom, (-x_inf, -y_inf), (x_inf, y_inf));
+    let p_l = project_to_boundary(c, datapoints.left, (-x_inf, -y_inf), (x_inf, y_inf));
 
-    let x_limit_min = data_points.x_data_range.start().min(x_min).min(c.0);
-    let x_limit_max = data_points.x_data_range.end().max(x_max).max(c.0);
-    let y_limit_min = data_points.y_data_range.start().min(y_min).min(c.1);
-    let y_limit_max = data_points.y_data_range.end().max(y_max).max(c.1);
+    // 2. Build each quadrant with the rectangular limits
+    // Order: TR (T to R), BR (R to B), BL (B to L), TL (L to T)
+    let tr_poly = build_poly(c, p_t, p_r, x_inf, y_inf);
+    let br_poly = build_poly(c, p_r, p_b, x_inf, y_inf);
+    let bl_poly = build_poly(c, p_b, p_l, x_inf, y_inf);
+    let tl_poly = build_poly(c, p_l, p_t, x_inf, y_inf);
 
-    println!(
-        "Data x min: {} axis x min: {x_min} xlimitmin {x_limit_min}",
-        data_points.x_data_range.start()
-    );
-
-    // Projected points (Spoke Ends)
-    let p_t = project_to_boundary(
-        c,
-        (t_x, y_max),
-        (x_limit_min, y_limit_min),
-        (x_limit_max, y_limit_max),
-    );
-    let p_b = project_to_boundary(
-        c,
-        (b_x, y_min),
-        (x_limit_min, y_limit_min),
-        (x_limit_max, y_limit_max),
-    );
-    let p_l = project_to_boundary(
-        c,
-        (x_min, l_y),
-        (x_limit_min, y_limit_min),
-        (x_limit_max, y_limit_max),
-    );
-    let p_r = project_to_boundary(
-        c,
-        (x_max, r_y),
-        (x_limit_min, y_limit_min),
-        (x_limit_max, y_limit_max),
-    );
-
-    // Universe Corners
-    let tl_c = (x_limit_min, y_limit_max);
-    let tr_c = (x_limit_max, y_limit_max);
-    let bl_c = (x_limit_min, y_limit_min);
-    let br_c = (x_limit_max, y_limit_min);
-
-    let tl = vec![c, p_l, tl_c, p_t];
-
-    let tr = vec![c, p_t, tr_c, p_r];
-
-    let br = vec![c, p_r, br_c, p_b];
-
-    let bl = vec![c, p_b, bl_c, p_l];
-
-    // Bottom-Left (BL)
-    let bl = flow_gates::geometry::create_polygon_geometry(bl, x_channel, y_channel)
-        .map_err(|_| anyhow::anyhow!("failed bl"))?;
-
-    // Bottom-Right (BR)
-    let br = flow_gates::geometry::create_polygon_geometry(br, x_channel, y_channel)
-        .map_err(|_| anyhow::anyhow!("failed br"))?;
-
-    // Top-Right (TR)
-    let tr = flow_gates::geometry::create_polygon_geometry(tr, x_channel, y_channel)
-        .map_err(|_| anyhow::anyhow!("failed tr"))?;
-
-    // Top-Left (TL)
-    let tl = flow_gates::geometry::create_polygon_geometry(tl, x_channel, y_channel)
-        .map_err(|_| anyhow::anyhow!("failed tl"))?;
-
-    println!("gates created");
-    Ok((bl, br, tr, tl))
+    Ok((
+        flow_gates::geometry::create_polygon_geometry(bl_poly, x_channel, y_channel)?,
+        flow_gates::geometry::create_polygon_geometry(br_poly, x_channel, y_channel)?,
+        flow_gates::geometry::create_polygon_geometry(tr_poly, x_channel, y_channel)?,
+        flow_gates::geometry::create_polygon_geometry(tl_poly, x_channel, y_channel)?,
+    ))
 }
+
+
 
 pub fn project_to_boundary(
     center: (f32, f32),
@@ -1174,4 +1199,17 @@ fn nice_bounds(min: f32, max: f32) -> (f32, f32) {
     let nice_max = (max / step_size).ceil() * step_size;
 
     (nice_min, nice_max)
+}
+
+
+pub fn get_infinite_bounds(transform: &TransformType) -> f32 {
+    let physical_max = 100_000_000.0; // 10^8: safely beyond any detector limit
+
+    match transform{
+        TransformType::Linear => physical_max,
+        TransformType::Arcsinh { cofactor } => (physical_max / cofactor).asinh() + 5.0,
+        TransformType::Biexponential { .. } => todo!(),
+    }
+
+
 }

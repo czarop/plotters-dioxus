@@ -112,7 +112,7 @@ impl DrawableGate for BooleanGate {
         _param: std::sync::Arc<str>,
         _old_transform: &flow_fcs::TransformType,
         _new_transform: &flow_fcs::TransformType,
-        _data_range: (f32, f32),
+        // _data_range: (f32, f32),
         _axis_range: (f32, f32),
     ) -> anyhow::Result<Box<dyn DrawableGate>> {
         Ok(self.clone_box())

@@ -72,15 +72,16 @@ pub fn PseudoColourPlot(
                         )
                     };
 
-                    println!("X Bounds are: {}, {}", inc_x.start(), inc_x.end());
+                    let bounds = get_bounds(&data).ok_or_else(|| anyhow::anyhow!("Could not get bounds"))?;
+                    
 
                     let mapper = PlotMapper::new(
                         width as f32,
                         height as f32,
                         inc_x,
                         inc_y,
-                        RangeInclusive::new(x_axis_info.data_lower, x_axis_info.data_upper),
-                        RangeInclusive::new(y_axis_info.data_lower, y_axis_info.data_upper),
+                        RangeInclusive::new(bounds.0.0, bounds.0.1),
+                        RangeInclusive::new(bounds.1.0, bounds.1.1),
                         x_axis_info.transform.clone(),
                         y_axis_info.transform.clone(),
                     );
@@ -154,4 +155,24 @@ pub fn PseudoColourPlot(
         }
 
     }
+}
+
+
+fn get_bounds(data: &[(f32, f32)]) -> Option<((f32, f32), (f32, f32))> {
+    if data.is_empty() { return None; }
+
+    let initial = (
+        (data[0].0, data[0].0), // (min_x, max_x)
+        (data[0].1, data[0].1)  // (min_y, max_y)
+    );
+
+    let bounds = data.iter().skip(1).fold(initial, |mut acc, &(x, y)| {
+        acc.0.0 = acc.0.0.min(x);
+        acc.0.1 = acc.0.1.max(x);
+        acc.1.0 = acc.1.0.min(y);
+        acc.1.1 = acc.1.1.max(y);
+        acc
+    });
+
+    Some(bounds)
 }

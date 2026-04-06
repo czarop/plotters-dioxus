@@ -1,4 +1,5 @@
 use anyhow::anyhow;
+use flow_fcs::TransformType;
 use flow_gates::types::LabelPosition;
 use flow_gates::{
     GateError, GateGeometry, GateNode, create_polygon_geometry, create_rectangle_geometry,
@@ -16,7 +17,7 @@ use crate::gate_editor::gates::GateId;
 use crate::gate_editor::gates::gate_composite::bisector_gate::BisectorGate;
 use crate::gate_editor::gates::gate_composite::quadrant_gate::QuadrantGate;
 use crate::gate_editor::gates::gate_composite::skewed_quadrant_gate::{
-    DataPoints, SkewedQuadrantGate,
+    DataPoints, SkewedQuadrantGate, get_infinite_bounds,
 };
 use crate::gate_editor::gates::gate_single::ellipse_gate::EllipseGate;
 use crate::gate_editor::gates::gate_single::line_gate::LineGate;
@@ -591,9 +592,8 @@ pub fn get_composite_gates_from_filter_container(
             "Unexpected gate type for composite subgate"
         ));
     };
-    let (x_data_range, y_data_range) =
-        extract_data_range_from_axis_settings(&params, axis_settings)?;
-    let (x_axis_range, y_axis_range) =
+
+    let (x_axis_range, y_axis_range, x_transform, y_transform) =
         extract_axis_range_from_axis_settings(&params, axis_settings)?;
 
     let (subgate_ids, subgate_names, gate_id): (_, _, Arc<str>) = match &composite_type {
@@ -629,12 +629,12 @@ pub fn get_composite_gates_from_filter_container(
                 gate_id.clone(),
                 composite_group_id.clone(),
                 params,
-                &x_data_range,
-                &y_data_range,
                 &x_axis_range,
                 &y_axis_range,
                 &subgate_ids,
                 &subgate_names,
+                &x_transform,
+                &y_transform
             )?;
             map.insert(
                 (default_gate_arc.get_id(), GateSource::Global),
@@ -659,12 +659,14 @@ pub fn get_composite_gates_from_filter_container(
                 composite_group_id.clone(),
                 &default_subgates,
                 params,
-                &x_data_range,
-                &y_data_range,
+                // &x_data_range,
+                // &y_data_range,
                 &x_axis_range,
                 &y_axis_range,
                 subgate_ids.clone(),
                 &subgate_names,
+                &x_transform,
+                        &y_transform
             )?;
             map.insert(
                 (default_gate_arc.get_id(), GateSource::Global),
@@ -734,12 +736,12 @@ pub fn get_composite_gates_from_filter_container(
                             gate_id.clone(),
                             composite_group_id.clone(),
                             params,
-                            &x_data_range,
-                            &y_data_range,
                             &x_axis_range,
                             &y_axis_range,
                             &subgate_ids,
                             &subgate_names,
+                            &x_transform,
+                            &y_transform
                         )?;
                         group_cache.insert(group_id.clone(), new_gate.clone());
                         // Insert into the final map with the Group key
@@ -798,10 +800,12 @@ pub fn get_composite_gates_from_filter_container(
                             params,
                             &x_axis_range,
                             &y_axis_range,
-                            &x_data_range,
-                            &y_data_range,
+                            // &x_data_range,
+                            // &y_data_range,
                             subgate_ids.clone(),
                             &subgate_names,
+                            &x_transform,
+                        &y_transform
                         )?;
 
                         group_cache.insert(group_id.clone(), new_gate.clone());
@@ -852,12 +856,14 @@ pub fn get_composite_gates_from_filter_container(
                         gate_id.clone(),
                         composite_group_id.clone(),
                         params,
-                        &x_data_range,
-                        &y_data_range,
+                        // &x_data_range,
+                        // &y_data_range,
                         &x_axis_range,
                         &y_axis_range,
                         &subgate_ids,
                         &subgate_names,
+                        &x_transform,
+                        &y_transform
                     )?;
 
                     map.insert(
@@ -898,10 +904,10 @@ pub fn get_composite_gates_from_filter_container(
                         params,
                         &x_axis_range,
                         &y_axis_range,
-                        &x_data_range,
-                        &y_data_range,
                         subgate_ids.clone(),
                         &subgate_names,
+                        &x_transform,
+                        &y_transform
                     )?;
 
                     map.insert(
@@ -934,25 +940,25 @@ pub fn get_sorted_subgate_ids_and_names(
     (ids, names)
 }
 
-pub fn extract_data_range_from_axis_settings(
-    params: &(&Arc<str>, &Arc<str>),
-    axis_settings: &im::HashMap<Arc<str>, AxisInfo, FxBuildHasher>,
-) -> anyhow::Result<(RangeInclusive<f32>, RangeInclusive<f32>)> {
-    let x_axis = axis_settings.get(params.0).ok_or_else(|| {
-        anyhow::anyhow!("Could not find axis settings for parameter {}", params.0)
-    })?;
-    let y_axis = axis_settings.get(params.1).ok_or_else(|| {
-        anyhow::anyhow!("Could not find axis settings for parameter {}", params.1)
-    })?;
-    let x_data_range = x_axis.data_lower..=x_axis.data_upper;
-    let y_data_range = y_axis.data_lower..=y_axis.data_upper;
-    Ok((x_data_range, y_data_range))
-}
+// pub fn extract_data_range_from_axis_settings(
+//     params: &(&Arc<str>, &Arc<str>),
+//     axis_settings: &im::HashMap<Arc<str>, AxisInfo, FxBuildHasher>,
+// ) -> anyhow::Result<(RangeInclusive<f32>, RangeInclusive<f32>)> {
+//     let x_axis = axis_settings.get(params.0).ok_or_else(|| {
+//         anyhow::anyhow!("Could not find axis settings for parameter {}", params.0)
+//     })?;
+//     let y_axis = axis_settings.get(params.1).ok_or_else(|| {
+//         anyhow::anyhow!("Could not find axis settings for parameter {}", params.1)
+//     })?;
+//     let x_data_range = x_axis.data_lower..=x_axis.data_upper;
+//     let y_data_range = y_axis.data_lower..=y_axis.data_upper;
+//     Ok((x_data_range, y_data_range))
+// }
 
 pub fn extract_axis_range_from_axis_settings(
     params: &(&Arc<str>, &Arc<str>),
     axis_settings: &im::HashMap<Arc<str>, AxisInfo, FxBuildHasher>,
-) -> anyhow::Result<(RangeInclusive<f32>, RangeInclusive<f32>)> {
+) -> anyhow::Result<(RangeInclusive<f32>, RangeInclusive<f32>, TransformType, TransformType)> {
     let x_axis = axis_settings.get(params.0).ok_or_else(|| {
         anyhow::anyhow!("Could not find axis settings for parameter {}", params.0)
     })?;
@@ -961,13 +967,17 @@ pub fn extract_axis_range_from_axis_settings(
     })?;
     let x_axis_range = x_axis.axis_lower..=x_axis.axis_upper;
     let y_axis_range = y_axis.axis_lower..=y_axis.axis_upper;
-    Ok((x_axis_range, y_axis_range))
+
+    let x_trans = x_axis.transform.clone();
+    let y_trans = x_axis.transform.clone();
+
+    Ok((x_axis_range, y_axis_range, x_trans, y_trans))
 }
 
 pub fn make_data_points_for_quadrant_filter(
     gate: &GateSerialized,
-    x_data_range: &RangeInclusive<f32>,
-    y_data_range: &RangeInclusive<f32>,
+    // x_data_range: &RangeInclusive<f32>,
+    // y_data_range: &RangeInclusive<f32>,
     x_axis_range: &RangeInclusive<f32>,
     y_axis_range: &RangeInclusive<f32>,
 ) -> anyhow::Result<DataPoints> {
@@ -982,8 +992,6 @@ pub fn make_data_points_for_quadrant_filter(
         center.1,
         x_axis_range.clone(),
         y_axis_range.clone(),
-        x_data_range.clone(),
-        y_data_range.clone(),
     );
 
     Ok(data_points)
@@ -994,17 +1002,15 @@ pub fn get_quadrant_gate_for_filter_container(
     id: Arc<str>,
     name: String,
     params: (&Arc<str>, &Arc<str>),
-    x_data_range: &RangeInclusive<f32>,
-    y_data_range: &RangeInclusive<f32>,
     x_axis_range: &RangeInclusive<f32>,
     y_axis_range: &RangeInclusive<f32>,
     subgate_ids: &[Arc<str>],
     subgate_names: &[String],
+    x_transform: &TransformType,
+    y_transform: &TransformType
 ) -> anyhow::Result<Arc<dyn DrawableGate>> {
     let default_data_points = make_data_points_for_quadrant_filter(
         filter,
-        x_data_range,
-        y_data_range,
         x_axis_range,
         y_axis_range,
     )?;
@@ -1013,6 +1019,12 @@ pub fn get_quadrant_gate_for_filter_container(
         .cloned()
         .collect_tuple()
         .ok_or_else(|| anyhow::anyhow!("Expected 4 items"))?;
+
+        let x_inf = get_infinite_bounds(x_transform);
+
+        let y_inf = get_infinite_bounds(y_transform);
+
+        let infs = (x_inf, y_inf);
 
     let default_gate = QuadrantGate::try_new_from_data_points(
         id,
@@ -1023,6 +1035,7 @@ pub fn get_quadrant_gate_for_filter_container(
         true,
         Some(subgate_ids.to_vec()),
         Some(subgate_names),
+        infs
     )?;
     let default_gate_arc: Arc<dyn DrawableGate> = Arc::new(default_gate);
     Ok(default_gate_arc)
@@ -1123,8 +1136,8 @@ pub fn calculate_skewed_quadrant_polygon(
 
 pub fn angle_gates_to_skewed_data_points(
     angle_gate_map: FxHashMap<QuadrantPosition, Vec<(f32, f32)>>,
-    x_data_range: RangeInclusive<f32>,
-    y_data_range: RangeInclusive<f32>,
+    // x_data_range: RangeInclusive<f32>,
+    // y_data_range: RangeInclusive<f32>,
 ) -> anyhow::Result<DataPoints> {
     // we need two opposite quadrants to construct the DataPoints
 
@@ -1147,8 +1160,8 @@ pub fn angle_gates_to_skewed_data_points(
         bottom,
         right,
         top,
-        x_data_range,
-        y_data_range,
+        // x_data_range,
+        // y_data_range,
     })
 }
 
@@ -1159,10 +1172,10 @@ pub fn get_skewed_quadrant_gate(
     params: (&Arc<str>, &Arc<str>),
     x_axis_range: &RangeInclusive<f32>,
     y_axis_range: &RangeInclusive<f32>,
-    x_data_range: &RangeInclusive<f32>,
-    y_data_range: &RangeInclusive<f32>,
     subgate_ids: Vec<Arc<str>>,
     subgate_names: &[String],
+    x_transform: &TransformType,
+    y_transform: &TransformType
 ) -> anyhow::Result<Arc<dyn DrawableGate>> {
     let default_gate_map: FxHashMap<_, _> = subgates
         .iter()
@@ -1191,9 +1204,15 @@ pub fn get_skewed_quadrant_gate(
 
     let data_points = angle_gates_to_skewed_data_points(
         default_gate_map,
-        x_data_range.clone(),
-        y_data_range.clone(),
+        // x_data_range.clone(),
+        // y_data_range.clone(),
     )?;
+
+    let x_inf = get_infinite_bounds(x_transform);
+
+        let y_inf = get_infinite_bounds(y_transform);
+
+        let infs = (x_inf, y_inf);
 
     let gate = SkewedQuadrantGate::try_new_from_data_points(
         gate_id.clone(),
@@ -1204,6 +1223,7 @@ pub fn get_skewed_quadrant_gate(
         true,
         Some(subgate_ids.clone()),
         Some(subgate_names),
+        infs
     )?;
 
     Ok(Arc::new(gate))

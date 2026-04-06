@@ -39,8 +39,8 @@ pub struct AxisInfo {
     pub param: Param,
     pub axis_lower: f32,
     pub axis_upper: f32,
-    pub data_lower: f32,
-    pub data_upper: f32,
+    // pub data_lower: f32,
+    // pub data_upper: f32,
     pub transform: flow_fcs::TransformType,
 }
 
@@ -53,8 +53,8 @@ impl Default for AxisInfo {
             },
             axis_lower: 0_f32,
             axis_upper: 4194304_f32,
-            data_lower: 0_f32,
-            data_upper: 4194304_f32,
+            // data_lower: 0_f32,
+            // data_upper: 4194304_f32,
             transform: flow_fcs::TransformType::Linear,
         }
     }
@@ -65,8 +65,8 @@ impl AxisInfo {
         param: Param,
         lower_raw: f32,
         upper_raw: f32,
-        data_lower: f32,
-        data_upper: f32,
+        // data_lower: f32,
+        // data_upper: f32,
         transform: TransformType,
     ) -> Self {
         match transform {
@@ -74,21 +74,21 @@ impl AxisInfo {
                 param,
                 axis_lower: lower_raw,
                 axis_upper: upper_raw,
-                data_lower,
-                data_upper,
+                // data_lower,
+                // data_upper,
                 transform,
             },
             TransformType::Arcsinh { cofactor } => {
                 let lower = asinh_transform_f32(lower_raw, cofactor).unwrap_or(0f32);
                 let upper = asinh_transform_f32(upper_raw, cofactor).unwrap_or(f32::INFINITY);
-                let data_lower = asinh_transform_f32(data_lower, cofactor).unwrap_or(0f32);
-                let data_upper = asinh_transform_f32(data_upper, cofactor).unwrap_or(f32::INFINITY);
+                // let data_lower = asinh_transform_f32(data_lower, cofactor).unwrap_or(0f32);
+                // let data_upper = asinh_transform_f32(data_upper, cofactor).unwrap_or(f32::INFINITY);
                 Self {
                     param,
                     axis_lower: lower,
                     axis_upper: upper,
-                    data_lower,
-                    data_upper,
+                    // data_lower,
+                    // data_upper,
                     transform,
                 }
             }
@@ -104,8 +104,8 @@ impl AxisInfo {
     pub fn into_archsinh(&self, cofactor: f32) -> anyhow::Result<Self> {
         let old_lower = self.axis_lower;
         let old_upper = self.axis_upper;
-        let old_dl = self.data_lower;
-        let old_du = self.data_upper;
+        // let old_dl = self.data_lower;
+        // let old_du = self.data_upper;
         let transform = TransformType::Arcsinh { cofactor };
         let new_self = match self.transform {
             flow_fcs::TransformType::Arcsinh {
@@ -113,28 +113,28 @@ impl AxisInfo {
             } => {
                 let lower = asinh_to_asinh(old_lower, old_cofactor, cofactor)?;
                 let upper = asinh_to_asinh(old_upper, old_cofactor, cofactor)?;
-                let data_lower = asinh_to_asinh(old_dl, old_cofactor, cofactor)?;
-                let data_upper = asinh_to_asinh(old_du, old_cofactor, cofactor)?;
+                // let data_lower = asinh_to_asinh(old_dl, old_cofactor, cofactor)?;
+                // let data_upper = asinh_to_asinh(old_du, old_cofactor, cofactor)?;
                 Self {
                     param: self.param.clone(),
                     axis_lower: lower,
                     axis_upper: upper,
-                    data_lower,
-                    data_upper,
+                    // data_lower,
+                    // data_upper,
                     transform,
                 }
             }
             _ => {
                 let lower = asinh_transform_f32(old_lower, cofactor)?;
                 let upper = asinh_transform_f32(old_upper, cofactor)?;
-                let data_lower = asinh_transform_f32(old_dl, cofactor)?;
-                let data_upper = asinh_transform_f32(old_du, cofactor)?;
+                // let data_lower = asinh_transform_f32(old_dl, cofactor)?;
+                // let data_upper = asinh_transform_f32(old_du, cofactor)?;
                 Self {
                     param: self.param.clone(),
                     axis_lower: lower,
                     axis_upper: upper,
-                    data_lower,
-                    data_upper,
+                    // data_lower,
+                    // data_upper,
                     transform,
                 }
             }
@@ -145,8 +145,8 @@ impl AxisInfo {
     pub fn into_linear(&self) -> anyhow::Result<Self> {
         let old_lower = self.axis_lower;
         let old_upper = self.axis_upper;
-        let old_dl = self.data_lower;
-        let old_du = self.data_upper;
+        // let old_dl = self.data_lower;
+        // let old_du = self.data_upper;
         let transform = TransformType::Linear;
         let new_self = match self.transform {
             TransformType::Linear => self.clone(),
@@ -156,14 +156,14 @@ impl AxisInfo {
             } => {
                 let upper_untransformed = asinh_reverse_f32(old_upper, old_cofactor)?;
                 let lower_untransformed = asinh_reverse_f32(old_lower, old_cofactor)?;
-                let data_lower = asinh_reverse_f32(old_dl, old_cofactor)?;
-                let data_upper = asinh_reverse_f32(old_du, old_cofactor)?;
+                // let data_lower = asinh_reverse_f32(old_dl, old_cofactor)?;
+                // let data_upper = asinh_reverse_f32(old_du, old_cofactor)?;
                 Self {
                     param: self.param.clone(),
                     axis_lower: lower_untransformed,
                     axis_upper: upper_untransformed,
-                    data_lower,
-                    data_upper,
+                    // data_lower,
+                    // data_upper,
                     transform,
                 }
             }
@@ -171,8 +171,8 @@ impl AxisInfo {
                 param: self.param.clone(),
                 axis_lower: old_lower,
                 axis_upper: old_upper,
-                data_lower: old_dl,
-                data_upper: old_du,
+                // data_lower: old_dl,
+                // data_upper: old_du,
                 transform,
             },
         };
@@ -221,8 +221,8 @@ impl AxisInfo {
                 param: self.param.clone(),
                 axis_lower: lower_raw,
                 axis_upper: self.axis_upper,
-                data_lower: self.data_lower,
-                data_upper: self.data_upper,
+                // data_lower: self.data_lower,
+                // data_upper: self.data_upper,
                 transform: self.transform.clone(),
             },
             TransformType::Arcsinh { cofactor } => {
@@ -231,8 +231,8 @@ impl AxisInfo {
                     param: self.param.clone(),
                     axis_lower: new_lower,
                     axis_upper: self.axis_upper,
-                    data_lower: self.data_lower,
-                    data_upper: self.data_upper,
+                    // data_lower: self.data_lower,
+                    // data_upper: self.data_upper,
                     transform: self.transform.clone(),
                 }
             }
@@ -246,8 +246,8 @@ impl AxisInfo {
                 param: self.param.clone(),
                 axis_lower: self.axis_lower,
                 axis_upper: upper_raw,
-                data_lower: self.data_lower,
-                data_upper: self.data_upper,
+                // data_lower: self.data_lower,
+                // data_upper: self.data_upper,
                 transform: self.transform.clone(),
             },
             TransformType::Arcsinh { cofactor } => {
@@ -256,8 +256,8 @@ impl AxisInfo {
                     param: self.param.clone(),
                     axis_lower: self.axis_lower,
                     axis_upper: new_upper,
-                    data_lower: self.data_lower,
-                    data_upper: self.data_upper,
+                    // data_lower: self.data_lower,
+                    // data_upper: self.data_upper,
                     transform: self.transform.clone(),
                 }
             }

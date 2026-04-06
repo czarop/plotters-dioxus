@@ -513,7 +513,7 @@ impl super::super::gate_traits::DrawableGate for BisectorGate {
         param: std::sync::Arc<str>,
         old_transform: &TransformType,
         new_transform: &TransformType,
-        _data_range: (f32, f32),
+        // _data_range: (f32, f32),
         _axis_range: (f32, f32),
     ) -> anyhow::Result<Box<dyn super::super::gate_traits::DrawableGate>> {
         let (x_param, _) = &self.parameters;

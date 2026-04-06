@@ -2,6 +2,7 @@ use crate::gate_editor::gates::gate_buttons::NewGateButtons;
 use crate::gate_editor::plots::axis_store::AxisStore;
 use crate::gate_editor::plots::axis_store::AxisStoreImplExt;
 use crate::gate_editor::plots::axis_store::AxisStoreStoreExt;
+use crate::gate_editor::plots::axis_store::ScalingInfoSource;
 use crate::gate_editor::plots::plot_window::PlotWindow;
 use crate::omiq::metadata::MetaDataImplExt;
 use crate::omiq::metadata::MetaDataOrigin;
@@ -79,7 +80,7 @@ pub fn MainWindow() -> Element {
                 .nth(3)
                 .ok_or_else(|| anyhow::anyhow!("File does not have a forth non-empty line"))?;
             let path = PathBuf::from(forth_line);
-            axis_store.set_axes_from_file(path)
+            axis_store.set_axes_from_file(path, ScalingInfoSource::Omiq)
         })
         .await;
 

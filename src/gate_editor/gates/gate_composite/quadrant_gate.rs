@@ -2,7 +2,7 @@ use flow_fcs::TransformType;
 
 use crate::gate_editor::{
     gates::{
-        gate_composite::skewed_quadrant_gate::{DataPoints, create_skewed_quadrant_geos},
+        gate_composite::skewed_quadrant_gate::{DataPoints, create_skewed_quadrant_geos, get_infinite_bounds},
         gate_drag::{GateDragData, PointDragData},
         gate_single::{polygon_gate::PolygonGate, rescale_helper_point},
         gate_traits::DrawableGate,
@@ -12,9 +12,10 @@ use crate::gate_editor::{
 };
 use anyhow::Result;
 use flow_gates::Gate;
+
 use indexmap::IndexMap;
 use rustc_hash::FxBuildHasher;
-use std::{ops::RangeInclusive, sync::Arc};
+use std::{sync::Arc};
 type FxIndexMap<K, V> = IndexMap<K, V, FxBuildHasher>;
 
 #[derive(PartialEq, Clone)]
@@ -25,6 +26,7 @@ pub struct QuadrantGate {
     points: DataPoints,
     axis_matched: bool,
     parameters: (Arc<str>, Arc<str>),
+    infs: (f32, f32)
 }
 
 impl QuadrantGate {
@@ -39,6 +41,12 @@ impl QuadrantGate {
         let (cx, cy) = plot_map.pixel_to_data(click_loc_raw.0, click_loc_raw.1, None, None);
         let points = DataPoints::new_from_click(cx, cy, plot_map);
 
+        let x_inf = get_infinite_bounds(&plot_map.get_x_transform());
+
+        let y_inf = get_infinite_bounds(&plot_map.get_y_transform());
+
+        let infs = (x_inf, y_inf);
+
         Self::try_new_from_data_points(
             id,
             name,
@@ -48,6 +56,7 @@ impl QuadrantGate {
             true,
             None,
             None,
+            infs
         )
     }
 
@@ -60,6 +69,7 @@ impl QuadrantGate {
         axis_matched: bool,
         subgate_ids: Option<Vec<Arc<str>>>,
         subgate_names: Option<(String, String, String, String)>,
+        infs: (f32, f32)
     ) -> Result<Self> {
         // FORCE ORTHOGONALITY: Overwrite any skew with center alignment
         data_points.left.1 = data_points.center.1;
@@ -71,7 +81,7 @@ impl QuadrantGate {
         let parameters = (x_axis_param.clone(), y_axis_param.clone());
 
         // Reuse the skewed geometry generator (orthogonal is just 0 skew)
-        let geos = create_skewed_quadrant_geos(data_points.clone(), &x_axis_param, &y_axis_param)?;
+        let geos = create_skewed_quadrant_geos(data_points.clone(), &x_axis_param, &y_axis_param, infs.0, infs.1)?;
 
         let sub_ids = if let Some(ids) = subgate_ids {
             ids
@@ -121,10 +131,11 @@ impl QuadrantGate {
             points: data_points,
             axis_matched,
             parameters,
+            infs
         })
     }
 
-    fn clone_with_point(&self, data_points: DataPoints) -> Result<Self> {
+    fn clone_with_point(&self, data_points: DataPoints, infs: Option<(f32, f32)>) -> Result<Self> {
         let gate_ids = self.gates.keys().cloned().collect();
         let mut it = self.gates.iter().map(|(_, v)| v.get_name().to_string());
 
@@ -143,6 +154,7 @@ impl QuadrantGate {
             self.axis_matched,
             Some(gate_ids),
             Some(gate_names),
+            if infs.is_some() {infs.unwrap()} else {self.infs}
         )
     }
 
@@ -154,6 +166,7 @@ impl QuadrantGate {
         if swap_axis {
             let new_parameters = (self.parameters.1.clone(), self.parameters.0.clone());
             let new_points = self.points.clone_for_swap_axis();
+            let infs = (self.infs.1, self.infs.0);
             Box::new(Self {
                 gates,
                 id: self.id.clone(),
@@ -161,6 +174,7 @@ impl QuadrantGate {
                 points: new_points,
                 axis_matched: !self.axis_matched,
                 parameters: new_parameters,
+                infs
             })
         } else {
             Box::new(Self {
@@ -170,6 +184,7 @@ impl QuadrantGate {
                 points: self.points.clone(),
                 axis_matched: self.axis_matched,
                 parameters: self.parameters.clone(),
+                infs: self.infs.clone()
             })
         }
     }
@@ -412,11 +427,11 @@ impl DrawableGate for QuadrantGate {
             right: (xmax, clamped_c.1),
             bottom: (clamped_c.0, ymin),
             top: (clamped_c.0, ymax),
-            x_data_range: self.points.x_data_range.clone(),
-            y_data_range: self.points.y_data_range.clone(),
+            // x_data_range: self.points.x_data_range.clone(),
+            // y_data_range: self.points.y_data_range.clone(),
         };
 
-        Ok(Box::new(self.clone_with_point(new_pts)?))
+        Ok(Box::new(self.clone_with_point(new_pts, None)?))
     }
 
     fn recalculate_gate_for_new_axis_limits(
@@ -444,7 +459,7 @@ impl DrawableGate for QuadrantGate {
             new_points.right.1 = new_points.center.1;
         }
 
-        Ok(Some(Box::new(self.clone_with_point(new_points)?)))
+        Ok(Some(Box::new(self.clone_with_point(new_points, None)?)))
     }
 
     fn recalculate_gate_for_rescaled_axis(
@@ -452,7 +467,7 @@ impl DrawableGate for QuadrantGate {
         param: Arc<str>,
         old_transform: &TransformType,
         new_transform: &TransformType,
-        data_range: (f32, f32),
+        // data_range: (f32, f32),
         axis_range: (f32, f32),
     ) -> Result<Box<dyn DrawableGate>> {
         let (x_param, _) = &self.parameters;
@@ -490,19 +505,18 @@ impl DrawableGate for QuadrantGate {
                 },
             ),
             top: (c.0, if !is_x { new_upper } else { self.points.top.1 }),
-            x_data_range: if is_x {
-                RangeInclusive::new(data_range.0, data_range.1)
-            } else {
-                self.points.x_data_range.clone()
-            },
-            y_data_range: if !is_x {
-                RangeInclusive::new(data_range.0, data_range.1)
-            } else {
-                self.points.y_data_range.clone()
-            },
+            
         };
-
-        Ok(Box::new(self.clone_with_point(new_pts)?))
+        let infs = {
+            
+            let new_inf = get_infinite_bounds(&new_transform);
+            if is_x {
+                (new_inf, self.infs.1)
+            } else {
+                (self.infs.0, new_inf)
+            }
+    };
+        Ok(Box::new(self.clone_with_point(new_pts, Some(infs))?))
     }
 
     fn match_to_plot_axis(

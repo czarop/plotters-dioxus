@@ -85,7 +85,7 @@ pub trait DrawableGate: Send + Sync {
         param: std::sync::Arc<str>,
         old_transform: &TransformType,
         new_transform: &TransformType,
-        data_range: (f32, f32),
+        // data_range: (f32, f32),
         axis_range: (f32, f32),
     ) -> anyhow::Result<Box<dyn DrawableGate>>;
 

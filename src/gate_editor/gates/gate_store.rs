@@ -773,12 +773,19 @@ impl<Lens> Store<GateState, Lens> {
                     return scaled.clone();
                 }
                 let (x_marker, y_marker) = gate.get_params();
+                // let is_x = marker == &x_marker;
+                // let data_range = if is_x {
+                //     (*(plot_map.x_data_min_max().start()), *(plot_map.x_data_min_max().end()))
+                // } else {
+                //     (*(plot_map.y_data_min_max().start()), *(plot_map.y_data_min_max().end()))
+                // };
+                
                 if marker == &x_marker || marker == &y_marker {
                     let new_gate = match gate.recalculate_gate_for_rescaled_axis(
                         marker.clone(),
                         &old_axis_options.transform,
                         &new_axis_options.transform,
-                        (new_axis_options.data_lower, new_axis_options.data_upper),
+                        // data_range,
                         (new_axis_options.axis_lower, new_axis_options.axis_upper),
                     ) {
                         Ok(new_gate) => Arc::from(new_gate),

@@ -8,7 +8,9 @@ use flow_gates::transforms::{
 };
 use rustc_hash::FxBuildHasher;
 use std::{ops::RangeInclusive, path::PathBuf, sync::Arc};
-use polars::prelude::SerReader;
+
+use polars::prelude::*;
+use itertools::izip;
 use crate::gate_editor::{AxisInfo, gates::GateId};
 
 #[derive(Clone, Debug, PartialEq)]
@@ -127,6 +129,14 @@ impl PlotMapper {
     pub fn y_data_min_max(&self) -> RangeInclusive<f32> {
         self.y_data_range.clone()
     }
+
+    pub fn get_x_transform(&self) -> TransformType {
+        self.x_transform.clone()
+    }
+
+    pub fn get_y_transform(&self) -> TransformType {
+        self.y_transform.clone()
+    }
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, Hash)]
@@ -193,8 +203,8 @@ impl<Lens> Store<AxisStore, Lens> {
                     p.clone(),
                     lower,
                     4194304.0,
-                    data_lower,
-                    data_upper,
+                    // data_lower,
+                    // data_upper,
                     transform,
                 )
             });
@@ -282,32 +292,72 @@ impl<Lens> Store<AxisStore, Lens> {
         }
     }
 
-    fn set_axes_from_file(&mut self, path: PathBuf) -> anyhow::Result<()> {
-        let df = fetch_metadata_from_csv(path)?;
+    fn set_axes_from_file(&mut self, path: PathBuf, source: ScalingInfoSource) -> anyhow::Result<()> {
+        let mut df = match source{
+            ScalingInfoSource::Omiq => fetch_axes_from_omiq_csv(path)?,
+        };
+
+        let primary_col = df.column("Feature Name (Primary)")?.str()?;
+        let secondary_col = df.column("Feature Name (Secondary)")?.str()?;
+        let scaling_col = df.column("Scaling Type")?.str()?;
+        let cofactor_col = df.column("Cofactor")?.i64()?;
+        let min_col = df.column("Min")?.i64()?;
+        let max_col = df.column("Max")?.i64()?;
+        // let min_z_col = df.column("Min Z")?.i64()?;
+        // let max_z_col = df.column("Max Z")?.i64()?;
+
+        let configs: Vec<(Param, TransformType, RangeInclusive<i64>)> = izip!(
+        primary_col,
+        secondary_col,
+        scaling_col,
+        cofactor_col,
+        min_col,
+        max_col,
+        // min_z_col,
+        // max_z_col
+    )
+    .filter_map(
+        |(prim_opt, sec_opt, scale_opt, cof_opt, min_opt, max_opt)| {
+            let param = Param{ 
+                marker: Arc::from(sec_opt?), 
+                fluoro: Arc::from(prim_opt?) 
+            };
+            let transform = match scale_opt? {
+                "Arcsinh" => TransformType::Arcsinh { cofactor: cof_opt? as f32 },
+                "None (linear)" => TransformType::Linear,
+                _ => unreachable!("Unknown transform type")
+            };
+            let range = min_opt?..=max_opt?;
+            Some((param, transform, range))
+
+        })
+        .collect();
+
+
         Ok(())
     }
 }
 
-fn fetch_metadata_from_csv(path: PathBuf) -> anyhow::Result<DataFrame> {
-    // 1. Read just the first row to get the column names
-    let schema_df = CsvReadOptions::default()
-        .with_has_header(true)
-        .with_n_rows(Some(0)) // Only get headers
-        .try_into_reader_with_file_path(Some(path.clone()))?
-        .finish()?;
+pub enum ScalingInfoSource{
+    Omiq
+}
 
-    // 2. Map every column name to DataType::String
-    let schema = Schema::from_iter(
-        schema_df
-            .get_column_names()
-            .iter()
-            .map(|&name| Field::new(name.clone(), DataType::String)),
-    );
+fn fetch_axes_from_omiq_csv(path: PathBuf,) -> anyhow::Result<DataFrame> {
 
-    // 3. Read the actual data using our "All-String" schema
+    let schema = Schema::from_iter(vec![
+        Field::new("Feature Name (Primary)".into(), DataType::String),
+        Field::new("Feature Name (Secondary)".into(), DataType::String),
+        Field::new("Scaling Type".into(), DataType::String),
+        Field::new("Cofactor".into(), DataType::Int64),
+        Field::new("Min".into(), DataType::Int64),
+        Field::new("Max".into(), DataType::Int64),
+        Field::new("Min Z".into(), DataType::Int64),
+        Field::new("Max Z".into(), DataType::Int64),
+    ]);
+
     let csv = CsvReadOptions::default()
         .with_has_header(true)
-        .with_schema(Some(Arc::new(schema))) // Tell Polars: "Everything is a string"
+        .with_schema(Some(Arc::new(schema)))
         .try_into_reader_with_file_path(Some(path))?
         .finish()?;
 

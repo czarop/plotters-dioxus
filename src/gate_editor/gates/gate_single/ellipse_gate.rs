@@ -261,7 +261,7 @@ impl DrawableGate for EllipseGate {
         param: Arc<str>,
         old: &TransformType,
         new: &TransformType,
-        _data_range: (f32, f32),
+        // _data_range: (f32, f32),
         _axis_range: (f32, f32),
     ) -> anyhow::Result<Box<dyn DrawableGate>> {
         let (x_param, y_param) = self.get_params();
