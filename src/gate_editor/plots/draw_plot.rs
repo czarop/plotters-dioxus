@@ -51,20 +51,6 @@ pub fn PseudoColourPlot(
                         .label(y_axis_info.param.to_string())
                         .build()?;
 
-                    // let actual_ranges = flow_plots::create_axis_specs(
-                    //     &x_axis_options.range,
-                    //     &y_axis_options.range,
-                    //     &x_axis_info.transform,
-                    //     &y_axis_info.transform,
-                    // )?;
-
-                    // let (inc_x, inc_y) = {
-                    //     (
-                    //         actual_ranges.0.start..=actual_ranges.0.end,
-                    //         actual_ranges.1.start..=actual_ranges.1.end,
-                    //     )
-                    // };
-
                     let (inc_x, inc_y) = {
                         (
                             *(x_axis_options.range.start())..=*(x_axis_options.range.end()),

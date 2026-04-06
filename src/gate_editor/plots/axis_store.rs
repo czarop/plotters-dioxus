@@ -2,9 +2,9 @@ use anyhow::anyhow;
 use polars::{frame::DataFrame, prelude::{CsvReadOptions, DataType, Field, Schema}};
 use core::f32;
 use dioxus::prelude::*;
-use flow_fcs::TransformType;
+use flow_fcs::{TransformType, Transformable};
 use flow_gates::transforms::{
-    get_plotting_area, pixel_to_raw, pixel_to_raw_y, raw_to_pixel, raw_to_pixel_y,
+    Axis, get_plotting_area, pixel_to_raw, pixel_to_raw_y, raw_to_pixel, raw_to_pixel_y
 };
 use rustc_hash::FxBuildHasher;
 use std::{ops::RangeInclusive, path::PathBuf, sync::Arc};
@@ -171,6 +171,9 @@ pub struct AxisStore {
 #[store(pub name = AxisStoreImplExt)]
 impl<Lens> Store<AxisStore, Lens> {
     fn add_new_default_axis_settings(&mut self, p: &Param, fcs_file: &flow_fcs::Fcs) {
+        if self.settings().peek().contains_key(&p.fluoro) {
+            return
+        }
         self.settings()
             .write()
             .entry(p.fluoro.clone())
@@ -195,16 +198,10 @@ impl<Lens> Store<AxisStore, Lens> {
                     -10000.0
                 };
 
-                let (data_lower, data_upper) = fcs_file
-                    .get_minmax_of_parameter(&p.fluoro)
-                    .expect("couldn't find parameter");
-
                 AxisInfo::new_from_raw(
                     p.clone(),
                     lower,
                     4194304.0,
-                    // data_lower,
-                    // data_upper,
                     transform,
                 )
             });
@@ -293,7 +290,7 @@ impl<Lens> Store<AxisStore, Lens> {
     }
 
     fn set_axes_from_file(&mut self, path: PathBuf, source: ScalingInfoSource) -> anyhow::Result<()> {
-        let mut df = match source{
+        let df = match source{
             ScalingInfoSource::Omiq => fetch_axes_from_omiq_csv(path)?,
         };
 
@@ -306,7 +303,7 @@ impl<Lens> Store<AxisStore, Lens> {
         // let min_z_col = df.column("Min Z")?.i64()?;
         // let max_z_col = df.column("Max Z")?.i64()?;
 
-        let configs: Vec<(Param, TransformType, RangeInclusive<i64>)> = izip!(
+        let configs: Vec<AxisInfo> = izip!(
         primary_col,
         secondary_col,
         scaling_col,
@@ -327,12 +324,22 @@ impl<Lens> Store<AxisStore, Lens> {
                 "None (linear)" => TransformType::Linear,
                 _ => unreachable!("Unknown transform type")
             };
-            let range = min_opt?..=max_opt?;
-            Some((param, transform, range))
+
+            let lower = transform.transform(&(min_opt? as f32));
+            let upper = transform.transform(&(max_opt? as f32));
+
+            let ai = AxisInfo{ param, axis_lower: lower, axis_upper: upper, transform };
+            Some(ai)
 
         })
         .collect();
 
+        self.with_mut(|s| {
+
+            for ai in configs {
+                s.settings.insert(ai.param.fluoro.clone(), ai);
+            }
+        });
 
         Ok(())
     }
