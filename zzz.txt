@@ -1,11 +1,21 @@
 Gates:
+Set Comp from omiq Comp
+gates to omiq json
 
-move away from flow-plots and flow-gates?
+Allow selection of files
 
-hierarchy ordering not implemented for homemade composite gates
 give a clear error when metadata found in json is not present in metadata store
 
-gate axis limits 'niceifying' is not working well - it gives too much above the plot. This is a lib feature??
+Paired samples (FMX FS)
+Move gates according to rules
+Move gates according to clusters
+
+
+Nice to have:
+
+
+
+
 Allow choosing other gates at the same level for AND and OR
 Add filter Cache
 
@@ -18,19 +28,17 @@ You have no concept of linked gates - but this is just using the same gate at 2 
 Allow linking and unlinking gates from the GUI
 Visualise linked gates
 
-Meta:
-Set Scaling from omiq Scaling
-Set Comp from omiq Comp
 
-Paired samples (FMX FS)
+
+
 Send Scaling to omiq Scaling
-Save gates to omiq gating
 
-Allow selection of files
+
+
 Deal with nested folders for groups
 
 
-Nice to have:
+
 Contourplot
 Histogram
 label positions
