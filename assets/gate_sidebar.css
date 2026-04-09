@@ -6,7 +6,7 @@
     border-right: 1px solid #e2e8f0;
     display: flex;
     flex-direction: column;
-    overflow-y: auto;
+    overflow: auto;
 }
 
 .sidebar-title {
@@ -21,6 +21,7 @@
     padding-top: 8px;
     display: flex;
     flex-direction: column;
+    min-width: max-content;
 }
 
 /* Individual Node Row */
@@ -32,6 +33,8 @@
     user-select: none;
     transition: background-color 0.15s ease;
     color: #4a5568;
+    width: 100%;
+    min-width: max-content;
 }
 
 .gate-node-row:hover {

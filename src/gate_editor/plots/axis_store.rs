@@ -315,8 +315,14 @@ impl<Lens> Store<AxisStore, Lens> {
     )
     .filter_map(
         |(prim_opt, sec_opt, scale_opt, cof_opt, min_opt, max_opt)| {
+            let marker_name = if sec_opt? == "" {
+                prim_opt.clone()
+            } else {
+                sec_opt
+            };
+
             let param = Param{ 
-                marker: Arc::from(sec_opt?), 
+                marker: Arc::from(marker_name?), 
                 fluoro: Arc::from(prim_opt?) 
             };
             let transform = match scale_opt? {
@@ -337,8 +343,11 @@ impl<Lens> Store<AxisStore, Lens> {
         self.with_mut(|s| {
 
             for ai in configs {
+                s.sorted_settings.insert(ai.param.clone());
                 s.settings.insert(ai.param.fluoro.clone(), ai);
             }
+
+            
         });
 
         Ok(())

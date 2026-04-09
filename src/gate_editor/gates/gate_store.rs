@@ -4,7 +4,7 @@ use anyhow::anyhow;
 use dioxus::prelude::*;
 use flow_fcs::TransformType;
 use flow_gates::{BooleanOperation, Gate};
-use rustc_hash::{FxBuildHasher, FxHashMap};
+use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use std::collections::HashSet;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
@@ -922,6 +922,11 @@ impl<Lens> Store<GateState, Lens> {
         // 2. Deserialize into your ExperimentJson struct
         let experiment: crate::omiq::deserialise::ExperimentJson = serde_json::from_reader(reader)?;
 
+        let mut reachable: FxHashSet<Arc<str>> = FxHashSet::default();
+        for node in experiment.tree.nodes.values() {
+            collect_reachable(&node.filter_container_id, &experiment.tree.filter_containers, &mut reachable);
+        }
+
         let mut composite_gates: std::collections::HashMap<
             CompositeType,
             Vec<(u32, crate::omiq::deserialise::AtomicContainer)>,
@@ -930,7 +935,10 @@ impl<Lens> Store<GateState, Lens> {
         let mut primary_gates = vec![];
         let mut boolean_gates = vec![];
         // step 1 is to separate the composite gates from the primary gates
-        for container in experiment.tree.filter_containers.values() {
+        for (id, container) in &experiment.tree.filter_containers {
+            if !reachable.contains(id){
+                continue
+            }
             let container = match container {
                 FilterContainer::Atomic(atomic_container) => atomic_container,
                 FilterContainer::Compound(compound_container) => {
@@ -982,8 +990,29 @@ impl<Lens> Store<GateState, Lens> {
 
         let mut w = self.write();
 
+        let mut sorted_nodes: Vec<_> = experiment.tree.nodes.values().collect();
+
+        // 2. Sort nodes by their depth in the tree
+        // This ensures parents always exist before children
+        sorted_nodes.sort_by_cached_key(|node| {
+            let mut depth = 0;
+            let mut current_parent: &str = &node.parent_id;
+            
+            // Walk up the tree to the root to find the depth
+            while current_parent != "" {
+                if let Some(parent) = experiment.tree.nodes.get(current_parent) {
+                    current_parent = &parent.parent_id;
+                    depth += 1;
+                } else {
+                    // Parent ID exists but isn't in the map (shouldn't happen with clean data)
+                    break;
+                }
+            }
+            depth
+        });
+
         // build the hierarchy first.
-        for (_node_id, node) in experiment.tree.nodes {
+        for node in sorted_nodes.into_iter() {
             // deal with composites - you need to add the sub-gates not the gates
             let parent_id = if *"" != *node.parent_id {
                 node_to_gate_id
@@ -996,7 +1025,8 @@ impl<Lens> Store<GateState, Lens> {
                 ROOTGATE.clone()
             };
             w.hierarchy
-                .add_gate_child(parent_id, node.filter_container_id, Some(node.ord))?;
+                .add_gate_child(parent_id, node.filter_container_id.clone(), Some(node.ord))?;
+            node_to_gate_id.insert(node.id.clone(), node.filter_container_id.clone());
         }
 
         // 3. Iterate through the primary gates containers and process them
@@ -1011,7 +1041,7 @@ impl<Lens> Store<GateState, Lens> {
                         let gate_id = gate.get_id();
                         let parent =
                             w.hierarchy.get_parent(&gate_id).cloned().ok_or_else(|| {
-                                anyhow::anyhow!("Could not locate parent in hierarchy")
+                                anyhow::anyhow!("Could not locate parent of {} in hierarchy", gate_id)
                             })?;
                         let params = gate.get_params();
                         let key = GatesOnPlotKey::new(params.0, params.1, Some(parent));
@@ -1053,7 +1083,7 @@ impl<Lens> Store<GateState, Lens> {
                                 .get_parent(any_subgate)
                                 .cloned()
                                 .ok_or_else(|| {
-                                    anyhow::anyhow!("Could not locate parent in hierarchy")
+                                    anyhow::anyhow!("Could not locate parent of subgate {} in hierarchy", any_subgate)
                                 })?;
                         let params = gate.get_params();
                         let key = GatesOnPlotKey::new(params.0, params.1, Some(parent));
@@ -1129,4 +1159,23 @@ impl<Lens> Store<GateState, Lens> {
 
         Ok(())
     }
+}
+
+// Collect all reachable filterContainer IDs from the tree nodes,
+// recursively following CompoundFilterContainer sub-ids.
+fn collect_reachable(
+    fc_id: &str,
+    filter_containers: &std::collections::HashMap<Arc<str>, FilterContainer>,
+    reachable: &mut rustc_hash::FxHashSet<Arc<str>>,
+) {
+    if !reachable.insert(fc_id.into()) {
+        return; // already visited
+    }
+
+    if let Some(FilterContainer::Compound(c)) = filter_containers.get(fc_id) {
+        for sub_id in &c.filter_container_ids {
+            collect_reachable(sub_id, filter_containers, reachable);
+        }
+    }
+    
 }

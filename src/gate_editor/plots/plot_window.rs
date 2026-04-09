@@ -38,11 +38,11 @@ pub fn PlotWindow(
     let mut axis_store = use_context::<Store<AxisStore, CopyValue<AxisStore, SyncStorage>>>();
 
     // RESOURCE 1: Load FCS File
-    let mut fcs_file: Signal<Option<flow_fcs::Fcs>> = use_signal(|| None);
+    let mut fcs_file: SyncSignal<Option<flow_fcs::Fcs>> = use_signal_sync(|| None);
     let _ = use_resource(move || async move {
-        let sample = &*sample_stub.read();
+        let sample_path = sample_stub.read().get_filepath().to_owned();
 
-        let Some(file_name) = sample.get_filepath().file_name() else {
+        let Some(file_name) = sample_path.file_name() else {
             return;
         };
         let Some(file_name) = file_name.to_str() else {
@@ -57,7 +57,7 @@ pub fn PlotWindow(
             return;
         };
 
-        match get_flow_data(std::path::PathBuf::from(sample.get_filepath())).await {
+        match get_flow_data(sample_path).await {
             Ok(f) => {
                 *plot_store.current_file_id().write() = id.clone();
                 fcs_file.set(Some(f))
@@ -69,32 +69,34 @@ pub fn PlotWindow(
         }
     });
 
-    use_effect(move || {
-        if let Some(fcs_file) = &*fcs_file.read() {
-            let mut sorted_settings = indexmap::IndexSet::with_hasher(rustc_hash::FxBuildHasher);
+    // not currently used - but rejig if it is needed!
+    // use_effect(move || {
+    //     // if let Some(fcs_file) = &*fcs_file.read() {
+    //     if let Some(fcs_file) = fcs_file() {
+    //         let mut sorted_settings = indexmap::IndexSet::with_hasher(rustc_hash::FxBuildHasher);
 
-            // 1. Get the parameters and sort them by their internal FCS parameter number once
-            let mut params_to_add: Vec<_> = fcs_file.parameters.values().collect();
-            params_to_add.sort_by_key(|p| p.parameter_number);
+    //         // 1. Get the parameters and sort them by their internal FCS parameter number once
+    //         let mut params_to_add: Vec<_> = fcs_file.parameters.values().collect();
+    //         params_to_add.sort_by_key(|p| p.parameter_number);
 
-            // 2. Iterate and update the store
-            for fcs_param in params_to_add {
-                let p = Param {
-                    marker: fcs_param.label_name.clone(),
-                    fluoro: fcs_param.channel_name.clone(),
-                };
+    //         // 2. Iterate and update the store
+    //         for fcs_param in params_to_add {
+    //             let p = Param {
+    //                 marker: fcs_param.label_name.clone(),
+    //                 fluoro: fcs_param.channel_name.clone(),
+    //             };
 
-                // Add settings to the FxHashMap if not present
-                axis_store.add_new_default_axis_settings(&p, fcs_file);
+    //             // Add settings to the FxHashMap if not present
+    //             axis_store.add_new_default_axis_settings(&p, &fcs_file);
 
-                // Insert into the IndexSet (Order is preserved automatically)
-                sorted_settings.insert(p.clone());
-            }
+    //             // Insert into the IndexSet (Order is preserved automatically)
+    //             sorted_settings.insert(p.clone());
+    //         }
 
-            // 3. Update the store's set
-            *axis_store.sorted_settings().write() = sorted_settings;
-        }
-    });
+    //         // 3. Update the store's set
+    //         *axis_store.sorted_settings().write() = sorted_settings;
+    //     }
+    // });
 
     // this is currently scaling the data but filtering is done elsewhere!
     let scaled_data = use_resource(move || async move {
@@ -105,26 +107,24 @@ pub fn PlotWindow(
             }
         }
 
-        if let Some(fcs_file) = &*fcs_file.read() {
-            let fcs_clone = fcs_file.clone();
-            let result =
-                tokio::task::spawn_blocking(move || -> Result<Arc<DataFrame>, anyhow::Error> {
-                    let param_refs: Vec<(&str, f32)> =
-                        params.iter().map(|(k, v)| (k.as_ref(), *v)).collect();
-                    let scaled_df = fcs_clone.apply_arcsinh_transforms(param_refs.as_slice())?;
-                    let df_with_index = scaled_df.with_row_index("original_index".into(), None)?;
+        if fcs_file.read().is_none() {return Err(anyhow::anyhow!("No data to scale"))};
 
-                    Ok(Arc::new(df_with_index))
-                })
-                .await;
+        let result =
+            tokio::task::spawn_blocking(move || -> Result<Arc<DataFrame>, anyhow::Error> {
+                let param_refs: Vec<(&str, f32)> =
+                    params.iter().map(|(k, v)| (k.as_ref(), *v)).collect();
+                let scaled_df = &*fcs_file.read().as_ref().unwrap().apply_arcsinh_transforms(param_refs.as_slice())?;
+                let df_with_index = scaled_df.with_row_index("original_index".into(), None)?;
 
-            match result {
-                Ok(d) => d,
-                Err(_) => Err(anyhow::anyhow!("error scaling data")),
-            }
-        } else {
-            Err(anyhow::anyhow!("No data to scale"))
+                Ok(Arc::new(df_with_index))
+            })
+            .await;
+
+        match result {
+            Ok(d) => d,
+            Err(_) => Err(anyhow::anyhow!("error scaling data")),
         }
+        
     });
 
     // fetch the axis limits from the settings dict when axis changed
@@ -173,7 +173,15 @@ pub fn PlotWindow(
                 let Ok(resolver) = resolver.peek().clone() else {
                     return Err(anyhow::anyhow!("No resolver"));
                 };
-                if let Some(Ok(d)) = &*scaled_data.read() {
+
+                let d = scaled_data.read().as_ref()
+                    .and_then(|res| res.as_ref().ok())
+                    .cloned();
+
+                let Some(d) = d else { 
+                    plot_data_signal.set(vec![]);
+                    return Err(anyhow::anyhow!("No data yet"))
+                };
                     let filtered_data =
                         match get_filtered_dataframe(d.clone(), parental, resolver).await {
                             Ok(d) => d.clone(),
@@ -190,10 +198,7 @@ pub fn PlotWindow(
                     };
 
                     Ok(filtered_data)
-                } else {
-                    plot_data_signal.set(vec![]);
-                    Err(anyhow::anyhow!("No data yet"))
-                }
+                
             }
         });
 
@@ -306,4 +311,5 @@ pub fn PlotWindow(
         
         }
     }
+
 }

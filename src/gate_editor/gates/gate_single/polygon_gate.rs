@@ -272,25 +272,26 @@ impl DrawableGate for PolygonGate {
         let mut labels = vec![];
 
         if let Some(gate_stats) = gate_stats {
-            let x_offset = {
-                let axis = plot_map.x_axis_min_max();
-                let xrange = *axis.end() - *axis.start();
-                if let Some(label_pos) = &self.inner.label_position {
-                    xrange * label_pos.offset_x
-                } else {
-                    0f32
-                }
-            };
-            let y_offset = {
-                let axis = plot_map.y_axis_min_max();
-                let yrange = *axis.end() - *axis.start();
-                if let Some(label_pos) = &self.inner.label_position {
-                    yrange * label_pos.offset_y
-                } else {
-                    0f32
-                }
-            };
-            let offset = (x_offset, y_offset);
+            // let x_offset = {
+            //     let axis = plot_map.x_axis_min_max();
+            //     let xrange = *axis.end() - *axis.start();
+            //     if let Some(label_pos) = &self.inner.label_position {
+            //         xrange * label_pos.offset_x
+            //     } else {
+            //         0f32
+            //     }
+            // };
+            // let y_offset = {
+            //     let axis = plot_map.y_axis_min_max();
+            //     let yrange = *axis.end() - *axis.start();
+            //     if let Some(label_pos) = &self.inner.label_position {
+            //         yrange * label_pos.offset_y
+            //     } else {
+            //         0f32
+            //     }
+            // };
+            // let offset = (x_offset, y_offset);
+            let offset = (0f32, 0f32);
             if let Some(percent) = gate_stats.get_percent_for_id(self.inner.id.clone()) {
                 let params = self.get_params();
                 let origin = self

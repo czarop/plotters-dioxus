@@ -6,7 +6,7 @@ use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use dioxus::prelude::*;
 
 use flow_plots::{
-    BasePlotOptions, ColorMaps, DensityPlot, DensityPlotOptions, Plot, render::RenderConfig,
+    BasePlotOptions, ColorMaps, DensityPlot, DensityPlotOptions, Plot, ScatterPlotData, render::RenderConfig
 };
 
 use crate::gate_editor::{AxisInfo, gates::draw_gates::GateLayer, plots::axis_store::PlotMapper};
@@ -24,14 +24,16 @@ pub fn PseudoColourPlot(
     use_context_provider::<Signal<Option<Arc<PlotMapper>>>>(|| plot_map);
 
     let render_result = use_resource(move || {
+        
+        let data_final: flow_plots::ScatterPlotData = ScatterPlotData{ points: data(), gate_ids: None, z_values: None };
         async move {
             let x_axis_info = x_axis_info();
             let y_axis_info = y_axis_info();
             let (width, height) = size();
-            let data = data();
 
             let result = tokio::task::spawn_blocking(
                 move || -> Result<(String, Arc<PlotMapper>), anyhow::Error> {
+                    let bounds = get_bounds(&data_final.points).ok_or_else(|| anyhow::anyhow!("Could not get bounds"))?;
                     let plot = DensityPlot::new();
                     let base_options = BasePlotOptions::new()
                         .width(width)
@@ -58,7 +60,7 @@ pub fn PseudoColourPlot(
                         )
                     };
 
-                    let bounds = get_bounds(&data).ok_or_else(|| anyhow::anyhow!("Could not get bounds"))?;
+                    
                     
 
                     let mapper = PlotMapper::new(
@@ -81,7 +83,7 @@ pub fn PseudoColourPlot(
                         .build()?;
 
                     let mut render_config = RenderConfig::default();
-                    let data_final: flow_plots::ScatterPlotData = data.into();
+                    
                     let plot_data = plot.render(data_final, &options, &mut render_config)?;
 
                     let base64_str = BASE64_STANDARD.encode(&plot_data);
@@ -141,6 +143,7 @@ pub fn PseudoColourPlot(
         }
 
     }
+
 }
 
 

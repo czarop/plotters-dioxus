@@ -206,7 +206,10 @@ pub fn MainWindow() -> Element {
                     upload_succeded.set(true);
                     Ok(())
                 }
-                Ok(Err(e)) => Err(e),
+                Ok(Err(e)) => {
+                    println!("{e}");
+                    Err(e)
+                },
                 Err(e) => Err(anyhow::anyhow!("Thread joined with error: {}", e)),
             }
         }
@@ -504,9 +507,16 @@ pub fn MainWindow() -> Element {
                 div {
                     NewGateButtons { callback: move |gate_type| current_gate_type.set(gate_type) }
                     {
-                        if let Some(files) = &*filehandler.read() {
-                            let sample_stub = files.file_list()[sample_index()].clone();
-                            let sample_stub2 = files.file_list()[sample_index() + 1].clone();
+                        let maybe_stubs = filehandler
+                            .read()
+                            .as_ref()
+                            .map(|files| {
+                                let list = files.file_list();
+                                let idx = sample_index();
+                                let idx2 = (idx + 1) % list.len();
+                                (list[idx].clone(), list[idx2].clone())
+                            });
+                        if let Some((sample_stub, sample_stub2)) = maybe_stubs {
                             rsx! {
                                 div { class: "gate-window-container",
                                     div { class: "gate-window",
